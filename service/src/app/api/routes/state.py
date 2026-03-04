@@ -7,5 +7,5 @@ router = APIRouter(prefix="/api", tags=["state"])
 
 
 @router.get("/state")
-async def get_state(runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def get_state(runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, object]:
     return runtime.snapshot()

@@ -7,5 +7,5 @@ router = APIRouter(prefix="/api/history", tags=["history"])
 
 
 @router.get("")
-async def get_history(runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def get_history(runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, object]:
     return runtime.history()

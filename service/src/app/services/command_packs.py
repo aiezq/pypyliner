@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeAlias, cast
 
 from src.app.core.constants import (
     CUSTOM_COMMAND_PACK_FILE,
@@ -20,6 +20,8 @@ from src.app.services.runtime import ServiceError
 
 _IDENTIFIER_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 _SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
+JsonObject: TypeAlias = dict[str, Any]
+CommandItem: TypeAlias = dict[str, str]
 
 
 class CommandPackManager:
@@ -97,7 +99,7 @@ class CommandPackManager:
             ) from error
 
         pack_id = self._slugify(parsed.pack_id, Path(source_name).stem or "pack")
-        commands = []
+        commands: list[CommandItem] = []
         used_ids: set[str] = set()
         for index, command in enumerate(parsed.commands, start=1):
             base_id = command.id or command.name or f"cmd_{index}"
@@ -147,7 +149,7 @@ class CommandPackManager:
 
         if not isinstance(payload, dict):
             raise ServiceError(status_code=400, detail=f"Pack file '{path.name}' must contain a JSON object")
-        return payload
+        return cast(JsonObject, payload)
 
     def list_command_packs(self) -> dict[str, Any]:
         packs: list[dict[str, Any]] = []
@@ -189,13 +191,14 @@ class CommandPackManager:
     def create_template(self, payload: CommandTemplateCreatePayload) -> dict[str, Any]:
         target_pack_id = self._slugify(payload.pack_id or "custom", "custom")
         target_file = self._custom_pack_file if target_pack_id == "custom" else self._packs_dir / f"{target_pack_id}.json"
+        pack_commands: list[CommandItem]
 
         if target_file.exists():
             raw_pack = self._read_json_file(target_file)
             parsed_pack = self._validate_pack(raw_pack, target_file.name)
             pack_commands = [
                 {
-                    "id": item.id,
+                    "id": item.id or "",
                     "name": item.name,
                     "command": item.command,
                     "description": item.description,
@@ -522,7 +525,7 @@ class CommandPackManager:
         if not isinstance(raw_json, dict):
             raise ServiceError(status_code=400, detail="Import payload must contain a JSON object")
 
-        parsed_pack = self._validate_pack(raw_json, payload.file_name or "import.json")
+        parsed_pack = self._validate_pack(cast(JsonObject, raw_json), payload.file_name or "import.json")
         file_name = payload.file_name or f"{parsed_pack.pack_id}.json"
         safe_name = self._safe_file_name(file_name)
         file_path = self._packs_dir / safe_name

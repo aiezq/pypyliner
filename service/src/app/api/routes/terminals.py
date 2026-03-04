@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
@@ -23,7 +24,7 @@ def _read_text(path: Path) -> str:
 
 
 @router.get("")
-async def get_terminals(runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def get_terminals(runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, Any]:
     return {"manual_terminals": runtime.list_manual_terminals()}
 
 
@@ -31,7 +32,7 @@ async def get_terminals(runtime: RuntimeManager = Depends(get_runtime)) -> dict:
 async def create_terminal(
     payload: ManualTerminalCreatePayload,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     return await runtime.create_manual_terminal(payload)
 
 
@@ -40,7 +41,7 @@ async def run_terminal_command(
     terminal_id: str,
     payload: ManualTerminalCommandPayload,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await runtime.run_manual_terminal_command(terminal_id, payload)
     except ServiceError as error:
@@ -52,7 +53,7 @@ async def complete_terminal_command(
     terminal_id: str,
     payload: ManualTerminalAutocompletePayload,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await runtime.complete_manual_terminal_command(terminal_id, payload)
     except ServiceError as error:
@@ -64,7 +65,7 @@ async def rename_terminal(
     terminal_id: str,
     payload: ManualTerminalRenamePayload,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await runtime.rename_manual_terminal(terminal_id, payload)
     except ServiceError as error:
@@ -75,7 +76,7 @@ async def rename_terminal(
 async def stop_terminal(
     terminal_id: str,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await runtime.stop_manual_terminal(terminal_id)
     except ServiceError as error:
@@ -86,7 +87,7 @@ async def stop_terminal(
 async def clear_terminal(
     terminal_id: str,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await runtime.clear_manual_terminal(terminal_id)
     except ServiceError as error:
@@ -97,7 +98,7 @@ async def clear_terminal(
 async def close_terminal(
     terminal_id: str,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     try:
         await runtime.close_manual_terminal(terminal_id)
         return {"deleted": True, "terminal_id": terminal_id}

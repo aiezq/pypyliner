@@ -3,6 +3,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from threading import Lock
+from typing import TypeAlias
+
+SerializedRecord: TypeAlias = dict[str, object]
+SerializedRecords: TypeAlias = list[SerializedRecord]
 
 
 class HistoryDatabase:
@@ -202,7 +206,12 @@ class HistoryDatabase:
             )
             conn.commit()
 
-    def fetch_history(self, *, runs_limit: int = 200, terminal_limit: int = 300) -> dict:
+    def fetch_history(
+        self,
+        *,
+        runs_limit: int = 200,
+        terminal_limit: int = 300,
+    ) -> SerializedRecord:
         with self._lock:
             conn = self._connect()
             run_rows = conn.execute(
@@ -216,7 +225,7 @@ class HistoryDatabase:
             ).fetchall()
 
             run_ids = [row["id"] for row in run_rows]
-            sessions_by_run: dict[str, list[dict]] = {run_id: [] for run_id in run_ids}
+            sessions_by_run: dict[str, SerializedRecords] = {run_id: [] for run_id in run_ids}
             if run_ids:
                 placeholders = ",".join("?" for _ in run_ids)
                 session_rows = conn.execute(
@@ -264,7 +273,7 @@ class HistoryDatabase:
                 (terminal_limit,),
             ).fetchall()
 
-            terminals_history: list[dict] = []
+            terminals_history: SerializedRecords = []
             for row in terminal_rows:
                 command_rows = conn.execute(
                     """

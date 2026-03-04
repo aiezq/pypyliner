@@ -7,7 +7,7 @@ import shlex
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Literal
+from typing import Awaitable, Callable, Literal, TypeAlias, TypeVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -34,6 +34,10 @@ from src.app.services.history_db import HistoryDatabase
 StreamType = Literal["out", "err", "meta"]
 StatusType = Literal["idle", "pending", "running", "success", "failed", "stopped"]
 RunStatusType = Literal["running", "success", "failed", "stopped"]
+SerializedRecord: TypeAlias = dict[str, object]
+SerializedRecords: TypeAlias = list[SerializedRecord]
+EventPayload: TypeAlias = SerializedRecord
+T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -50,6 +54,10 @@ class TerminalLine:
     created_at: str
 
 
+def _new_line_buffer() -> list[TerminalLine]:
+    return []
+
+
 @dataclass(slots=True)
 class PipelineSessionState:
     id: str
@@ -58,7 +66,7 @@ class PipelineSessionState:
     command: str
     status: StatusType
     exit_code: int | None
-    lines: list[TerminalLine] = field(default_factory=list)
+    lines: list[TerminalLine] = field(default_factory=_new_line_buffer)
 
 
 @dataclass(slots=True)
@@ -85,7 +93,7 @@ class ManualTerminalState:
     created_at: str
     log_file_path: Path
     draft_command: str = ""
-    lines: list[TerminalLine] = field(default_factory=list)
+    lines: list[TerminalLine] = field(default_factory=_new_line_buffer)
     stop_requested: bool = False
     current_process: asyncio.subprocess.Process | None = None
 
@@ -104,12 +112,12 @@ class EventHub:
         async with self._lock:
             self._clients.discard(websocket)
 
-    async def broadcast(self, event_type: str, data: dict) -> None:
+    async def broadcast(self, event_type: str, data: EventPayload) -> None:
         async with self._lock:
             clients = tuple(self._clients)
 
         stale_clients: list[WebSocket] = []
-        payload = {"type": event_type, "data": data}
+        payload: SerializedRecord = {"type": event_type, "data": dict(data)}
         for client in clients:
             try:
                 await client.send_json(payload)
@@ -130,7 +138,7 @@ def make_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:10]}"
 
 
-def append_with_limit(items: list, item: object, max_size: int = MAX_LINES_IN_MEMORY) -> None:
+def append_with_limit(items: list[T], item: T, max_size: int = MAX_LINES_IN_MEMORY) -> None:
     items.append(item)
     if len(items) > max_size:
         del items[: len(items) - max_size]
@@ -156,7 +164,7 @@ class RuntimeManager:
             asyncio.to_thread(TERMINAL_LOGS_DIR.mkdir, parents=True, exist_ok=True),
         )
 
-    def _serialize_line(self, line: TerminalLine) -> dict:
+    def _serialize_line(self, line: TerminalLine) -> SerializedRecord:
         return {
             "id": line.id,
             "stream": line.stream,
@@ -164,7 +172,7 @@ class RuntimeManager:
             "created_at": line.created_at,
         }
 
-    def _serialize_session(self, session: PipelineSessionState) -> dict:
+    def _serialize_session(self, session: PipelineSessionState) -> SerializedRecord:
         return {
             "id": session.id,
             "step_id": session.step_id,
@@ -175,7 +183,7 @@ class RuntimeManager:
             "lines": [self._serialize_line(line) for line in session.lines],
         }
 
-    def _serialize_run(self, run: PipelineRunState) -> dict:
+    def _serialize_run(self, run: PipelineRunState) -> SerializedRecord:
         return {
             "id": run.id,
             "pipeline_name": run.pipeline_name,
@@ -186,7 +194,7 @@ class RuntimeManager:
             "sessions": [self._serialize_session(session) for session in run.sessions],
         }
 
-    def _serialize_terminal(self, terminal: ManualTerminalState) -> dict:
+    def _serialize_terminal(self, terminal: ManualTerminalState) -> SerializedRecord:
         return {
             "id": terminal.id,
             "title": terminal.title,
@@ -200,7 +208,7 @@ class RuntimeManager:
             "lines": [self._serialize_line(line) for line in terminal.lines],
         }
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> SerializedRecord:
         return {
             "runs": self.list_runs(),
             "manual_terminals": [
@@ -209,7 +217,7 @@ class RuntimeManager:
             ],
         }
 
-    def list_runs(self) -> list[dict]:
+    def list_runs(self) -> SerializedRecords:
         ordered = sorted(
             self.runs.values(),
             key=lambda run: run.started_at,
@@ -217,18 +225,18 @@ class RuntimeManager:
         )
         return [self._serialize_run(run) for run in ordered]
 
-    def list_manual_terminals(self) -> list[dict]:
+    def list_manual_terminals(self) -> SerializedRecords:
         return [
             self._serialize_terminal(terminal)
             for terminal in self.manual_terminals.values()
         ]
 
-    def history(self) -> dict:
+    def history(self) -> SerializedRecord:
         if self.history_db is None:
             return {"runs": self.list_runs(), "manual_terminal_history": []}
         return self.history_db.fetch_history()
 
-    def get_run(self, run_id: str) -> dict:
+    def get_run(self, run_id: str) -> SerializedRecord:
         run = self.runs.get(run_id)
         if run is None:
             raise ServiceError(status_code=404, detail="Run not found")
@@ -699,7 +707,7 @@ class RuntimeManager:
         )
         await self._emit_terminal_status(terminal)
 
-    async def create_pipeline_run(self, payload: PipelineRunCreatePayload) -> dict:
+    async def create_pipeline_run(self, payload: PipelineRunCreatePayload) -> SerializedRecord:
         run_id = make_id("run")
         started_at = now_iso()
         log_file_path = RUN_LOGS_DIR / f"{run_id}.log"
@@ -833,7 +841,7 @@ class RuntimeManager:
         )
         await self._emit_run_status(run)
 
-    async def stop_pipeline_run(self, run_id: str) -> dict:
+    async def stop_pipeline_run(self, run_id: str) -> SerializedRecord:
         run = self.runs.get(run_id)
         if run is None:
             raise ServiceError(status_code=404, detail="Run not found")
@@ -846,7 +854,10 @@ class RuntimeManager:
             asyncio.create_task(self._terminate_process(run.current_process))
         return self._serialize_run(run)
 
-    async def create_manual_terminal(self, payload: ManualTerminalCreatePayload) -> dict:
+    async def create_manual_terminal(
+        self,
+        payload: ManualTerminalCreatePayload,
+    ) -> SerializedRecord:
         terminal_id = make_id("terminal")
         title = payload.title or self._next_manual_terminal_title()
         terminal = ManualTerminalState(
@@ -881,7 +892,7 @@ class RuntimeManager:
         self,
         terminal_id: str,
         payload: ManualTerminalCommandPayload,
-    ) -> dict:
+    ) -> SerializedRecord:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -921,7 +932,7 @@ class RuntimeManager:
         self,
         terminal_id: str,
         payload: ManualTerminalAutocompletePayload,
-    ) -> dict:
+    ) -> SerializedRecord:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -953,7 +964,7 @@ class RuntimeManager:
             "matches": matches,
         }
 
-    async def stop_manual_terminal(self, terminal_id: str) -> dict:
+    async def stop_manual_terminal(self, terminal_id: str) -> SerializedRecord:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -981,7 +992,7 @@ class RuntimeManager:
         self,
         terminal_id: str,
         payload: ManualTerminalRenamePayload,
-    ) -> dict:
+    ) -> SerializedRecord:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -1005,7 +1016,7 @@ class RuntimeManager:
         )
         return self._serialize_terminal(terminal)
 
-    async def clear_manual_terminal(self, terminal_id: str) -> dict:
+    async def clear_manual_terminal(self, terminal_id: str) -> SerializedRecord:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
