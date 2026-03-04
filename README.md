@@ -86,10 +86,20 @@ Useful flags:
 - `--api-base-url <url>`
 - `--skip-setup`
 
+`make dev` now checks Node.js toolchain automatically.
+If `node` is missing, `scripts/dev.sh` will try to install it via system package manager
+(`brew` on macOS, `apt/dnf/yum/pacman/zypper` on Linux).
+
 One-time dependency setup only:
 
 ```bash
 make setup
+```
+
+Quick git update:
+
+```bash
+make update
 ```
 
 Direct runner help:
