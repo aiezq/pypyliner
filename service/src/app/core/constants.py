@@ -1,0 +1,19 @@
+from pathlib import Path
+
+SERVICE_DIR = Path(__file__).resolve().parents[3]
+LOGS_DIR = SERVICE_DIR / "logs"
+DATA_DIR = SERVICE_DIR / "data"
+RUN_LOGS_DIR = LOGS_DIR / "runs"
+TERMINAL_LOGS_DIR = LOGS_DIR / "terminals"
+HISTORY_DB_PATH = DATA_DIR / "history.sqlite3"
+COMMAND_PACKS_DIR = SERVICE_DIR / "command_packs"
+PIPELINE_FLOWS_DIR = SERVICE_DIR / "pipeline_flows"
+DEFAULT_COMMAND_PACK_FILE = COMMAND_PACKS_DIR / "default.json"
+CUSTOM_COMMAND_PACK_FILE = COMMAND_PACKS_DIR / "custom.json"
+
+MAX_LINES_IN_MEMORY = 600
+SHELL_EXECUTABLE = "/bin/bash"
+DEFAULT_MANUAL_TERMINAL_COMMAND = f"{SHELL_EXECUTABLE} --noprofile --norc"
+DEFAULT_MANUAL_TERMINAL_CWD = Path.home()
+PROMPT_STATE_MARKER = "__OPERATOR_HELPER_PROMPT__"
+PIPELINE_OPEN_TERMINAL_COMMAND = "operator:create_terminal"

@@ -1,0 +1,13 @@
+{
+  "pack_id": "core",
+  "pack_name": "Core Commands",
+  "description": "Built-in command templates.",
+  "commands": [
+    {
+      "id": "open_terminal",
+      "name": "Open terminal shell",
+      "command": "operator:create_terminal",
+      "description": "Создает новый интерактивный терминал в приложении."
+    }
+  ]
+}
