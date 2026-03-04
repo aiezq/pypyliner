@@ -1,6 +1,7 @@
 import { formatTime } from '../lib/mappers'
 import type { BackendManualTerminalHistory, RunState } from '../types'
 
+
 interface HistoryPanelProps {
   runs: RunState[]
   terminalHistory: BackendManualTerminalHistory[]

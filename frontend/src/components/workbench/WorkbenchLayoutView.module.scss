@@ -1,0 +1,111 @@
+  .layout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .layout--workbench {
+    align-items: flex-start;
+  }
+
+  .workbenchSlot {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+    position: relative;
+  }
+
+  .workbenchSlot--flow {
+    grid-column: auto;
+  }
+
+  .workbenchSlot--fullWidth {
+    flex-basis: 100% !important;
+  }
+
+  .workbenchSlotToolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .workbenchSlotHandle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.26rem 0.56rem;
+    border: 1px solid rgba(126, 168, 231, 0.42);
+    border-radius: 999px;
+    background: rgba(7, 22, 43, 0.9);
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    user-select: none;
+    cursor: grab;
+  }
+
+  .workbenchSlotHandle:active {
+    cursor: grabbing;
+  }
+
+  .workbenchSlotToggle {
+    padding: 0.28rem 0.62rem;
+    border-radius: 999px;
+    border-color: rgba(130, 170, 232, 0.44);
+    background: rgba(10, 27, 52, 0.92);
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+  }
+
+  .workbenchSlot--dragging {
+    opacity: 0.82;
+  }
+
+  .workbenchSlot--dragover > .panel {
+    border-color: rgba(96, 224, 175, 0.65);
+    box-shadow: var(--shadow), inset 0 0 0 1px rgba(96, 224, 175, 0.44);
+  }
+
+  .workbenchSlotResizeHandle {
+    position: absolute;
+    top: 38px;
+    right: -6px;
+    bottom: 0;
+    width: 10px;
+    cursor: ew-resize;
+    z-index: 50;
+  }
+
+  .workbenchSlotResizeHandle::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 4px;
+    width: 2px;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      rgba(125, 174, 244, 0.1),
+      rgba(125, 174, 244, 0.7),
+      rgba(125, 174, 244, 0.1)
+    );
+  }
+
+  @media (max-width: 1060px) {
+    .layout {
+      display: block;
+    }
+
+    .workbenchSlotToolbar {
+      justify-content: flex-start;
+    }
+
+    .workbenchSlotResizeHandle {
+      display: none;
+    }
+  }

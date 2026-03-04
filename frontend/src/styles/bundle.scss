@@ -1,0 +1,12 @@
+@use './Base.module.scss';
+@use '../App.module.scss';
+@use '../components/HeaderBar.module.scss';
+@use '../components/HistoryPanel.module.scss';
+@use '../components/CommandPackImportModal.module.scss';
+@use '../components/PipelineFlowSettingsModal.module.scss';
+@use '../components/PipelineFlowPanel.module.scss';
+@use '../components/PipelineDock.module.scss';
+@use '../components/TerminalInstancesPanel.module.scss';
+@use '../components/TerminalWindowsLayer.module.scss';
+@use '../components/workbench/WorkbenchLayoutView.module.scss';
+@use '../components/workbench/WorkbenchPanelContent.module.scss';

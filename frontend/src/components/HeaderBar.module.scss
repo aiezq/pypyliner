@@ -1,0 +1,104 @@
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.2rem;
+    align-items: flex-start;
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 16% 18%, rgba(44, 84, 160, 0.33), transparent 45%),
+      radial-gradient(circle at 88% 75%, rgba(14, 117, 88, 0.28), transparent 48%),
+      linear-gradient(130deg, rgba(15, 25, 50, 0.86), rgba(8, 20, 41, 0.92));
+    padding: 1.3rem 1.55rem;
+    box-shadow: var(--shadow);
+  }
+
+  .hero h1 {
+    margin: 0.3rem 0;
+    font-size: clamp(1.4rem, 2.2vw, 2rem);
+    letter-spacing: 0.04em;
+  }
+
+  .hero__kicker {
+    margin: 0;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+  }
+
+  .hero__subtitle {
+    margin: 0.2rem 0 0;
+    color: var(--muted);
+    max-width: 700px;
+  }
+
+  .hero__badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .hero__right {
+    display: grid;
+    justify-items: end;
+    gap: 0.7rem;
+  }
+
+  .hero__badges span {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .badge--ok {
+    border-color: rgba(96, 224, 175, 0.55) !important;
+    color: #86f1c5 !important;
+  }
+
+  .badge--warn {
+    border-color: rgba(239, 201, 120, 0.55) !important;
+    color: #ffd983 !important;
+  }
+
+  .hero__actionButton {
+    border-color: rgba(91, 128, 184, 0.56);
+    background: linear-gradient(130deg, rgba(20, 78, 93, 0.92), rgba(23, 79, 143, 0.95));
+    border-radius: 10px;
+    padding: 0.42rem 0.72rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .hero__actionButton--newTerminal {
+    border-color: rgba(97, 185, 142, 0.58);
+    background: linear-gradient(130deg, rgba(20, 106, 77, 0.92), rgba(16, 132, 90, 0.95));
+  }
+
+  .hero__actionButton--settings {
+    border-color: rgba(157, 184, 224, 0.5);
+    background: linear-gradient(130deg, rgba(17, 43, 78, 0.9), rgba(19, 60, 105, 0.93));
+  }
+
+  .hero__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 1060px) {
+    .hero {
+      flex-direction: column;
+    }
+
+    .hero__right,
+    .hero__actions,
+    .hero__badges {
+      justify-items: start;
+      justify-content: flex-start;
+    }
+  }

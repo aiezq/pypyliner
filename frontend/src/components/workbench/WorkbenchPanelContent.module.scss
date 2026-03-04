@@ -1,0 +1,201 @@
+  .pinnedTerminalPanel {
+    display: grid;
+    gap: 0.65rem;
+    min-height: 260px;
+  }
+
+  .pinnedTerminalHeadActions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pinnedTerminalPanel .section__head {
+    align-items: center;
+  }
+
+  .pinnedTerminalHeadActions .terminalWindowControl {
+    flex: 0 0 auto;
+  }
+
+  .pinnedTerminalTitle {
+    min-width: 0;
+  }
+
+  .pinnedTerminalTitleMain {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .pinnedTerminalTitleMain h2 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .terminalActions {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .terminalPrompt {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: #a5f4c8;
+    border: 1px solid rgba(94, 162, 126, 0.35);
+    border-radius: 10px;
+    background: rgba(16, 42, 33, 0.55);
+    padding: 0.56rem 0.65rem;
+    white-space: nowrap;
+  }
+
+  .terminalCommandInputWrap {
+    position: relative;
+    flex: 1 1 320px;
+    min-width: 220px;
+  }
+
+  .terminalCommandInputWrap input {
+    width: 100%;
+    padding-right: 4.9rem;
+  }
+
+  .terminalInputActions {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+  }
+
+  .terminalInputAction {
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border-radius: 9px;
+    border-color: rgba(126, 168, 231, 0.45);
+    background: rgba(8, 28, 52, 0.94);
+    display: grid;
+    place-items: center;
+  }
+
+  .terminalInputAction:hover:enabled {
+    transform: none;
+  }
+
+  .terminalInputActionIcon {
+    display: block;
+    line-height: 1;
+    font-size: 0.88rem;
+  }
+
+  .terminalInputAction--clear {
+    border-color: rgba(209, 126, 126, 0.56);
+    background: rgba(82, 30, 35, 0.95);
+    color: #ffd7d7;
+  }
+
+  .terminalInputAction--send {
+    border-color: rgba(96, 190, 126, 0.75);
+    background: linear-gradient(140deg, rgba(30, 144, 86, 0.96), rgba(28, 168, 93, 0.98));
+    color: #fff;
+  }
+
+  .terminalInputAction--send .terminalInputActionIcon {
+    font-size: 0.96rem;
+  }
+
+  .terminalFooterActions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .terminalCopyTailControl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .terminalCopyTailControl input {
+    width: 4.5rem;
+    padding: 0.34rem 0.44rem;
+    border-radius: 8px;
+    text-align: right;
+  }
+
+  .terminalFooterCopyButton {
+    padding: 0.42rem 0.62rem;
+    border-radius: 9px;
+    border-color: rgba(122, 167, 229, 0.48);
+    background: rgba(9, 30, 56, 0.94);
+    font-size: 0.76rem;
+  }
+
+  .terminalWindowControl {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border-color: rgba(132, 173, 231, 0.5);
+    background: rgba(9, 31, 58, 0.95);
+    color: var(--text);
+    line-height: 1;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .terminalWindowControl--danger {
+    border-color: rgba(236, 121, 121, 0.6);
+    background: rgba(102, 28, 34, 0.95);
+    color: #ffd2d2;
+  }
+
+  .terminalWindowControl--warning {
+    border-color: rgba(243, 179, 94, 0.62);
+    background: rgba(105, 66, 21, 0.95);
+    color: #ffe1b5;
+  }
+
+  .terminalWindowControl--pin {
+    border-color: rgba(109, 178, 243, 0.62);
+    background: rgba(25, 62, 111, 0.95);
+    color: #d5e9ff;
+  }
+
+  .terminalWindow__meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  @media (max-width: 1060px) {
+    .terminalActions {
+      align-items: stretch;
+    }
+
+    .terminalCommandInputWrap {
+      flex-basis: 100%;
+      min-width: 0;
+    }
+
+    .terminalFooterActions {
+      justify-content: flex-start;
+    }
+  }

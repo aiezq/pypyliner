@@ -1,3 +1,5 @@
+
+
 interface HeaderBarProps {
   isSocketConnected: boolean
   terminalInstancesCount: number

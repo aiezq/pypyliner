@@ -2,6 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from 'react'
 import { TemplateEditableValueSchema } from '../lib/schemas'
 import type { CommandTemplate } from '../types'
 
+
 type TemplateEditableField = 'name' | 'command'
 
 interface PipelineDockProps {

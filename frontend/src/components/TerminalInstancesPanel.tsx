@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { ManualTerminal, TerminalLine, TerminalSession } from '../types'
 
+
 interface TerminalInstancesPanelProps {
   runSessions: TerminalSession[]
   manualTerminals: ManualTerminal[]
