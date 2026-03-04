@@ -10,6 +10,8 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 API_BASE_URL="${API_BASE_URL:-}"
+NODE_INSTALL_DIR="${NODE_INSTALL_DIR:-$HOME/.local/operator-helper/node}"
+NODE_FALLBACK_VERSION="${NODE_FALLBACK_VERSION:-22.12.0}"
 
 SETUP_ONLY=0
 SKIP_SETUP=0
@@ -55,9 +57,131 @@ run_privileged() {
   exit 1
 }
 
+node_version_is_supported() {
+  if ! command -v node >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local version_raw
+  version_raw="$(node -v 2>/dev/null || true)"
+  version_raw="${version_raw#v}"
+  if [[ -z "$version_raw" ]]; then
+    return 1
+  fi
+
+  local major minor patch
+  IFS='.' read -r major minor patch <<<"$version_raw"
+  major="${major:-0}"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+
+  if (( major > 22 )); then
+    return 0
+  fi
+  if (( major == 22 )); then
+    (( minor >= 12 )) && return 0 || return 1
+  fi
+  if (( major == 20 )); then
+    (( minor >= 19 )) && return 0 || return 1
+  fi
+  return 1
+}
+
+print_node_version_mismatch() {
+  local detected
+  detected="$(node -v 2>/dev/null || echo "not found")"
+  echo "[setup] Node.js version is too old: ${detected}" >&2
+  echo "[setup] Vite requires Node.js >=20.19 or >=22.12." >&2
+}
+
+prepend_local_node_path() {
+  if [[ -d "$NODE_INSTALL_DIR/current/bin" ]]; then
+    case ":$PATH:" in
+      *":$NODE_INSTALL_DIR/current/bin:"*) ;;
+      *) PATH="$NODE_INSTALL_DIR/current/bin:$PATH" ;;
+    esac
+  fi
+}
+
+detect_node_archive_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "x64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    armv7l) echo "armv7l" ;;
+    *)
+      echo "Unsupported CPU architecture for auto node binary install: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+download_file() {
+  local url="$1"
+  local output="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$output"
+    return
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "$output" "$url"
+    return
+  fi
+  echo "Need curl or wget to download Node.js binary archive." >&2
+  exit 1
+}
+
+install_node_from_binary_archive() {
+  local os_name
+  os_name="$(uname -s)"
+  local platform
+  case "$os_name" in
+    Linux) platform="linux" ;;
+    Darwin) platform="darwin" ;;
+    *)
+      echo "Unsupported OS for binary Node.js bootstrap: $os_name" >&2
+      return 1
+      ;;
+  esac
+
+  local arch
+  arch="$(detect_node_archive_arch)" || return 1
+
+  local archive_name="node-v${NODE_FALLBACK_VERSION}-${platform}-${arch}.tar.xz"
+  local download_url="https://nodejs.org/download/release/v${NODE_FALLBACK_VERSION}/${archive_name}"
+
+  echo "[setup] Installing Node.js v${NODE_FALLBACK_VERSION} to ${NODE_INSTALL_DIR} (no apt-get update)"
+  mkdir -p "$NODE_INSTALL_DIR"
+
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+  local archive_path="$temp_dir/$archive_name"
+
+  download_file "$download_url" "$archive_path"
+  tar -xJf "$archive_path" -C "$temp_dir"
+
+  local extracted_dir="$temp_dir/node-v${NODE_FALLBACK_VERSION}-${platform}-${arch}"
+  if [[ ! -d "$extracted_dir/bin" ]]; then
+    echo "Downloaded archive has unexpected layout: $archive_name" >&2
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  local target_dir="$NODE_INSTALL_DIR/node-v${NODE_FALLBACK_VERSION}-${platform}-${arch}"
+  rm -rf "$target_dir"
+  mkdir -p "$NODE_INSTALL_DIR"
+  mv "$extracted_dir" "$target_dir"
+  ln -sfn "$target_dir" "$NODE_INSTALL_DIR/current"
+  rm -rf "$temp_dir"
+
+  prepend_local_node_path
+  if command -v node >/dev/null 2>&1; then
+    echo "[setup] Node.js installed: $(node -v)"
+  fi
+}
+
 install_node_macos() {
   if command -v brew >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via Homebrew"
+    echo "[setup] Installing/upgrading Node.js via Homebrew"
     brew install node
     return
   fi
@@ -66,30 +190,48 @@ install_node_macos() {
   exit 1
 }
 
+install_node_linux_apt() {
+  echo "[setup] Installing/upgrading Node.js via apt (without apt-get update)"
+  run_privileged apt-get -f install -y || true
+  run_privileged apt-get install -y nodejs npm || true
+}
+
+install_node_linux_dnf() {
+  echo "[setup] Installing/upgrading Node.js 22.x via NodeSource (dnf)"
+  curl -fsSL https://rpm.nodesource.com/setup_22.x | run_privileged bash -
+  run_privileged dnf install -y nodejs
+}
+
+install_node_linux_yum() {
+  echo "[setup] Installing/upgrading Node.js 22.x via NodeSource (yum)"
+  curl -fsSL https://rpm.nodesource.com/setup_22.x | run_privileged bash -
+  run_privileged yum install -y nodejs
+}
+
 install_node_linux() {
+  if install_node_from_binary_archive; then
+    return
+  fi
+
   if command -v apt-get >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via apt-get"
-    run_privileged apt-get update
-    run_privileged apt-get install -y nodejs npm
+    install_node_linux_apt
     return
   fi
   if command -v dnf >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via dnf"
-    run_privileged dnf install -y nodejs npm
+    install_node_linux_dnf
     return
   fi
   if command -v yum >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via yum"
-    run_privileged yum install -y nodejs npm
+    install_node_linux_yum
     return
   fi
   if command -v pacman >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via pacman"
+    echo "[setup] Installing/upgrading Node.js via pacman"
     run_privileged pacman -Sy --noconfirm nodejs npm
     return
   fi
   if command -v zypper >/dev/null 2>&1; then
-    echo "[setup] Installing Node.js via zypper"
+    echo "[setup] Installing/upgrading Node.js via zypper"
     run_privileged zypper --non-interactive install nodejs npm
     return
   fi
@@ -99,19 +241,24 @@ install_node_linux() {
 }
 
 ensure_node_toolchain() {
-  if command -v node >/dev/null 2>&1 && \
+  prepend_local_node_path
+  if node_version_is_supported && \
     (command -v pnpm >/dev/null 2>&1 || command -v npm >/dev/null 2>&1); then
     return
   fi
 
-  echo "[setup] Node.js toolchain is missing. Attempting automatic install..."
+  if command -v node >/dev/null 2>&1; then
+    print_node_version_mismatch
+  else
+    echo "[setup] Node.js toolchain is missing. Attempting automatic install..."
+  fi
 
   case "$(uname -s)" in
     Darwin)
-      install_node_macos
+      install_node_macos || true
       ;;
     Linux)
-      install_node_linux
+      install_node_linux || true
       ;;
     *)
       echo "Unsupported OS for automatic Node.js installation: $(uname -s)" >&2
@@ -120,8 +267,16 @@ ensure_node_toolchain() {
       ;;
   esac
 
-  if ! command -v node >/dev/null 2>&1; then
-    echo "Node.js installation finished, but 'node' is still not available in PATH." >&2
+  prepend_local_node_path
+
+  if ! node_version_is_supported; then
+    install_node_from_binary_archive || true
+  fi
+
+  if ! node_version_is_supported; then
+    print_node_version_mismatch
+    echo "Automatic install did not provide required Node.js version." >&2
+    echo "Please install Node.js 22 LTS manually and re-run make dev." >&2
     exit 1
   fi
   if ! command -v pnpm >/dev/null 2>&1 && ! command -v npm >/dev/null 2>&1; then
