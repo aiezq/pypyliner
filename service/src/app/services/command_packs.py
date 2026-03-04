@@ -2,19 +2,29 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypeAlias, cast
 
-from src.app.core.constants import (
-    CUSTOM_COMMAND_PACK_FILE,
-    DEFAULT_COMMAND_PACK_FILE,
-    PIPELINE_OPEN_TERMINAL_COMMAND,
-)
+from sqlmodel import Session, select
+
+from src.app.core.constants import PIPELINE_OPEN_TERMINAL_COMMAND
+from src.app.core.database import session_scope
+from src.app.core.settings import get_settings
+from src.app.models.db import CommandPackRecord, CommandTemplateRecord
 from src.app.schemas.command_pack import (
     CommandPackFilePayload,
     CommandPackImportPayload,
     CommandTemplateCreatePayload,
     CommandTemplateUpdatePayload,
+)
+from src.app.schemas.service_types import (
+    CommandPackData,
+    CommandPackImportData,
+    CommandPackListData,
+    CommandTemplateData,
+    CommandTemplateDeleteData,
+    CommandTemplateMutationData,
 )
 from src.app.services.runtime import ServiceError
 
@@ -22,19 +32,112 @@ _IDENTIFIER_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 _SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 JsonObject: TypeAlias = dict[str, Any]
 CommandItem: TypeAlias = dict[str, str]
+TEMPLATE_POSITION_COLUMN: Any = cast(Any, CommandTemplateRecord).position
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class CommandPackManager:
     def __init__(self) -> None:
-        self._default_pack_file = DEFAULT_COMMAND_PACK_FILE
-        self._custom_pack_file = CUSTOM_COMMAND_PACK_FILE
-        self._packs_dir = DEFAULT_COMMAND_PACK_FILE.parent
+        self._legacy_packs_dir = get_settings().command_packs_dir
 
     async def ensure_ready(self) -> None:
-        self._packs_dir.mkdir(parents=True, exist_ok=True)
-        if self._default_pack_file.exists():
+        with session_scope() as session:
+            existing = session.exec(select(CommandPackRecord.pack_id)).first()
+            if existing is None:
+                self._bootstrap_from_legacy_files(session)
+
+            core = session.get(CommandPackRecord, "core")
+            if core is None:
+                self._insert_core_pack(session)
+                session.commit()
+
+    def _insert_core_pack(self, session: Session) -> None:
+        payload = self._default_pack_payload()
+        parsed = CommandPackFilePayload.model_validate(payload)
+        timestamp = _now_iso()
+        session.add(
+            CommandPackRecord(
+                pack_id="core",
+                pack_name=parsed.pack_name,
+                description=parsed.description,
+                source_name="default.json",
+                is_core=True,
+                updated_at=timestamp,
+            )
+        )
+        for index, item in enumerate(parsed.commands, start=1):
+            session.add(
+                CommandTemplateRecord(
+                    pack_id="core",
+                    template_id=item.id or f"cmd_{index}",
+                    name=item.name,
+                    command=item.command,
+                    description=item.description,
+                    position=index,
+                )
+            )
+
+    def _bootstrap_from_legacy_files(self, session: Session) -> None:
+        legacy_dir = self._legacy_packs_dir
+        if not legacy_dir.exists():
             return
-        self._write_pack_file(self._default_pack_file, self._default_pack_payload())
+
+        imported = False
+        for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
+            try:
+                raw_pack = json.loads(file_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(raw_pack, dict):
+                continue
+
+            try:
+                parsed = self._validate_pack(cast(JsonObject, raw_pack), file_path.name)
+            except ServiceError:
+                continue
+
+            imported = True
+            pack = session.get(CommandPackRecord, parsed.pack_id)
+            if pack is None:
+                pack = CommandPackRecord(
+                    pack_id=parsed.pack_id,
+                    pack_name=parsed.pack_name,
+                    description=parsed.description,
+                    source_name=file_path.name,
+                    is_core=parsed.pack_id == "core",
+                    updated_at=_now_iso(),
+                )
+                session.add(pack)
+            else:
+                pack.pack_name = parsed.pack_name
+                pack.description = parsed.description
+                pack.source_name = file_path.name
+                pack.is_core = pack.pack_id == "core"
+                pack.updated_at = _now_iso()
+
+            existing_templates = session.exec(
+                select(CommandTemplateRecord).where(CommandTemplateRecord.pack_id == parsed.pack_id)
+            ).all()
+            for item in existing_templates:
+                session.delete(item)
+
+            for index, item in enumerate(parsed.commands, start=1):
+                session.add(
+                    CommandTemplateRecord(
+                        pack_id=parsed.pack_id,
+                        template_id=item.id or f"cmd_{index}",
+                        name=item.name,
+                        command=item.command,
+                        description=item.description,
+                        position=index,
+                    )
+                )
+
+        if imported:
+            session.commit()
 
     @staticmethod
     def _default_pack_payload() -> dict[str, Any]:
@@ -130,122 +233,110 @@ class CommandPackManager:
         )
 
     @staticmethod
-    def _write_pack_file(path: Path, pack: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(pack, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+    def _fetch_templates(pack_id: str) -> list[CommandTemplateRecord]:
+        with session_scope() as session:
+            return list(
+                session.exec(
+                    select(CommandTemplateRecord)
+                    .where(CommandTemplateRecord.pack_id == pack_id)
+                    .order_by(TEMPLATE_POSITION_COLUMN)
+                ).all()
+            )
 
-    @staticmethod
-    def _read_json_file(path: Path) -> dict[str, Any]:
-        try:
-            content = path.read_text(encoding="utf-8")
-            payload = json.loads(content)
-        except FileNotFoundError as error:
-            raise ServiceError(status_code=404, detail=f"Command pack file not found: {path.name}") from error
-        except json.JSONDecodeError as error:
-            raise ServiceError(status_code=400, detail=f"Invalid JSON in pack file '{path.name}': {error}") from error
-
-        if not isinstance(payload, dict):
-            raise ServiceError(status_code=400, detail=f"Pack file '{path.name}' must contain a JSON object")
-        return cast(JsonObject, payload)
-
-    def list_command_packs(self) -> dict[str, Any]:
-        packs: list[dict[str, Any]] = []
-        templates: list[dict[str, str]] = []
+    def list_command_packs(self) -> CommandPackListData:
+        packs: list[CommandPackData] = []
+        templates: list[CommandTemplateData] = []
         errors: list[str] = []
 
-        pack_files = sorted(self._packs_dir.glob("*.json"), key=lambda path: path.name)
-        for file_path in pack_files:
-            try:
-                raw_pack = self._read_json_file(file_path)
-                pack = self._validate_pack(raw_pack, file_path.name)
-            except ServiceError as error:
-                errors.append(error.detail)
-                continue
+        with session_scope() as session:
+            pack_rows = session.exec(
+                select(CommandPackRecord).order_by(CommandPackRecord.pack_name)
+            ).all()
 
-            serialized_templates: list[dict[str, str]] = []
-            for command in pack.commands:
-                template = {
-                    "id": f"{pack.pack_id}:{command.id}",
-                    "name": command.name,
-                    "command": command.command,
-                    "description": command.description,
-                }
-                serialized_templates.append(template)
-                templates.append(template)
+            for pack in pack_rows:
+                template_rows = session.exec(
+                    select(CommandTemplateRecord)
+                    .where(CommandTemplateRecord.pack_id == pack.pack_id)
+                    .order_by(TEMPLATE_POSITION_COLUMN)
+                ).all()
 
-            packs.append(
-                {
-                    "pack_id": pack.pack_id,
-                    "pack_name": pack.pack_name,
-                    "description": pack.description,
-                    "file_name": file_path.name,
-                    "templates": serialized_templates,
-                }
-            )
+                serialized_templates: list[CommandTemplateData] = []
+                for command in template_rows:
+                    template: CommandTemplateData = {
+                        "id": f"{pack.pack_id}:{command.template_id}",
+                        "name": command.name,
+                        "command": command.command,
+                        "description": command.description,
+                    }
+                    serialized_templates.append(template)
+                    templates.append(template)
+
+                packs.append(
+                    {
+                        "pack_id": pack.pack_id,
+                        "pack_name": pack.pack_name,
+                        "description": pack.description,
+                        "file_name": pack.source_name,
+                        "templates": serialized_templates,
+                    }
+                )
 
         return {"packs": packs, "templates": templates, "errors": errors}
 
-    def create_template(self, payload: CommandTemplateCreatePayload) -> dict[str, Any]:
+    def create_template(self, payload: CommandTemplateCreatePayload) -> CommandTemplateMutationData:
         target_pack_id = self._slugify(payload.pack_id or "custom", "custom")
-        target_file = self._custom_pack_file if target_pack_id == "custom" else self._packs_dir / f"{target_pack_id}.json"
-        pack_commands: list[CommandItem]
 
-        if target_file.exists():
-            raw_pack = self._read_json_file(target_file)
-            parsed_pack = self._validate_pack(raw_pack, target_file.name)
-            pack_commands = [
-                {
-                    "id": item.id or "",
-                    "name": item.name,
-                    "command": item.command,
-                    "description": item.description,
-                }
-                for item in parsed_pack.commands
-            ]
-            pack_name = parsed_pack.pack_name
-            description = parsed_pack.description
-        else:
-            pack_commands = []
-            pack_name = "Custom Commands" if target_pack_id == "custom" else target_pack_id.replace("_", " ").title()
-            description = "User-defined command templates."
+        with session_scope() as session:
+            pack = session.get(CommandPackRecord, target_pack_id)
+            if pack is None:
+                pack_name = "Custom Commands" if target_pack_id == "custom" else target_pack_id.replace("_", " ").title()
+                pack = CommandPackRecord(
+                    pack_id=target_pack_id,
+                    pack_name=pack_name,
+                    description="User-defined command templates.",
+                    source_name=f"{target_pack_id}.json",
+                    is_core=False,
+                    updated_at=_now_iso(),
+                )
+                session.add(pack)
+                template_rows: list[CommandTemplateRecord] = []
+            else:
+                template_rows = list(
+                    session.exec(
+                        select(CommandTemplateRecord)
+                        .where(CommandTemplateRecord.pack_id == pack.pack_id)
+                        .order_by(TEMPLATE_POSITION_COLUMN)
+                    ).all()
+                )
 
-        base_command_id = self._slugify(payload.name, "cmd")
-        next_command_id = base_command_id
-        used_command_ids = {item["id"] for item in pack_commands}
-        suffix = 2
-        while next_command_id in used_command_ids:
-            next_command_id = f"{base_command_id}_{suffix}"
-            suffix += 1
+            base_command_id = self._slugify(payload.name, "cmd")
+            next_command_id = base_command_id
+            used_command_ids = {item.template_id for item in template_rows}
+            suffix = 2
+            while next_command_id in used_command_ids:
+                next_command_id = f"{base_command_id}_{suffix}"
+                suffix += 1
 
-        next_command = {
-            "id": next_command_id,
-            "name": payload.name.strip(),
-            "command": payload.command.strip(),
-            "description": payload.description.strip() or "User-defined template command.",
-        }
-        pack_commands.append(next_command)
+            next_template = CommandTemplateRecord(
+                pack_id=pack.pack_id,
+                template_id=next_command_id,
+                name=payload.name.strip(),
+                command=payload.command.strip(),
+                description=payload.description.strip() or "User-defined template command.",
+                position=len(template_rows) + 1,
+            )
+            session.add(next_template)
+            pack.updated_at = _now_iso()
+            session.commit()
 
-        pack_payload = CommandPackFilePayload.model_validate(
-            {
+            return {
+                "id": f"{target_pack_id}:{next_command_id}",
+                "name": next_template.name,
+                "command": next_template.command,
+                "description": next_template.description,
                 "pack_id": target_pack_id,
-                "pack_name": pack_name,
-                "description": description,
-                "commands": pack_commands,
+                "pack_file": pack.source_name,
             }
-        ).model_dump()
-        self._write_pack_file(target_file, pack_payload)
-
-        return {
-            "id": f"{target_pack_id}:{next_command_id}",
-            "name": next_command["name"],
-            "command": next_command["command"],
-            "description": next_command["description"],
-            "pack_id": target_pack_id,
-            "pack_file": target_file.name,
-        }
 
     @staticmethod
     def _split_template_id(template_id: str) -> tuple[str, str]:
@@ -265,22 +356,21 @@ class CommandPackManager:
             )
         return pack, command
 
-    def _find_pack_file(self, pack_id: str) -> tuple[Path, CommandPackFilePayload]:
-        for file_path in sorted(self._packs_dir.glob("*.json"), key=lambda path: path.name):
-            try:
-                raw_pack = self._read_json_file(file_path)
-                parsed_pack = self._validate_pack(raw_pack, file_path.name)
-            except ServiceError:
-                continue
-            if parsed_pack.pack_id == pack_id:
-                return file_path, parsed_pack
+    @staticmethod
+    def _find_pack(session: Session, pack_id: str) -> CommandPackRecord:
+        pack = session.get(CommandPackRecord, pack_id)
+        if pack is None:
+            raise ServiceError(
+                status_code=404,
+                detail=f"Command pack '{pack_id}' not found.",
+            )
+        return pack
 
-        raise ServiceError(
-            status_code=404,
-            detail=f"Command pack '{pack_id}' not found.",
-        )
-
-    def update_template(self, template_id: str, payload: CommandTemplateUpdatePayload) -> dict[str, Any]:
+    def update_template(
+        self,
+        template_id: str,
+        payload: CommandTemplateUpdatePayload,
+    ) -> CommandTemplateMutationData:
         pack_id, command_id = self._split_template_id(template_id)
         if payload.name is None and payload.command is None:
             raise ServiceError(
@@ -288,236 +378,198 @@ class CommandPackManager:
                 detail="Nothing to update. Provide 'name' and/or 'command'.",
             )
 
-        target_file, parsed_pack = self._find_pack_file(pack_id)
-        updated_commands: list[dict[str, str]] = []
-        updated_template: dict[str, str] | None = None
+        with session_scope() as session:
+            pack = self._find_pack(session, pack_id)
+            command = session.exec(
+                select(CommandTemplateRecord)
+                .where(CommandTemplateRecord.pack_id == pack_id)
+                .where(CommandTemplateRecord.template_id == command_id)
+            ).first()
+            if command is None:
+                raise ServiceError(
+                    status_code=404,
+                    detail=f"Template '{command_id}' not found in pack '{pack_id}'.",
+                )
 
-        for command in parsed_pack.commands:
-            next_name = command.name
-            next_command = command.command
-            if command.id == command_id:
-                if payload.name is not None:
-                    candidate_name = payload.name.strip()
-                    if not candidate_name:
-                        raise ServiceError(status_code=400, detail="Template name cannot be empty.")
-                    next_name = candidate_name
-                if payload.command is not None:
-                    candidate_command = payload.command.strip()
-                    if not candidate_command:
-                        raise ServiceError(status_code=400, detail="Template command cannot be empty.")
-                    next_command = candidate_command
-                updated_template = {
-                    "id": command.id or command_id,
-                    "name": next_name,
-                    "command": next_command,
-                    "description": command.description,
-                }
+            if payload.name is not None:
+                candidate_name = payload.name.strip()
+                if not candidate_name:
+                    raise ServiceError(status_code=400, detail="Template name cannot be empty.")
+                command.name = candidate_name
 
-            updated_commands.append(
-                {
-                    "id": command.id or command_id,
-                    "name": next_name,
-                    "command": next_command,
-                    "description": command.description,
-                }
-            )
+            if payload.command is not None:
+                candidate_command = payload.command.strip()
+                if not candidate_command:
+                    raise ServiceError(status_code=400, detail="Template command cannot be empty.")
+                command.command = candidate_command
 
-        if updated_template is None:
-            raise ServiceError(
-                status_code=404,
-                detail=f"Template '{command_id}' not found in pack '{pack_id}'.",
-            )
+            pack.updated_at = _now_iso()
+            session.commit()
 
-        updated_pack = CommandPackFilePayload.model_validate(
-            {
-                "pack_id": parsed_pack.pack_id,
-                "pack_name": parsed_pack.pack_name,
-                "description": parsed_pack.description,
-                "commands": updated_commands,
+            return {
+                "id": f"{pack_id}:{command.template_id}",
+                "name": command.name,
+                "command": command.command,
+                "description": command.description,
+                "pack_id": pack_id,
+                "pack_file": pack.source_name,
             }
-        ).model_dump()
-        self._write_pack_file(target_file, updated_pack)
 
-        return {
-            "id": f"{pack_id}:{updated_template['id']}",
-            "name": updated_template["name"],
-            "command": updated_template["command"],
-            "description": updated_template["description"],
-            "pack_id": pack_id,
-            "pack_file": target_file.name,
-        }
-
-    def delete_template(self, template_id: str) -> dict[str, Any]:
+    def delete_template(self, template_id: str) -> CommandTemplateDeleteData:
         pack_id, command_id = self._split_template_id(template_id)
-        target_file, parsed_pack = self._find_pack_file(pack_id)
 
-        commands = [
-            {
-                "id": item.id or "",
-                "name": item.name,
-                "command": item.command,
-                "description": item.description,
+        with session_scope() as session:
+            pack = self._find_pack(session, pack_id)
+            commands = session.exec(
+                select(CommandTemplateRecord)
+                .where(CommandTemplateRecord.pack_id == pack_id)
+                .order_by(TEMPLATE_POSITION_COLUMN)
+            ).all()
+            commands = list(commands)
+
+            command_index = next(
+                (index for index, item in enumerate(commands) if item.template_id == command_id),
+                -1,
+            )
+            if command_index < 0:
+                raise ServiceError(
+                    status_code=404,
+                    detail=f"Template '{command_id}' not found in pack '{pack_id}'.",
+                )
+
+            if pack.is_core and len(commands) <= 1:
+                raise ServiceError(
+                    status_code=409,
+                    detail="Cannot delete the last template from the core command pack.",
+                )
+
+            target = commands[command_index]
+            session.delete(target)
+
+            for position, item in enumerate(commands[:command_index] + commands[command_index + 1 :], start=1):
+                item.position = position
+
+            if not pack.is_core and len(commands) == 1:
+                session.delete(pack)
+            else:
+                pack.updated_at = _now_iso()
+
+            session.commit()
+
+            return {
+                "deleted": True,
+                "template_id": template_id,
+                "pack_id": pack_id,
+                "pack_file": pack.source_name,
             }
-            for item in parsed_pack.commands
-        ]
 
-        command_index = next(
-            (index for index, item in enumerate(commands) if item["id"] == command_id),
-            -1,
-        )
-        if command_index < 0:
-            raise ServiceError(
-                status_code=404,
-                detail=f"Template '{command_id}' not found in pack '{pack_id}'.",
-            )
-
-        if target_file == self._default_pack_file and len(commands) <= 1:
-            raise ServiceError(
-                status_code=409,
-                detail="Cannot delete the last template from the core command pack.",
-            )
-
-        del commands[command_index]
-        if commands:
-            next_pack_payload = CommandPackFilePayload.model_validate(
-                {
-                    "pack_id": parsed_pack.pack_id,
-                    "pack_name": parsed_pack.pack_name,
-                    "description": parsed_pack.description,
-                    "commands": commands,
-                }
-            ).model_dump()
-            self._write_pack_file(target_file, next_pack_payload)
-        else:
-            target_file.unlink(missing_ok=True)
-
-        return {
-            "deleted": True,
-            "template_id": template_id,
-            "pack_id": pack_id,
-            "pack_file": target_file.name,
-        }
-
-    def move_template(self, template_id: str, target_pack_id: str) -> dict[str, Any]:
+    def move_template(
+        self,
+        template_id: str,
+        target_pack_id: str,
+    ) -> CommandTemplateMutationData:
         source_pack_id, source_command_id = self._split_template_id(template_id)
         normalized_target_pack_id = self._slugify(target_pack_id, "custom")
 
-        source_file, source_pack = self._find_pack_file(source_pack_id)
-        source_commands = [
-            {
-                "id": item.id or "",
-                "name": item.name,
-                "command": item.command,
-                "description": item.description,
-            }
-            for item in source_pack.commands
-        ]
+        with session_scope() as session:
+            source_pack = self._find_pack(session, source_pack_id)
+            source_commands = session.exec(
+                select(CommandTemplateRecord)
+                .where(CommandTemplateRecord.pack_id == source_pack_id)
+                .order_by(TEMPLATE_POSITION_COLUMN)
+            ).all()
+            source_commands = list(source_commands)
 
-        source_index = next(
-            (index for index, item in enumerate(source_commands) if item["id"] == source_command_id),
-            -1,
-        )
-        if source_index < 0:
-            raise ServiceError(
-                status_code=404,
-                detail=f"Template '{source_command_id}' not found in pack '{source_pack_id}'.",
+            source_command = next((item for item in source_commands if item.template_id == source_command_id), None)
+            if source_command is None:
+                raise ServiceError(
+                    status_code=404,
+                    detail=f"Template '{source_command_id}' not found in pack '{source_pack_id}'.",
+                )
+
+            if source_pack_id == normalized_target_pack_id:
+                return {
+                    "id": f"{source_pack_id}:{source_command.template_id}",
+                    "name": source_command.name,
+                    "command": source_command.command,
+                    "description": source_command.description,
+                    "pack_id": source_pack_id,
+                    "pack_file": source_pack.source_name,
+                }
+
+            if source_pack.is_core and len(source_commands) <= 1:
+                raise ServiceError(
+                    status_code=409,
+                    detail="Cannot move the last template from the core command pack.",
+                )
+
+            target_pack = session.get(CommandPackRecord, normalized_target_pack_id)
+            if target_pack is None:
+                target_pack = CommandPackRecord(
+                    pack_id=normalized_target_pack_id,
+                    pack_name=(
+                        "Custom Commands"
+                        if normalized_target_pack_id == "custom"
+                        else normalized_target_pack_id.replace("_", " ").title()
+                    ),
+                    description="User-defined command templates.",
+                    source_name=f"{normalized_target_pack_id}.json",
+                    is_core=False,
+                    updated_at=_now_iso(),
+                )
+                session.add(target_pack)
+                target_commands: list[CommandTemplateRecord] = []
+            else:
+                target_commands = list(
+                    session.exec(
+                        select(CommandTemplateRecord)
+                        .where(CommandTemplateRecord.pack_id == normalized_target_pack_id)
+                        .order_by(TEMPLATE_POSITION_COLUMN)
+                    ).all()
+                )
+
+            candidate_command_id = self._slugify(source_command.template_id, "cmd")
+            used_target_ids = {item.template_id for item in target_commands}
+            next_command_id = candidate_command_id
+            suffix = 2
+            while next_command_id in used_target_ids:
+                next_command_id = f"{candidate_command_id}_{suffix}"
+                suffix += 1
+
+            moved_command = CommandTemplateRecord(
+                pack_id=normalized_target_pack_id,
+                template_id=next_command_id,
+                name=source_command.name,
+                command=source_command.command,
+                description=source_command.description,
+                position=len(target_commands) + 1,
             )
+            session.add(moved_command)
 
-        command_to_move = source_commands[source_index]
-        if source_pack_id == normalized_target_pack_id:
+            session.delete(source_command)
+            remaining_source = [item for item in source_commands if item.template_id != source_command_id]
+            for index, item in enumerate(remaining_source, start=1):
+                item.position = index
+
+            if not source_pack.is_core and not remaining_source:
+                session.delete(source_pack)
+            else:
+                source_pack.updated_at = _now_iso()
+
+            target_pack.updated_at = _now_iso()
+            session.commit()
+
             return {
-                "id": f"{source_pack_id}:{command_to_move['id']}",
-                "name": command_to_move["name"],
-                "command": command_to_move["command"],
-                "description": command_to_move["description"],
-                "pack_id": source_pack_id,
-                "pack_file": source_file.name,
-            }
-        if source_file == self._default_pack_file and len(source_commands) <= 1:
-            raise ServiceError(
-                status_code=409,
-                detail="Cannot move the last template from the core command pack.",
-            )
-
-        target_file = (
-            self._custom_pack_file
-            if normalized_target_pack_id == "custom"
-            else self._packs_dir / f"{normalized_target_pack_id}.json"
-        )
-        if target_file.exists():
-            target_raw_pack = self._read_json_file(target_file)
-            target_pack = self._validate_pack(target_raw_pack, target_file.name)
-            target_commands = [
-                {
-                    "id": item.id or "",
-                    "name": item.name,
-                    "command": item.command,
-                    "description": item.description,
-                }
-                for item in target_pack.commands
-            ]
-            target_pack_name = target_pack.pack_name
-            target_pack_description = target_pack.description
-        else:
-            target_commands = []
-            target_pack_name = (
-                "Custom Commands"
-                if normalized_target_pack_id == "custom"
-                else normalized_target_pack_id.replace("_", " ").title()
-            )
-            target_pack_description = "User-defined command templates."
-
-        candidate_command_id = self._slugify(command_to_move["id"], "cmd")
-        used_target_ids = {item["id"] for item in target_commands}
-        next_command_id = candidate_command_id
-        suffix = 2
-        while next_command_id in used_target_ids:
-            next_command_id = f"{candidate_command_id}_{suffix}"
-            suffix += 1
-
-        moved_command = {
-            "id": next_command_id,
-            "name": command_to_move["name"],
-            "command": command_to_move["command"],
-            "description": command_to_move["description"],
-        }
-        target_commands.append(moved_command)
-
-        target_payload = CommandPackFilePayload.model_validate(
-            {
+                "id": f"{normalized_target_pack_id}:{moved_command.template_id}",
+                "name": moved_command.name,
+                "command": moved_command.command,
+                "description": moved_command.description,
                 "pack_id": normalized_target_pack_id,
-                "pack_name": target_pack_name,
-                "description": target_pack_description,
-                "commands": target_commands,
+                "pack_file": target_pack.source_name,
+                "moved_from_pack_id": source_pack_id,
             }
-        ).model_dump()
-        self._write_pack_file(target_file, target_payload)
 
-        del source_commands[source_index]
-        if source_commands:
-            source_payload = CommandPackFilePayload.model_validate(
-                {
-                    "pack_id": source_pack.pack_id,
-                    "pack_name": source_pack.pack_name,
-                    "description": source_pack.description,
-                    "commands": source_commands,
-                }
-            ).model_dump()
-            self._write_pack_file(source_file, source_payload)
-        else:
-            source_file.unlink(missing_ok=True)
-
-        return {
-            "id": f"{normalized_target_pack_id}:{moved_command['id']}",
-            "name": moved_command["name"],
-            "command": moved_command["command"],
-            "description": moved_command["description"],
-            "pack_id": normalized_target_pack_id,
-            "pack_file": target_file.name,
-            "moved_from_pack_id": source_pack_id,
-        }
-
-    def import_pack(self, payload: CommandPackImportPayload) -> dict[str, Any]:
+    def import_pack(self, payload: CommandPackImportPayload) -> CommandPackImportData:
         try:
             raw_json = json.loads(payload.content)
         except json.JSONDecodeError as error:
@@ -528,9 +580,46 @@ class CommandPackManager:
         parsed_pack = self._validate_pack(cast(JsonObject, raw_json), payload.file_name or "import.json")
         file_name = payload.file_name or f"{parsed_pack.pack_id}.json"
         safe_name = self._safe_file_name(file_name)
-        file_path = self._packs_dir / safe_name
 
-        self._write_pack_file(file_path, parsed_pack.model_dump())
+        with session_scope() as session:
+            pack = session.get(CommandPackRecord, parsed_pack.pack_id)
+            if pack is None:
+                pack = CommandPackRecord(
+                    pack_id=parsed_pack.pack_id,
+                    pack_name=parsed_pack.pack_name,
+                    description=parsed_pack.description,
+                    source_name=safe_name,
+                    is_core=parsed_pack.pack_id == "core",
+                    updated_at=_now_iso(),
+                )
+                session.add(pack)
+            else:
+                pack.pack_name = parsed_pack.pack_name
+                pack.description = parsed_pack.description
+                pack.source_name = safe_name
+                pack.updated_at = _now_iso()
+
+                existing = session.exec(
+                    select(CommandTemplateRecord)
+                    .where(CommandTemplateRecord.pack_id == parsed_pack.pack_id)
+                ).all()
+                for item in existing:
+                    session.delete(item)
+
+            for index, item in enumerate(parsed_pack.commands, start=1):
+                session.add(
+                    CommandTemplateRecord(
+                        pack_id=parsed_pack.pack_id,
+                        template_id=item.id or f"cmd_{index}",
+                        name=item.name,
+                        command=item.command,
+                        description=item.description,
+                        position=index,
+                    )
+                )
+
+            session.commit()
+
         return {
             "imported": True,
             "pack_id": parsed_pack.pack_id,

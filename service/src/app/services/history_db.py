@@ -1,80 +1,39 @@
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
-from threading import Lock
-from typing import TypeAlias
+from typing import Any, cast
 
-SerializedRecord: TypeAlias = dict[str, object]
-SerializedRecords: TypeAlias = list[SerializedRecord]
+from sqlalchemy import delete, desc
+from sqlmodel import select
+
+from src.app.core.database import init_db, session_scope
+from src.app.models.db import (
+    ManualTerminalCommandRecord,
+    ManualTerminalHistoryRecord,
+    RunRecord,
+    RunSessionRecord,
+)
+from src.app.schemas.service_types import (
+    HistoryData,
+    ManualTerminalHistoryItemData,
+    PipelineRunData,
+    PipelineSessionData,
+)
+RUN_STARTED_AT_COLUMN: Any = cast(Any, RunRecord).started_at
+RUN_SESSION_RUN_ID_COLUMN: Any = cast(Any, RunSessionRecord).run_id
+RUN_SESSION_POSITION_COLUMN: Any = cast(Any, RunSessionRecord).position
+TERMINAL_UPDATED_AT_COLUMN: Any = cast(Any, ManualTerminalHistoryRecord).updated_at
+TERMINAL_COMMAND_TERMINAL_ID_COLUMN: Any = cast(Any, ManualTerminalCommandRecord).terminal_id
+TERMINAL_COMMAND_ID_COLUMN: Any = cast(Any, ManualTerminalCommandRecord).id
 
 
 class HistoryDatabase:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path | None = None) -> None:
+        # Path is kept for backwards compatibility with existing construction code.
         self.db_path = db_path
-        self._conn: sqlite3.Connection | None = None
-        self._lock = Lock()
-
-    def _connect(self) -> sqlite3.Connection:
-        if self._conn is None:
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
-            connection = sqlite3.connect(self.db_path, check_same_thread=False)
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
-            self._conn = connection
-        return self._conn
 
     def ensure_ready(self) -> None:
-        with self._lock:
-            conn = self._connect()
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    id TEXT PRIMARY KEY,
-                    pipeline_name TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    started_at TEXT NOT NULL,
-                    finished_at TEXT,
-                    log_file_path TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS run_sessions (
-                    id TEXT PRIMARY KEY,
-                    run_id TEXT NOT NULL,
-                    step_id TEXT NOT NULL,
-                    position INTEGER NOT NULL DEFAULT 0,
-                    title TEXT NOT NULL,
-                    command TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    exit_code INTEGER,
-                    FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS idx_run_sessions_run_id_position
-                ON run_sessions(run_id, position);
-
-                CREATE TABLE IF NOT EXISTS manual_terminals_history (
-                    terminal_id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    closed_at TEXT,
-                    log_file_path TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS manual_terminal_commands (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    terminal_id TEXT NOT NULL,
-                    command TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY(terminal_id)
-                        REFERENCES manual_terminals_history(terminal_id)
-                        ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS idx_manual_terminal_commands_terminal_id
-                ON manual_terminal_commands(terminal_id, id DESC);
-                """
-            )
-            conn.commit()
+        init_db()
 
     def upsert_run(
         self,
@@ -86,23 +45,25 @@ class HistoryDatabase:
         finished_at: str | None,
         log_file_path: str,
     ) -> None:
-        with self._lock:
-            conn = self._connect()
-            conn.execute(
-                """
-                INSERT INTO runs (
-                    id, pipeline_name, status, started_at, finished_at, log_file_path
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    pipeline_name = excluded.pipeline_name,
-                    status = excluded.status,
-                    started_at = excluded.started_at,
-                    finished_at = excluded.finished_at,
-                    log_file_path = excluded.log_file_path
-                """,
-                (run_id, pipeline_name, status, started_at, finished_at, log_file_path),
-            )
-            conn.commit()
+        with session_scope() as session:
+            run = session.get(RunRecord, run_id)
+            if run is None:
+                run = RunRecord(
+                    id=run_id,
+                    pipeline_name=pipeline_name,
+                    status=status,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    log_file_path=log_file_path,
+                )
+                session.add(run)
+            else:
+                run.pipeline_name = pipeline_name
+                run.status = status
+                run.started_at = started_at
+                run.finished_at = finished_at
+                run.log_file_path = log_file_path
+            session.commit()
 
     def upsert_run_session(
         self,
@@ -116,34 +77,29 @@ class HistoryDatabase:
         status: str,
         exit_code: int | None,
     ) -> None:
-        with self._lock:
-            conn = self._connect()
-            conn.execute(
-                """
-                INSERT INTO run_sessions (
-                    id, run_id, step_id, position, title, command, status, exit_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
-                    run_id = excluded.run_id,
-                    step_id = excluded.step_id,
-                    position = excluded.position,
-                    title = excluded.title,
-                    command = excluded.command,
-                    status = excluded.status,
-                    exit_code = excluded.exit_code
-                """,
-                (
-                    session_id,
-                    run_id,
-                    step_id,
-                    position,
-                    title,
-                    command,
-                    status,
-                    exit_code,
-                ),
-            )
-            conn.commit()
+        with session_scope() as session:
+            run_session = session.get(RunSessionRecord, session_id)
+            if run_session is None:
+                run_session = RunSessionRecord(
+                    id=session_id,
+                    run_id=run_id,
+                    step_id=step_id,
+                    position=position,
+                    title=title,
+                    command=command,
+                    status=status,
+                    exit_code=exit_code,
+                )
+                session.add(run_session)
+            else:
+                run_session.run_id = run_id
+                run_session.step_id = step_id
+                run_session.position = position
+                run_session.title = title
+                run_session.command = command
+                run_session.status = status
+                run_session.exit_code = exit_code
+            session.commit()
 
     def upsert_manual_terminal(
         self,
@@ -155,30 +111,25 @@ class HistoryDatabase:
         closed_at: str | None,
         log_file_path: str,
     ) -> None:
-        with self._lock:
-            conn = self._connect()
-            conn.execute(
-                """
-                INSERT INTO manual_terminals_history (
-                    terminal_id, title, created_at, updated_at, closed_at, log_file_path
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(terminal_id) DO UPDATE SET
-                    title = excluded.title,
-                    created_at = excluded.created_at,
-                    updated_at = excluded.updated_at,
-                    closed_at = excluded.closed_at,
-                    log_file_path = excluded.log_file_path
-                """,
-                (
-                    terminal_id,
-                    title,
-                    created_at,
-                    updated_at,
-                    closed_at,
-                    log_file_path,
-                ),
-            )
-            conn.commit()
+        with session_scope() as session:
+            terminal = session.get(ManualTerminalHistoryRecord, terminal_id)
+            if terminal is None:
+                terminal = ManualTerminalHistoryRecord(
+                    terminal_id=terminal_id,
+                    title=title,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                    closed_at=closed_at,
+                    log_file_path=log_file_path,
+                )
+                session.add(terminal)
+            else:
+                terminal.title = title
+                terminal.created_at = created_at
+                terminal.updated_at = updated_at
+                terminal.closed_at = closed_at
+                terminal.log_file_path = log_file_path
+            session.commit()
 
     def append_manual_terminal_command(
         self,
@@ -187,113 +138,92 @@ class HistoryDatabase:
         command: str,
         created_at: str,
     ) -> None:
-        with self._lock:
-            conn = self._connect()
-            conn.execute(
-                """
-                INSERT INTO manual_terminal_commands (terminal_id, command, created_at)
-                VALUES (?, ?, ?)
-                """,
-                (terminal_id, command, created_at),
+        with session_scope() as session:
+            session.add(
+                ManualTerminalCommandRecord(
+                    terminal_id=terminal_id,
+                    command=command,
+                    created_at=created_at,
+                )
             )
-            conn.execute(
-                """
-                UPDATE manual_terminals_history
-                SET updated_at = ?, closed_at = NULL
-                WHERE terminal_id = ?
-                """,
-                (created_at, terminal_id),
-            )
-            conn.commit()
+            terminal = session.get(ManualTerminalHistoryRecord, terminal_id)
+            if terminal is not None:
+                terminal.updated_at = created_at
+                terminal.closed_at = None
+            session.commit()
 
     def fetch_history(
         self,
         *,
         runs_limit: int = 200,
         terminal_limit: int = 300,
-    ) -> SerializedRecord:
-        with self._lock:
-            conn = self._connect()
-            run_rows = conn.execute(
-                """
-                SELECT id, pipeline_name, status, started_at, finished_at, log_file_path
-                FROM runs
-                ORDER BY started_at DESC
-                LIMIT ?
-                """,
-                (runs_limit,),
-            ).fetchall()
+    ) -> HistoryData:
+        with session_scope() as session:
+            run_rows = session.exec(
+                select(RunRecord)
+                .order_by(desc(RUN_STARTED_AT_COLUMN))
+                .limit(runs_limit)
+            ).all()
 
-            run_ids = [row["id"] for row in run_rows]
-            sessions_by_run: dict[str, SerializedRecords] = {run_id: [] for run_id in run_ids}
+            run_ids = [run.id for run in run_rows]
+            sessions_by_run: dict[str, list[PipelineSessionData]] = {
+                run_id: [] for run_id in run_ids
+            }
             if run_ids:
-                placeholders = ",".join("?" for _ in run_ids)
-                session_rows = conn.execute(
-                    f"""
-                    SELECT id, run_id, step_id, title, command, status, exit_code
-                    FROM run_sessions
-                    WHERE run_id IN ({placeholders})
-                    ORDER BY run_id ASC, position ASC
-                    """,
-                    run_ids,
-                ).fetchall()
+                session_rows = session.exec(
+                    select(RunSessionRecord)
+                    .where(RUN_SESSION_RUN_ID_COLUMN.in_(run_ids))
+                    .order_by(RUN_SESSION_RUN_ID_COLUMN, RUN_SESSION_POSITION_COLUMN)
+                ).all()
                 for row in session_rows:
-                    sessions_by_run[row["run_id"]].append(
+                    sessions_by_run[row.run_id].append(
                         {
-                            "id": row["id"],
-                            "step_id": row["step_id"],
-                            "title": row["title"],
-                            "command": row["command"],
-                            "status": row["status"],
-                            "exit_code": row["exit_code"],
+                            "id": row.id,
+                            "step_id": row.step_id,
+                            "title": row.title,
+                            "command": row.command,
+                            "status": row.status,
+                            "exit_code": row.exit_code,
                             "lines": [],
                         }
                     )
 
-            runs = [
+            runs: list[PipelineRunData] = [
                 {
-                    "id": row["id"],
-                    "pipeline_name": row["pipeline_name"],
-                    "status": row["status"],
-                    "started_at": row["started_at"],
-                    "finished_at": row["finished_at"],
-                    "log_file_path": row["log_file_path"],
-                    "sessions": sessions_by_run.get(row["id"], []),
+                    "id": row.id,
+                    "pipeline_name": row.pipeline_name,
+                    "status": row.status,
+                    "started_at": row.started_at,
+                    "finished_at": row.finished_at,
+                    "log_file_path": row.log_file_path,
+                    "sessions": sessions_by_run.get(row.id, []),
                 }
                 for row in run_rows
             ]
 
-            terminal_rows = conn.execute(
-                """
-                SELECT terminal_id, title, created_at, updated_at, closed_at, log_file_path
-                FROM manual_terminals_history
-                ORDER BY updated_at DESC
-                LIMIT ?
-                """,
-                (terminal_limit,),
-            ).fetchall()
+            terminal_rows = session.exec(
+                select(ManualTerminalHistoryRecord)
+                .order_by(desc(TERMINAL_UPDATED_AT_COLUMN))
+                .limit(terminal_limit)
+            ).all()
 
-            terminals_history: SerializedRecords = []
+            terminals_history: list[ManualTerminalHistoryItemData] = []
             for row in terminal_rows:
-                command_rows = conn.execute(
-                    """
-                    SELECT command
-                    FROM manual_terminal_commands
-                    WHERE terminal_id = ?
-                    ORDER BY id DESC
-                    LIMIT 500
-                    """,
-                    (row["terminal_id"],),
-                ).fetchall()
-                commands = [item["command"] for item in reversed(command_rows)]
+                command_rows = session.exec(
+                    select(ManualTerminalCommandRecord)
+                    .where(TERMINAL_COMMAND_TERMINAL_ID_COLUMN == row.terminal_id)
+                    .order_by(desc(TERMINAL_COMMAND_ID_COLUMN))
+                    .limit(500)
+                ).all()
+                commands = [item.command for item in reversed(command_rows)]
                 terminals_history.append(
                     {
-                        "terminal_id": row["terminal_id"],
-                        "title": row["title"],
-                        "created_at": row["created_at"],
-                        "updated_at": row["updated_at"],
-                        "closed_at": row["closed_at"],
-                        "log_file_path": row["log_file_path"],
+                        "terminal_id": row.terminal_id,
+                        "title": row.title,
+                        "created_at": row.created_at,
+                        "updated_at": row.updated_at,
+                        "closed_at": row.closed_at,
+                        "log_file_path": row.log_file_path,
                         "commands": commands,
                     }
                 )
@@ -302,3 +232,11 @@ class HistoryDatabase:
                 "runs": runs,
                 "manual_terminal_history": terminals_history,
             }
+
+    def clear_history(self) -> None:
+        with session_scope() as session:
+            session.exec(delete(ManualTerminalCommandRecord))
+            session.exec(delete(ManualTerminalHistoryRecord))
+            session.exec(delete(RunSessionRecord))
+            session.exec(delete(RunRecord))
+            session.commit()

@@ -13,10 +13,10 @@ async def events_socket(
 ) -> None:
     await runtime.events.connect(websocket)
     try:
-        await websocket.send_json({"type": "snapshot", "data": runtime.snapshot()})
+        await websocket.send_json(runtime.snapshot_event())
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        await runtime.events.disconnect(websocket)
-    except Exception:
+        pass
+    finally:
         await runtime.events.disconnect(websocket)

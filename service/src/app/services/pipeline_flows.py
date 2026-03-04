@@ -1,19 +1,32 @@
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, cast
+import json
+from typing import Any, TypeAlias, cast
 
-from src.app.core.constants import PIPELINE_FLOWS_DIR
+from sqlalchemy import delete, desc
+from sqlmodel import Session, select
+
+from src.app.core.database import engine
+from src.app.core.settings import get_settings
+from src.app.models.db import PipelineFlowRecord, PipelineFlowStepRecord
 from src.app.schemas.pipeline_flow import (
     PipelineFlowCreatePayload,
     PipelineFlowFilePayload,
 )
+from src.app.schemas.service_types import (
+    PipelineFlowData,
+    PipelineFlowDeleteData,
+    PipelineFlowListData,
+)
 from src.app.services.runtime import ServiceError
 
 _IDENTIFIER_RE = re.compile(r"[^a-zA-Z0-9_-]+")
+JsonObject: TypeAlias = dict[str, Any]
+FLOW_UPDATED_AT_COLUMN: Any = cast(Any, PipelineFlowRecord).updated_at
+STEP_FLOW_ID_COLUMN: Any = cast(Any, PipelineFlowStepRecord).flow_id
+STEP_POSITION_COLUMN: Any = cast(Any, PipelineFlowStepRecord).position
 
 
 def _now_iso() -> str:
@@ -22,46 +35,83 @@ def _now_iso() -> str:
 
 class PipelineFlowManager:
     def __init__(self) -> None:
-        self._flows_dir = PIPELINE_FLOWS_DIR
+        self._legacy_flows_dir = get_settings().pipeline_flows_dir
 
     async def ensure_ready(self) -> None:
-        self._flows_dir.mkdir(parents=True, exist_ok=True)
+        with Session(engine) as session:
+            existing = session.exec(select(PipelineFlowRecord).limit(1)).first()
+            
+            if existing is not None:
+                return
+            self._bootstrap_from_legacy_files(session)
+            session.commit()
+
+    def _bootstrap_from_legacy_files(self, session: Session) -> None:
+        legacy_dir = self._legacy_flows_dir
+        if not legacy_dir.exists():
+            return
+
+        for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
+            try:
+                raw_data: object = json.loads(file_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(raw_data, dict):
+                continue
+            raw_flow = cast(dict[str, Any], raw_data)
+
+            try:
+                parsed = self._validate_flow(raw_flow, file_path.stem)
+            except ServiceError:
+                continue
+
+            flow = session.get(PipelineFlowRecord, parsed.flow_id)
+
+            if flow is None:
+                flow = PipelineFlowRecord(
+                    flow_id=parsed.flow_id,
+                    flow_name=parsed.flow_name,
+                    created_at=parsed.created_at,
+                    updated_at=parsed.updated_at,
+                )
+                session.add(flow)
+            else:
+                flow.flow_name = parsed.flow_name
+                flow.created_at = parsed.created_at
+                flow.updated_at = parsed.updated_at
+
+            existing_steps = session.exec(
+                select(PipelineFlowStepRecord).where(
+                    STEP_FLOW_ID_COLUMN == parsed.flow_id
+                )
+            ).all()
+            step_records = cast(list[PipelineFlowStepRecord], existing_steps)
+            for step in step_records:
+                session.delete(step)
+
+            for position, step in enumerate(parsed.steps, start=1):
+                session.add(
+                    PipelineFlowStepRecord(
+                        flow_id=parsed.flow_id,
+                        position=position,
+                        step_type=step.type,
+                        label=step.label,
+                        command=step.command,
+                    )
+                )
 
     @staticmethod
     def _slugify(value: str, fallback: str) -> str:
         normalized = _IDENTIFIER_RE.sub("_", value.strip().lower()).strip("_")
         return normalized or fallback
 
-    @staticmethod
-    def _read_json_file(path: Path) -> dict[str, Any]:
-        try:
-            content = path.read_text(encoding="utf-8")
-            payload = json.loads(content)
-        except FileNotFoundError as error:
-            raise ServiceError(status_code=404, detail=f"Pipeline flow file not found: {path.name}") from error
-        except json.JSONDecodeError as error:
-            raise ServiceError(status_code=400, detail=f"Invalid JSON in pipeline flow file '{path.name}': {error}") from error
-
-        if not isinstance(payload, dict):
-            raise ServiceError(status_code=400, detail=f"Pipeline flow file '{path.name}' must contain a JSON object")
-        return cast(dict[str, Any], payload)
-
-    @staticmethod
-    def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-
     def _normalize_flow_dict(self, raw_flow: dict[str, Any], source_name: str) -> dict[str, Any]:
         next_flow = dict(raw_flow)
-        source_stem = Path(source_name).stem
         if "flow_id" not in next_flow:
             if "id" in next_flow:
                 next_flow["flow_id"] = next_flow["id"]
             else:
-                next_flow["flow_id"] = source_stem
+                next_flow["flow_id"] = source_name
         if "flow_name" not in next_flow:
             if "name" in next_flow:
                 next_flow["flow_name"] = next_flow["name"]
@@ -87,7 +137,7 @@ class PipelineFlowManager:
                 detail=f"Invalid pipeline flow format in '{source_name}': {error}",
             ) from error
 
-        flow_id = self._slugify(parsed.flow_id, Path(source_name).stem or "flow")
+        flow_id = self._slugify(parsed.flow_id, self._slugify(source_name, "flow"))
         return PipelineFlowFilePayload.model_validate(
             {
                 "flow_id": flow_id,
@@ -99,85 +149,170 @@ class PipelineFlowManager:
         )
 
     @staticmethod
-    def _serialize_flow(flow: PipelineFlowFilePayload, file_name: str) -> dict[str, Any]:
+    def _serialize_flow(
+        flow: PipelineFlowRecord,
+        steps: list[PipelineFlowStepRecord],
+    ) -> PipelineFlowData:
         return {
             "id": flow.flow_id,
             "flow_name": flow.flow_name,
             "created_at": flow.created_at,
             "updated_at": flow.updated_at,
-            "file_name": file_name,
-            "steps": [step.model_dump() for step in flow.steps],
+            "file_name": f"{flow.flow_id}.json",
+            "steps": [
+                {
+                    "type": step.step_type,
+                    "label": step.label,
+                    "command": step.command,
+                }
+                for step in steps
+            ],
         }
 
-    def _flow_path(self, flow_id: str) -> Path:
-        normalized_id = self._slugify(flow_id, "flow")
-        return self._flows_dir / f"{normalized_id}.json"
+    def _normalized_flow_id(self, flow_id: str) -> str:
+        return self._slugify(flow_id, "flow")
 
-    def list_flows(self) -> dict[str, Any]:
-        flows: list[dict[str, Any]] = []
+    def list_flows(self) -> PipelineFlowListData:
+        flows: list[PipelineFlowData] = []
         errors: list[str] = []
 
-        flow_files = sorted(self._flows_dir.glob("*.json"), key=lambda path: path.name)
-        for file_path in flow_files:
-            try:
-                raw_flow = self._read_json_file(file_path)
-                parsed_flow = self._validate_flow(raw_flow, file_path.name)
-            except ServiceError as error:
-                errors.append(error.detail)
-                continue
-            flows.append(self._serialize_flow(parsed_flow, file_path.name))
+        with Session(engine) as session:
+            flow_rows = session.exec(
+                select(PipelineFlowRecord).order_by(desc(FLOW_UPDATED_AT_COLUMN))
+            ).all()
+            flow_records = cast(list[PipelineFlowRecord], flow_rows)
 
-        flows.sort(key=lambda item: item["updated_at"], reverse=True)
+            for flow in flow_records:
+                step_rows = session.exec(
+                    select(PipelineFlowStepRecord)
+                    .where(STEP_FLOW_ID_COLUMN == flow.flow_id)
+                    .order_by(STEP_POSITION_COLUMN)
+                ).all()
+                serialized_steps = cast(list[PipelineFlowStepRecord], step_rows)
+                flows.append(self._serialize_flow(flow, serialized_steps))
+
         return {"flows": flows, "errors": errors}
 
-    def create_flow(self, payload: PipelineFlowCreatePayload) -> dict[str, Any]:
+    def create_flow(self, payload: PipelineFlowCreatePayload) -> PipelineFlowData:
         base_flow_id = self._slugify(payload.flow_name, "flow")
-        next_flow_id = base_flow_id
-        suffix = 2
-        while self._flow_path(next_flow_id).exists():
-            next_flow_id = f"{base_flow_id}_{suffix}"
-            suffix += 1
-
         timestamp = _now_iso()
-        file_payload = PipelineFlowFilePayload.model_validate(
-            {
-                "flow_id": next_flow_id,
-                "flow_name": payload.flow_name.strip(),
-                "created_at": timestamp,
-                "updated_at": timestamp,
-                "steps": [step.model_dump() for step in payload.steps],
-            }
-        ).model_dump()
 
-        target_path = self._flow_path(next_flow_id)
-        self._write_json_file(target_path, file_payload)
-        parsed_payload = PipelineFlowFilePayload.model_validate(file_payload)
-        return self._serialize_flow(parsed_payload, target_path.name)
+        with Session(engine) as session:
+            next_flow_id = base_flow_id
+            suffix = 2
+            while session.get(PipelineFlowRecord, next_flow_id) is not None:
+                next_flow_id = f"{base_flow_id}_{suffix}"
+                suffix += 1
 
-    def update_flow(self, flow_id: str, payload: PipelineFlowCreatePayload) -> dict[str, Any]:
-        target_path = self._flow_path(flow_id)
-        if not target_path.exists():
-            raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
+            parsed_payload = PipelineFlowFilePayload.model_validate(
+                {
+                    "flow_id": next_flow_id,
+                    "flow_name": payload.flow_name.strip(),
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "steps": [step.model_dump() for step in payload.steps],
+                }
+            )
 
-        raw_existing = self._read_json_file(target_path)
-        parsed_existing = self._validate_flow(raw_existing, target_path.name)
+            flow = PipelineFlowRecord(
+                flow_id=parsed_payload.flow_id,
+                flow_name=parsed_payload.flow_name,
+                created_at=parsed_payload.created_at,
+                updated_at=parsed_payload.updated_at,
+            )
+            session.add(flow)
 
-        updated_payload = PipelineFlowFilePayload.model_validate(
-            {
-                "flow_id": parsed_existing.flow_id,
-                "flow_name": payload.flow_name.strip(),
-                "created_at": parsed_existing.created_at,
-                "updated_at": _now_iso(),
-                "steps": [step.model_dump() for step in payload.steps],
-            }
-        ).model_dump()
-        self._write_json_file(target_path, updated_payload)
-        parsed_updated = PipelineFlowFilePayload.model_validate(updated_payload)
-        return self._serialize_flow(parsed_updated, target_path.name)
+            for position, step in enumerate(parsed_payload.steps, start=1):
+                session.add(
+                    PipelineFlowStepRecord(
+                        flow_id=parsed_payload.flow_id,
+                        position=position,
+                        step_type=step.type,
+                        label=step.label,
+                        command=step.command,
+                    )
+                )
 
-    def delete_flow(self, flow_id: str) -> dict[str, Any]:
-        target_path = self._flow_path(flow_id)
-        if not target_path.exists():
-            raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
-        target_path.unlink(missing_ok=True)
-        return {"deleted": True, "flow_id": self._slugify(flow_id, "flow")}
+            session.commit()
+
+            step_rows = session.exec(
+                select(PipelineFlowStepRecord)
+                .where(STEP_FLOW_ID_COLUMN == parsed_payload.flow_id)
+                .order_by(STEP_POSITION_COLUMN)
+            ).all()
+            serialized_steps = cast(list[PipelineFlowStepRecord], step_rows)
+            return self._serialize_flow(flow, serialized_steps)
+
+    def update_flow(
+        self,
+        flow_id: str,
+        payload: PipelineFlowCreatePayload,
+    ) -> PipelineFlowData:
+        normalized_flow_id = self._normalized_flow_id(flow_id)
+
+        with Session(engine) as session:
+            flow = session.get(PipelineFlowRecord, normalized_flow_id)
+            if flow is None:
+                raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
+
+            updated_payload = PipelineFlowFilePayload.model_validate(
+                {
+                    "flow_id": flow.flow_id,
+                    "flow_name": payload.flow_name.strip(),
+                    "created_at": flow.created_at,
+                    "updated_at": _now_iso(),
+                    "steps": [step.model_dump() for step in payload.steps],
+                }
+            )
+
+            flow.flow_name = updated_payload.flow_name
+            flow.updated_at = updated_payload.updated_at
+
+            existing_steps = session.exec(
+                select(PipelineFlowStepRecord).where(
+                    STEP_FLOW_ID_COLUMN == flow.flow_id
+                )
+            ).all()
+            step_records = cast(list[PipelineFlowStepRecord], existing_steps)
+            for step in step_records:
+                session.delete(step)
+
+            for position, step in enumerate(updated_payload.steps, start=1):
+                session.add(
+                    PipelineFlowStepRecord(
+                        flow_id=flow.flow_id,
+                        position=position,
+                        step_type=step.type,
+                        label=step.label,
+                        command=step.command,
+                    )
+                )
+
+            session.commit()
+
+            step_rows = session.exec(
+                select(PipelineFlowStepRecord)
+                .where(STEP_FLOW_ID_COLUMN == flow.flow_id)
+                .order_by(STEP_POSITION_COLUMN)
+            ).all()
+            serialized_steps = cast(list[PipelineFlowStepRecord], step_rows)
+            return self._serialize_flow(flow, serialized_steps)
+
+    def delete_flow(self, flow_id: str) -> PipelineFlowDeleteData:
+        normalized_flow_id = self._normalized_flow_id(flow_id)
+
+        with Session(engine) as session:
+            flow = session.get(PipelineFlowRecord, normalized_flow_id)
+            
+            if flow is None:
+                raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
+
+            session.exec(
+                delete(PipelineFlowStepRecord).where(
+                    STEP_FLOW_ID_COLUMN == normalized_flow_id
+                )
+            )
+            session.delete(flow)
+            session.commit()
+
+        return {"deleted": True, "flow_id": normalized_flow_id}

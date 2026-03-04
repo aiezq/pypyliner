@@ -1,10 +1,9 @@
-from src.app.core.constants import HISTORY_DB_PATH
 from src.app.services.command_packs import CommandPackManager
 from src.app.services.history_db import HistoryDatabase
 from src.app.services.pipeline_flows import PipelineFlowManager
 from src.app.services.runtime import RuntimeManager
 
-history_database = HistoryDatabase(HISTORY_DB_PATH)
+history_database = HistoryDatabase()
 runtime_manager = RuntimeManager(history_db=history_database)
 command_pack_manager = CommandPackManager()
 pipeline_flow_manager = PipelineFlowManager()
