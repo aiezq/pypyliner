@@ -87,8 +87,10 @@ Useful flags:
 - `--skip-setup`
 
 `make dev` now checks Node.js toolchain automatically.
-If `node` is missing, `scripts/dev.sh` will try to install it via system package manager
-(`brew` on macOS, `apt/dnf/yum/pacman/zypper` on Linux).
+If `node` is missing or too old, `scripts/dev.sh` first tries local user-level install of
+Node.js (`$HOME/.local/operator-helper/node`) from official Node tarball, without
+`apt-get update`.
+On Linux, system package manager install is used only as fallback if tarball install fails.
 
 One-time dependency setup only:
 
@@ -101,6 +103,12 @@ Quick git update:
 ```bash
 make update
 ```
+
+`make update` also cleans local frontend artifacts before pull:
+- `frontend/node_modules`
+- `frontend/dist`
+- `frontend/.vite`
+- `frontend/package-lock.json` (if exists)
 
 Direct runner help:
 
