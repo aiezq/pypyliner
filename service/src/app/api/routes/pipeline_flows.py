@@ -1,52 +1,44 @@
-from typing import Any
-
 from fastapi import APIRouter, Depends
 
-from src.app.api.errors import raise_http_error
 from src.app.deps import get_pipeline_flow_manager
 from src.app.schemas.pipeline_flow import PipelineFlowCreatePayload
+from src.app.schemas.responses import (
+    PipelineFlowDeleteResponse,
+    PipelineFlowListResponse,
+    PipelineFlowResponse,
+)
 from src.app.services.pipeline_flows import PipelineFlowManager
-from src.app.services.runtime import ServiceError
 
 router = APIRouter(prefix="/api/pipeline-flows", tags=["pipeline-flows"])
 
 
-@router.get("")
+@router.get("", response_model=PipelineFlowListResponse)
 async def list_pipeline_flows(
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict[str, Any]:
-    return manager.list_flows()
+) -> PipelineFlowListResponse:
+    return PipelineFlowListResponse.model_validate(manager.list_flows())
 
 
-@router.post("")
+@router.post("", response_model=PipelineFlowResponse)
 async def create_pipeline_flow(
     payload: PipelineFlowCreatePayload,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict[str, Any]:
-    try:
-        return manager.create_flow(payload)
-    except ServiceError as error:
-        raise_http_error(error)
+) -> PipelineFlowResponse:
+    return PipelineFlowResponse.model_validate(manager.create_flow(payload))
 
 
-@router.put("/{flow_id}")
+@router.put("/{flow_id}", response_model=PipelineFlowResponse)
 async def update_pipeline_flow(
     flow_id: str,
     payload: PipelineFlowCreatePayload,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict[str, Any]:
-    try:
-        return manager.update_flow(flow_id, payload)
-    except ServiceError as error:
-        raise_http_error(error)
+) -> PipelineFlowResponse:
+    return PipelineFlowResponse.model_validate(manager.update_flow(flow_id, payload))
 
 
-@router.delete("/{flow_id}")
+@router.delete("/{flow_id}", response_model=PipelineFlowDeleteResponse)
 async def delete_pipeline_flow(
     flow_id: str,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict[str, Any]:
-    try:
-        return manager.delete_flow(flow_id)
-    except ServiceError as error:
-        raise_http_error(error)
+) -> PipelineFlowDeleteResponse:
+    return PipelineFlowDeleteResponse.model_validate(manager.delete_flow(flow_id))

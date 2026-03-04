@@ -3,3 +3,5 @@ data/*
 .vscode
 .venv/*
 __pycache__/
+.tracecov
+.coverage

@@ -7,7 +7,7 @@ import shlex
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Literal, TypeAlias, TypeVar
+from typing import Awaitable, Callable, Final, Literal, TypeVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -29,15 +29,42 @@ from src.app.schemas.terminal import (
     ManualTerminalCreatePayload,
     ManualTerminalRenamePayload,
 )
+from src.app.schemas.events import (
+    RunCreatedEventData,
+    RunSessionLineEventData,
+    RunSessionStatusEventData,
+    RunStatusEventData,
+    RuntimeEventData,
+    RuntimeEventMessage,
+    RuntimeEventType,
+    SnapshotEventMessage,
+    TerminalClosedEventData,
+    TerminalCreatedEventData,
+    TerminalLineEventData,
+    TerminalStatusEventData,
+    TerminalUpdatedEventData,
+)
+from src.app.schemas.service_types import (
+    CompletionData,
+    HistoryData,
+    ManualTerminalData,
+    PipelineRunData,
+    PipelineSessionData,
+    StateSnapshotData,
+    TerminalLineData,
+)
 from src.app.services.history_db import HistoryDatabase
 
 StreamType = Literal["out", "err", "meta"]
 StatusType = Literal["idle", "pending", "running", "success", "failed", "stopped"]
 RunStatusType = Literal["running", "success", "failed", "stopped"]
-SerializedRecord: TypeAlias = dict[str, object]
-SerializedRecords: TypeAlias = list[SerializedRecord]
-EventPayload: TypeAlias = SerializedRecord
 T = TypeVar("T")
+
+# Keep local non-optional aliases for settings-derived constants.
+RUN_LOGS_DIR_PATH: Final[Path] = RUN_LOGS_DIR
+TERMINAL_LOGS_DIR_PATH: Final[Path] = TERMINAL_LOGS_DIR
+MANUAL_TERMINAL_CWD: Final[Path] = DEFAULT_MANUAL_TERMINAL_CWD
+MANUAL_TERMINAL_COMMAND: Final[str] = DEFAULT_MANUAL_TERMINAL_COMMAND
 
 
 @dataclass(slots=True)
@@ -112,12 +139,12 @@ class EventHub:
         async with self._lock:
             self._clients.discard(websocket)
 
-    async def broadcast(self, event_type: str, data: EventPayload) -> None:
+    async def broadcast(self, event_type: RuntimeEventType, data: RuntimeEventData) -> None:
         async with self._lock:
             clients = tuple(self._clients)
 
         stale_clients: list[WebSocket] = []
-        payload: SerializedRecord = {"type": event_type, "data": dict(data)}
+        payload: RuntimeEventMessage = {"type": event_type, "data": data}
         for client in clients:
             try:
                 await client.send_json(payload)
@@ -160,11 +187,11 @@ class RuntimeManager:
 
     async def ensure_dirs(self) -> None:
         await asyncio.gather(
-            asyncio.to_thread(RUN_LOGS_DIR.mkdir, parents=True, exist_ok=True),
-            asyncio.to_thread(TERMINAL_LOGS_DIR.mkdir, parents=True, exist_ok=True),
+            asyncio.to_thread(RUN_LOGS_DIR_PATH.mkdir, parents=True, exist_ok=True),
+            asyncio.to_thread(TERMINAL_LOGS_DIR_PATH.mkdir, parents=True, exist_ok=True),
         )
 
-    def _serialize_line(self, line: TerminalLine) -> SerializedRecord:
+    def _serialize_line(self, line: TerminalLine) -> TerminalLineData:
         return {
             "id": line.id,
             "stream": line.stream,
@@ -172,7 +199,7 @@ class RuntimeManager:
             "created_at": line.created_at,
         }
 
-    def _serialize_session(self, session: PipelineSessionState) -> SerializedRecord:
+    def _serialize_session(self, session: PipelineSessionState) -> PipelineSessionData:
         return {
             "id": session.id,
             "step_id": session.step_id,
@@ -183,7 +210,7 @@ class RuntimeManager:
             "lines": [self._serialize_line(line) for line in session.lines],
         }
 
-    def _serialize_run(self, run: PipelineRunState) -> SerializedRecord:
+    def _serialize_run(self, run: PipelineRunState) -> PipelineRunData:
         return {
             "id": run.id,
             "pipeline_name": run.pipeline_name,
@@ -194,7 +221,7 @@ class RuntimeManager:
             "sessions": [self._serialize_session(session) for session in run.sessions],
         }
 
-    def _serialize_terminal(self, terminal: ManualTerminalState) -> SerializedRecord:
+    def _serialize_terminal(self, terminal: ManualTerminalState) -> ManualTerminalData:
         return {
             "id": terminal.id,
             "title": terminal.title,
@@ -208,7 +235,7 @@ class RuntimeManager:
             "lines": [self._serialize_line(line) for line in terminal.lines],
         }
 
-    def snapshot(self) -> SerializedRecord:
+    def snapshot(self) -> StateSnapshotData:
         return {
             "runs": self.list_runs(),
             "manual_terminals": [
@@ -217,7 +244,10 @@ class RuntimeManager:
             ],
         }
 
-    def list_runs(self) -> SerializedRecords:
+    def snapshot_event(self) -> SnapshotEventMessage:
+        return {"type": "snapshot", "data": self.snapshot()}
+
+    def list_runs(self) -> list[PipelineRunData]:
         ordered = sorted(
             self.runs.values(),
             key=lambda run: run.started_at,
@@ -225,18 +255,18 @@ class RuntimeManager:
         )
         return [self._serialize_run(run) for run in ordered]
 
-    def list_manual_terminals(self) -> SerializedRecords:
+    def list_manual_terminals(self) -> list[ManualTerminalData]:
         return [
             self._serialize_terminal(terminal)
             for terminal in self.manual_terminals.values()
         ]
 
-    def history(self) -> SerializedRecord:
+    def history(self) -> HistoryData:
         if self.history_db is None:
             return {"runs": self.list_runs(), "manual_terminal_history": []}
         return self.history_db.fetch_history()
 
-    def get_run(self, run_id: str) -> SerializedRecord:
+    def get_run(self, run_id: str) -> PipelineRunData:
         run = self.runs.get(run_id)
         if run is None:
             raise ServiceError(status_code=404, detail="Run not found")
@@ -252,7 +282,7 @@ class RuntimeManager:
     def get_terminal_log_path(terminal_id: str) -> Path:
         if not terminal_id.startswith("terminal_"):
             raise ServiceError(status_code=404, detail="Terminal not found")
-        return TERMINAL_LOGS_DIR / f"{terminal_id}.log"
+        return TERMINAL_LOGS_DIR_PATH / f"{terminal_id}.log"
 
     def _get_log_lock(self, path: Path) -> asyncio.Lock:
         lock = self._log_locks.get(path)
@@ -282,7 +312,7 @@ class RuntimeManager:
 
     @staticmethod
     def _normalize_prompt_cwd(raw_cwd: str) -> str:
-        home_path = str(DEFAULT_MANUAL_TERMINAL_CWD)
+        home_path = str(MANUAL_TERMINAL_CWD)
         if raw_cwd == home_path:
             return "~"
         if raw_cwd.startswith(home_path + "/"):
@@ -300,7 +330,7 @@ class RuntimeManager:
             return None
 
         user = parts[0].strip() or "operator"
-        cwd = parts[1].strip() or str(DEFAULT_MANUAL_TERMINAL_CWD)
+        cwd = parts[1].strip() or str(MANUAL_TERMINAL_CWD)
         return user, self._normalize_prompt_cwd(cwd)
 
     async def _request_manual_prompt_probe(self, terminal: ManualTerminalState) -> None:
@@ -346,13 +376,13 @@ class RuntimeManager:
     def _resolve_terminal_cwd(terminal: ManualTerminalState) -> Path:
         raw = terminal.prompt_cwd.strip()
         if not raw or raw == "~":
-            return DEFAULT_MANUAL_TERMINAL_CWD
+            return MANUAL_TERMINAL_CWD
         if raw.startswith("~/"):
-            return DEFAULT_MANUAL_TERMINAL_CWD / raw[2:]
+            return MANUAL_TERMINAL_CWD / raw[2:]
         path = Path(raw).expanduser()
         if path.is_absolute():
             return path
-        return (DEFAULT_MANUAL_TERMINAL_CWD / path).resolve()
+        return (MANUAL_TERMINAL_CWD / path).resolve()
 
     @staticmethod
     def _collect_path_matches(cwd: Path, token_body: str, max_items: int = 200) -> list[str]:
@@ -463,14 +493,12 @@ class RuntimeManager:
             run.log_file_path,
             f"[{line.created_at}] [{session.title}] [{stream}] {text}",
         )
-        await self.events.broadcast(
-            "run_session_line",
-            {
-                "run_id": run.id,
-                "session_id": session.id,
-                "line": self._serialize_line(line),
-            },
-        )
+        payload: RunSessionLineEventData = {
+            "run_id": run.id,
+            "session_id": session.id,
+            "line": self._serialize_line(line),
+        }
+        await self.events.broadcast("run_session_line", payload)
 
     async def _append_manual_line(
         self,
@@ -489,13 +517,11 @@ class RuntimeManager:
             terminal.log_file_path,
             f"[{line.created_at}] [{terminal.title}] [{stream}] {text}",
         )
-        await self.events.broadcast(
-            "terminal_line",
-            {
-                "terminal_id": terminal.id,
-                "line": self._serialize_line(line),
-            },
-        )
+        payload: TerminalLineEventData = {
+            "terminal_id": terminal.id,
+            "line": self._serialize_line(line),
+        }
+        await self.events.broadcast("terminal_line", payload)
 
     def _persist_run(self, run: PipelineRunState, include_sessions: bool = False) -> None:
         if self.history_db is None:
@@ -556,14 +582,12 @@ class RuntimeManager:
 
     async def _emit_run_status(self, run: PipelineRunState) -> None:
         self._persist_run(run)
-        await self.events.broadcast(
-            "run_status",
-            {
-                "run_id": run.id,
-                "status": run.status,
-                "finished_at": run.finished_at,
-            },
-        )
+        payload: RunStatusEventData = {
+            "run_id": run.id,
+            "status": run.status,
+            "finished_at": run.finished_at,
+        }
+        await self.events.broadcast("run_status", payload)
 
     async def _emit_run_session_status(
         self,
@@ -571,26 +595,22 @@ class RuntimeManager:
         session: PipelineSessionState,
     ) -> None:
         self._persist_run_session(run, session)
-        await self.events.broadcast(
-            "run_session_status",
-            {
-                "run_id": run.id,
-                "session_id": session.id,
-                "status": session.status,
-                "exit_code": session.exit_code,
-            },
-        )
+        payload: RunSessionStatusEventData = {
+            "run_id": run.id,
+            "session_id": session.id,
+            "status": session.status,
+            "exit_code": session.exit_code,
+        }
+        await self.events.broadcast("run_session_status", payload)
 
     async def _emit_terminal_status(self, terminal: ManualTerminalState) -> None:
         self._persist_manual_terminal(terminal)
-        await self.events.broadcast(
-            "terminal_status",
-            {
-                "terminal_id": terminal.id,
-                "status": terminal.status,
-                "exit_code": terminal.exit_code,
-            },
-        )
+        payload: TerminalStatusEventData = {
+            "terminal_id": terminal.id,
+            "status": terminal.status,
+            "exit_code": terminal.exit_code,
+        }
+        await self.events.broadcast("terminal_status", payload)
 
     @staticmethod
     def _is_process_running(process: asyncio.subprocess.Process | None) -> bool:
@@ -612,13 +632,13 @@ class RuntimeManager:
         if self._is_process_running(terminal.current_process):
             return
 
-        argv = shlex.split(DEFAULT_MANUAL_TERMINAL_COMMAND)
+        argv = shlex.split(MANUAL_TERMINAL_COMMAND)
         if not argv:
             raise ServiceError(status_code=500, detail="Invalid default terminal command")
 
         process = await asyncio.create_subprocess_exec(
             *argv,
-            cwd=str(DEFAULT_MANUAL_TERMINAL_CWD),
+            cwd=str(MANUAL_TERMINAL_CWD),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -631,8 +651,8 @@ class RuntimeManager:
         await self._append_manual_line(
             terminal,
             "meta",
-            f"[start] interactive shell started: {DEFAULT_MANUAL_TERMINAL_COMMAND} "
-            f"(cwd={DEFAULT_MANUAL_TERMINAL_CWD})",
+            f"[start] interactive shell started: {MANUAL_TERMINAL_COMMAND} "
+            f"(cwd={MANUAL_TERMINAL_CWD})",
         )
         await self._emit_terminal_status(terminal)
 
@@ -662,10 +682,10 @@ class RuntimeManager:
                         if user != terminal.prompt_user or cwd != terminal.prompt_cwd:
                             terminal.prompt_user = user
                             terminal.prompt_cwd = cwd
-                            await self.events.broadcast(
-                                "terminal_updated",
-                                {"terminal": self._serialize_terminal(terminal)},
-                            )
+                            payload: TerminalUpdatedEventData = {
+                                "terminal": self._serialize_terminal(terminal)
+                            }
+                            await self.events.broadcast("terminal_updated", payload)
                         continue
                     await self._append_manual_line(terminal, stream_name, text)
         except Exception:
@@ -707,10 +727,10 @@ class RuntimeManager:
         )
         await self._emit_terminal_status(terminal)
 
-    async def create_pipeline_run(self, payload: PipelineRunCreatePayload) -> SerializedRecord:
+    async def create_pipeline_run(self, payload: PipelineRunCreatePayload) -> PipelineRunData:
         run_id = make_id("run")
         started_at = now_iso()
-        log_file_path = RUN_LOGS_DIR / f"{run_id}.log"
+        log_file_path = RUN_LOGS_DIR_PATH / f"{run_id}.log"
 
         sessions: list[PipelineSessionState] = []
         for index, step in enumerate(payload.steps, start=1):
@@ -736,7 +756,8 @@ class RuntimeManager:
         self.runs[run.id] = run
         self._persist_run(run, include_sessions=True)
         await self._append_log(log_file_path, f"[{started_at}] [run] started: {run.pipeline_name}")
-        await self.events.broadcast("run_created", {"run": self._serialize_run(run)})
+        event_payload: RunCreatedEventData = {"run": self._serialize_run(run)}
+        await self.events.broadcast("run_created", event_payload)
         asyncio.create_task(self._execute_pipeline_run(run))
         return self._serialize_run(run)
 
@@ -841,7 +862,7 @@ class RuntimeManager:
         )
         await self._emit_run_status(run)
 
-    async def stop_pipeline_run(self, run_id: str) -> SerializedRecord:
+    async def stop_pipeline_run(self, run_id: str) -> PipelineRunData:
         run = self.runs.get(run_id)
         if run is None:
             raise ServiceError(status_code=404, detail="Run not found")
@@ -857,7 +878,7 @@ class RuntimeManager:
     async def create_manual_terminal(
         self,
         payload: ManualTerminalCreatePayload,
-    ) -> SerializedRecord:
+    ) -> ManualTerminalData:
         terminal_id = make_id("terminal")
         title = payload.title or self._next_manual_terminal_title()
         terminal = ManualTerminalState(
@@ -868,7 +889,7 @@ class RuntimeManager:
             status="idle",
             exit_code=None,
             created_at=now_iso(),
-            log_file_path=TERMINAL_LOGS_DIR / f"{terminal_id}.log",
+            log_file_path=TERMINAL_LOGS_DIR_PATH / f"{terminal_id}.log",
         )
         self.manual_terminals[terminal.id] = terminal
         self._persist_manual_terminal(
@@ -882,17 +903,15 @@ class RuntimeManager:
         )
         await self._append_manual_line(terminal, "meta", "[ready] terminal created")
         await self._start_manual_terminal_shell(terminal)
-        await self.events.broadcast(
-            "terminal_created",
-            {"terminal": self._serialize_terminal(terminal)},
-        )
+        event_payload: TerminalCreatedEventData = {"terminal": self._serialize_terminal(terminal)}
+        await self.events.broadcast("terminal_created", event_payload)
         return self._serialize_terminal(terminal)
 
     async def run_manual_terminal_command(
         self,
         terminal_id: str,
         payload: ManualTerminalCommandPayload,
-    ) -> SerializedRecord:
+    ) -> ManualTerminalData:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -932,7 +951,7 @@ class RuntimeManager:
         self,
         terminal_id: str,
         payload: ManualTerminalAutocompletePayload,
-    ) -> SerializedRecord:
+    ) -> CompletionData:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -964,7 +983,7 @@ class RuntimeManager:
             "matches": matches,
         }
 
-    async def stop_manual_terminal(self, terminal_id: str) -> SerializedRecord:
+    async def stop_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -992,7 +1011,7 @@ class RuntimeManager:
         self,
         terminal_id: str,
         payload: ManualTerminalRenamePayload,
-    ) -> SerializedRecord:
+    ) -> ManualTerminalData:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -1010,13 +1029,11 @@ class RuntimeManager:
             terminal.log_file_path,
             f"[{now_iso()}] [terminal] renamed: {previous_title} -> {next_title}",
         )
-        await self.events.broadcast(
-            "terminal_updated",
-            {"terminal": self._serialize_terminal(terminal)},
-        )
+        event_payload: TerminalUpdatedEventData = {"terminal": self._serialize_terminal(terminal)}
+        await self.events.broadcast("terminal_updated", event_payload)
         return self._serialize_terminal(terminal)
 
-    async def clear_manual_terminal(self, terminal_id: str) -> SerializedRecord:
+    async def clear_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
         terminal = self.manual_terminals.get(terminal_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal not found")
@@ -1045,4 +1062,5 @@ class RuntimeManager:
             closed_at=timestamp,
         )
         self.manual_terminals.pop(terminal_id, None)
-        await self.events.broadcast("terminal_closed", {"terminal_id": terminal_id})
+        payload: TerminalClosedEventData = {"terminal_id": terminal_id}
+        await self.events.broadcast("terminal_closed", payload)
