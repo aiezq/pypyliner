@@ -1,4 +1,10 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
 import { isPipelineOpenTerminalCommand } from '../lib/mappers'
 import { toTerminalWorkbenchPanelKey } from './useWorkbenchLayout'
 import type { ManualTerminal, RunState } from '../types'
@@ -41,13 +47,39 @@ export const useWorkbenchTerminalsViewModel = ({
   const [editingPinnedTerminalTitleId, setEditingPinnedTerminalTitleId] = useState<
     string | null
   >(null)
+  const [dismissedRunWindowIds, setDismissedRunWindowIds] = useState<string[]>([])
 
-  const visibleRunSessions = useMemo(
+  const runSessions = useMemo(
     () =>
       run?.sessions.filter(
         (session) => !isPipelineOpenTerminalCommand(session.command),
       ) ?? [],
     [run],
+  )
+  const runWindowIds = useMemo(
+    () => runSessions.map((session) => `run:${session.id}`),
+    [runSessions],
+  )
+  const runWindowIdSet = useMemo(() => new Set(runWindowIds), [runWindowIds])
+
+  useEffect(() => {
+    setDismissedRunWindowIds((prev) => {
+      const next = prev.filter((windowId) => runWindowIdSet.has(windowId))
+      return next.length === prev.length ? prev : next
+    })
+  }, [runWindowIdSet])
+
+  const dismissedRunWindowIdSet = useMemo(
+    () => new Set(dismissedRunWindowIds),
+    [dismissedRunWindowIds],
+  )
+
+  const visibleRunSessions = useMemo(
+    () =>
+      runSessions.filter(
+        (session) => !dismissedRunWindowIdSet.has(`run:${session.id}`),
+      ),
+    [dismissedRunWindowIdSet, runSessions],
   )
 
   const terminalWindowItems = useMemo(
@@ -107,6 +139,15 @@ export const useWorkbenchTerminalsViewModel = ({
     )
   }
 
+  const dismissRunSessionWindow = (windowId: string): void => {
+    if (!windowId.startsWith('run:')) {
+      return
+    }
+    setDismissedRunWindowIds((prev) =>
+      prev.includes(windowId) ? prev : [...prev, windowId],
+    )
+  }
+
   const consumeRequestedMinimizeTerminalWindow = (windowId: string): void => {
     setRequestedMinimizedTerminalWindowIds((prev) =>
       prev.filter((id) => id !== windowId),
@@ -140,6 +181,7 @@ export const useWorkbenchTerminalsViewModel = ({
     pinnedTerminalPanelKeys,
     terminalInstancesCount,
     requestMinimizeTerminalWindow,
+    dismissRunSessionWindow,
     consumeRequestedMinimizeTerminalWindow,
     editingPinnedTerminalTitleId,
     startPinnedTerminalTitleEdit,

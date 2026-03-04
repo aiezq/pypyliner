@@ -61,6 +61,9 @@ describe('useWorkbenchPanelContentProps', () => {
       editingPinnedTerminalTitleId: null,
       togglePinTerminalWindow: vi.fn(),
       minimizePinnedTerminalWindow: vi.fn(),
+      terminalWindowsBaseProps: {
+        onDismissRunSessionWindow: vi.fn(),
+      },
       startPinnedTerminalTitleEdit: vi.fn(),
       cancelPinnedTerminalTitleEdit: vi.fn(),
       savePinnedTerminalTitleEdit: vi.fn(),
@@ -80,6 +83,9 @@ describe('useWorkbenchPanelContentProps', () => {
     expect(result.onReloadTemplates).toBe(pipelineFeature.catalog.reloadCommandPacks)
     expect(result.onUpdateManualCommand).toBe(terminalFeature.manual.updateManualCommand)
     expect(result.onTogglePinTerminalWindow).toBe(layoutFeature.togglePinTerminalWindow)
+    expect(result.onDismissRunSessionWindow).toBe(
+      layoutFeature.terminalWindowsBaseProps.onDismissRunSessionWindow,
+    )
     expect(result.isCopyTailRecentlyCopied('terminal_1')).toBe(true)
     expect(result.isCopyTailRecentlyCopied('terminal_2')).toBe(false)
   })

@@ -58,6 +58,7 @@ export const useWorkbenchPanelContentProps = ({
     terminalWindowMap: layoutFeature.terminalWindowMap,
     editingPinnedTerminalTitleId: layoutFeature.editingPinnedTerminalTitleId,
     onTogglePinTerminalWindow: layoutFeature.togglePinTerminalWindow,
+    onDismissRunSessionWindow: layoutFeature.terminalWindowsBaseProps.onDismissRunSessionWindow,
     onMinimizePinnedTerminalWindow: layoutFeature.minimizePinnedTerminalWindow,
     onUpdateManualTitle: manual.updateManualTitle,
     onStartPinnedTerminalTitleEdit: layoutFeature.startPinnedTerminalTitleEdit,
