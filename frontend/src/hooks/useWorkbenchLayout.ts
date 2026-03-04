@@ -248,6 +248,38 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
     Record<string, number>
   >({})
   const workbenchPanelResizeRef = useRef<WorkbenchPanelResizeState | null>(null)
+  const workbenchPanelWidthsRef = useRef<Record<string, number>>(workbenchPanelWidths)
+  const lastPersistedWorkbenchWidthsRef = useRef<string>('')
+
+  const persistWorkbenchPanelWidths = useCallback((nextWidths: Record<string, number>): void => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      const serialized = JSON.stringify(nextWidths)
+      if (lastPersistedWorkbenchWidthsRef.current === serialized) {
+        return
+      }
+      window.localStorage.setItem(WORKBENCH_WIDTHS_STORAGE_KEY, serialized)
+      lastPersistedWorkbenchWidthsRef.current = serialized
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [])
+
+  const updateWorkbenchPanelWidths = useCallback((
+    updater: (prev: Record<string, number>) => Record<string, number>,
+    options?: { persist?: boolean },
+  ): void => {
+    const shouldPersist = options?.persist === true
+    setWorkbenchPanelWidths((prev) => {
+      const next = updater(prev)
+      if (shouldPersist) {
+        persistWorkbenchPanelWidths(next)
+      }
+      return next
+    })
+  }, [persistWorkbenchPanelWidths])
 
   const visibleWorkbenchPanelOrder = useMemo(() => {
     const terminalPanelSet = new Set(terminalPanelKeys)
@@ -353,10 +385,10 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
         workbenchPanelPreviousWidths[panel] ??
         workbenchPanelWidths[panel] ??
         currentWidth
-      setWorkbenchPanelWidths((prev) => ({
+      updateWorkbenchPanelWidths((prev) => ({
         ...prev,
         [panel]: Math.max(MIN_WORKBENCH_PANEL_WIDTH, Math.round(restoreWidth)),
-      }))
+      }), { persist: true })
       setWorkbenchPanelFullWidth((prev) => ({
         ...prev,
         [panel]: false,
@@ -389,12 +421,12 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
         ...prev,
         [panel]: false,
       }))
-      setWorkbenchPanelWidths((prev) => ({
+      updateWorkbenchPanelWidths((prev) => ({
         ...prev,
         [panel]: prev[panel] ?? fallbackWidth,
-      }))
+      }), { persist: true })
     },
-    [],
+    [updateWorkbenchPanelWidths],
   )
 
   useEffect(() => {
@@ -426,17 +458,7 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
   }, [workbenchPanelCollapsed])
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    try {
-      window.localStorage.setItem(
-        WORKBENCH_WIDTHS_STORAGE_KEY,
-        JSON.stringify(workbenchPanelWidths),
-      )
-    } catch {
-      // Ignore storage errors.
-    }
+    workbenchPanelWidthsRef.current = workbenchPanelWidths
   }, [workbenchPanelWidths])
 
   useEffect(() => {
@@ -465,13 +487,16 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
         MIN_WORKBENCH_PANEL_WIDTH,
         Math.round(resizeState.startWidth + delta),
       )
-      setWorkbenchPanelWidths((prev) => ({
+      updateWorkbenchPanelWidths((prev) => ({
         ...prev,
         [resizeState.panel]: nextWidth,
       }))
     }
 
     const onMouseUp = (): void => {
+      if (workbenchPanelResizeRef.current !== null) {
+        persistWorkbenchPanelWidths(workbenchPanelWidthsRef.current)
+      }
       workbenchPanelResizeRef.current = null
     }
 
@@ -481,7 +506,7 @@ export const useWorkbenchLayout = ({ terminalPanelKeys }: UseWorkbenchLayoutOpti
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
-  }, [])
+  }, [persistWorkbenchPanelWidths, updateWorkbenchPanelWidths])
 
   return {
     draggingWorkbenchPanel,

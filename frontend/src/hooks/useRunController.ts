@@ -2,13 +2,14 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { apiRequest } from '../lib/api'
 import { applyRuntimeSocketEvent } from '../lib/runtimeSocketEvents'
 import { getErrorMessage, toRunState } from '../lib/mappers'
+import type { RuntimeSocketEvent } from '../lib/schemas'
 import { useRuntimeSocket } from './useRuntimeSocket'
-import type { BackendRun, PipelineStep, RunState, SocketEvent } from '../types'
+import type { BackendRun, PipelineStep, RunState } from '../types'
 
 type RuntimeSocketEventContext = Parameters<typeof applyRuntimeSocketEvent>[1]
 type RuntimeSocketEventContextFactory = () => Omit<
   RuntimeSocketEventContext,
-  'setBackendError' | 'setRun'
+  'setRun'
 >
 
 interface UseRunControllerOptions {
@@ -32,13 +33,12 @@ export const useRunController = ({
 
   const isRunning = run?.status === 'running'
 
-  const applySocketEvent = useCallback((event: SocketEvent): void => {
+  const applySocketEvent = useCallback((event: RuntimeSocketEvent): void => {
     applyRuntimeSocketEvent(event, {
-      setBackendError,
       setRun,
       ...getSocketEventContext(),
     })
-  }, [getSocketEventContext, setBackendError])
+  }, [getSocketEventContext])
 
   const onRuntimeSocketOpen = useCallback(async (): Promise<void> => {
     setBackendError(null)

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
+import { useModalA11y } from '../hooks/useModalA11y'
 import { formatTime } from '../lib/mappers'
 import type { BackendPipelineFlow } from '../types'
 
@@ -24,6 +25,9 @@ function PipelineFlowSettingsModal({
   onRenameFlow,
   onDeleteFlow,
 }: PipelineFlowSettingsModalProps) {
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const titleId = useId()
+  const descriptionId = useId()
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -39,22 +43,12 @@ function PipelineFlowSettingsModal({
     onClose()
   }, [onClose, resetLocalState])
 
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !isMutating) {
-        handleClose()
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [handleClose, isMutating, isOpen])
+  useModalA11y({
+    isOpen,
+    dialogRef,
+    onRequestClose: handleClose,
+    closeOnEscape: !isMutating,
+  })
 
   if (!isOpen) {
     return null
@@ -131,13 +125,19 @@ function PipelineFlowSettingsModal({
       }}
     >
       <section
+        ref={dialogRef}
         className="modalCard modalCard--flowSettings"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         onClick={(event) => {
           event.stopPropagation()
         }}
       >
         <div className="modalHead">
-          <h2>Workflow Settings</h2>
+          <h2 id={titleId}>Workflow Settings</h2>
           <button
             type="button"
             className="buttonGhost"
@@ -148,7 +148,7 @@ function PipelineFlowSettingsModal({
           </button>
         </div>
 
-        <p className="modalHint">
+        <p className="modalHint" id={descriptionId}>
           Rename, remove or quickly open saved pipeline workflows.
         </p>
 

@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { useModalA11y } from '../hooks/useModalA11y'
 import { CommandPackImportFormSchema } from '../lib/schemas'
 
 
@@ -18,6 +19,9 @@ function CommandPackImportModal({
   onClose,
   onImport,
 }: CommandPackImportModalProps) {
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const titleId = useId()
+  const descriptionId = useId()
   const {
     formState,
     handleSubmit,
@@ -35,6 +39,13 @@ function CommandPackImportModal({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const importContent = watch('content')
 
+  useModalA11y({
+    isOpen,
+    dialogRef,
+    onRequestClose: onClose,
+    closeOnEscape: !formState.isSubmitting,
+  })
+
   useEffect(() => {
     if (!isOpen) {
       reset({
@@ -42,20 +53,8 @@ function CommandPackImportModal({
         content: '',
       })
       setSubmitError(null)
-      return
     }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [isOpen, onClose, reset])
+  }, [isOpen, reset])
 
   if (!isOpen) {
     return null
@@ -107,13 +106,19 @@ function CommandPackImportModal({
       }}
     >
       <section
+        ref={dialogRef}
         className="modalCard"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         onClick={(event) => {
           event.stopPropagation()
         }}
       >
         <div className="modalHead">
-          <h2>Import JSON DLC</h2>
+          <h2 id={titleId}>Import JSON DLC</h2>
           <button
             type="button"
             className="buttonGhost"
@@ -124,7 +129,7 @@ function CommandPackImportModal({
           </button>
         </div>
 
-        <p className="modalHint">
+        <p className="modalHint" id={descriptionId}>
           Upload `.json` file or paste JSON content manually.
         </p>
 

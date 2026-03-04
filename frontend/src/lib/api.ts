@@ -7,7 +7,7 @@ export const WS_EVENTS_URL = `${API_BASE_URL.replace(/^http/, 'ws')}/ws/events`
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   const hasBody = init?.body !== undefined
-  if (hasBody && !headers.has('Content-Type')) {
+  if (hasBody && !headers.has('content-type')) {
     headers.set('Content-Type', 'application/json')
   }
 

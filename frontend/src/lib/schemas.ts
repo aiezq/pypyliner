@@ -118,10 +118,81 @@ export const BackendHistorySchema = z.object({
   manual_terminal_history: z.array(BackendManualTerminalHistorySchema),
 })
 
-export const SocketEventSchema = z.object({
-  type: z.string(),
-  data: z.unknown(),
-})
+export const SocketEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('snapshot'),
+    data: BackendSnapshotSchema,
+  }),
+  z.object({
+    type: z.literal('run_created'),
+    data: z.object({
+      run: BackendRunSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('run_status'),
+    data: z.object({
+      run_id: z.string(),
+      status: RunStatusSchema,
+      finished_at: z.string().nullable(),
+    }),
+  }),
+  z.object({
+    type: z.literal('run_session_status'),
+    data: z.object({
+      run_id: z.string(),
+      session_id: z.string(),
+      status: SessionStatusSchema,
+      exit_code: z.number().int().nullable(),
+    }),
+  }),
+  z.object({
+    type: z.literal('run_session_line'),
+    data: z.object({
+      run_id: z.string(),
+      session_id: z.string(),
+      line: BackendLineSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_created'),
+    data: z.object({
+      terminal: BackendManualTerminalSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_updated'),
+    data: z.object({
+      terminal: BackendManualTerminalSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_status'),
+    data: z.object({
+      terminal_id: z.string(),
+      status: SessionStatusSchema,
+      exit_code: z.number().int().nullable(),
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_line'),
+    data: z.object({
+      terminal_id: z.string(),
+      line: BackendLineSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_closed'),
+    data: z.object({
+      terminal_id: z.string(),
+    }),
+  }),
+])
+
+export const RuntimeSocketEventSchema = SocketEventSchema
+
+export type SocketEvent = z.infer<typeof SocketEventSchema>
+export type RuntimeSocketEvent = SocketEvent
 
 const NonEmptyTrimmedStringSchema = z
   .string()
