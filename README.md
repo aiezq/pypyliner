@@ -1,122 +1,115 @@
-# Operator Helper
+# Pypyliner Operator Helper
 
-Local desktop-style app for Linux operators:
-- build and run command pipelines;
-- open interactive terminal instances in UI;
-- keep logs and history on local machine.
+Pypyliner Operator Helper — локальное desktop-приложение для Linux-операторов.
+Оно объединяет визуальный запуск пайплайнов, интерактивные терминальные окна и постоянную историю запусков.
 
-Stack:
-- Frontend: React + TypeScript + Vite
-- Backend: FastAPI + asyncio subprocesses
-- Storage: JSON files + SQLite
+- Фронтенд: React 19 + TypeScript + Vite
+- Бэкенд: FastAPI + runtime на asyncio subprocess
+- Хранение данных: JSON-файлы (паки/флоу) + SQLite (история)
 
-Important:
-- this project is intentionally local-first;
-- no auth is implemented;
-- all commands run on the same host where backend is running.
+Важно:
+- модель single-host (все работает на одной машине);
+- нет auth/RBAC (только доверенная локальная среда);
+- команды выполняются на хосте, где запущен бэкенд.
 
-## What it does
+## Текущая функциональность
 
-- Pipeline Flow:
-  - create/edit/delete steps directly in flow ribbon;
-  - reorder steps with drag-and-drop;
-  - run sequentially;
-  - save and switch between named flows;
-  - manage saved flows in `Workflow settings` (rename/delete/open).
-- Command Packs (DLC-like JSON packs):
-  - core prepared commands;
-  - custom packs;
-  - import from UI (`Import JSON DLC`) or by dropping JSON files into folder.
-- Manual terminals:
-  - create separate terminal windows;
-  - pin/unpin into main workbench;
-  - rename, stop, clear, close;
-  - send on `Enter`;
-  - command history with `ArrowUp/ArrowDown`;
-  - path completion on `Tab` (including cycling matches);
-  - copy last `N` lines from terminal output.
-- History tab:
-  - pipeline runs and terminal command history loaded from SQLite.
-- Real-time updates:
-  - WebSocket events for run/session/terminal updates.
+### Фронтенд
 
-## Project structure
+- Workbench с перетаскиваемыми и сворачиваемыми панелями (`Pipeline Flow`, `Pipeline Dock`, `Terminal Instances`).
+- Лента pipeline flow с горизонтальным DnD-переупорядочиванием (`@hello-pangea/dnd`).
+- Inline-редактирование шагов флоу и подготовленных команд.
+- Импорт и управление JSON command packs из интерфейса.
+- Сохранение pipeline workflow с переключением, переименованием и удалением через `Workflow settings`.
+- Плавающие терминальные окна с pin/unpin в workbench.
+- Возможности терминала:
+  - отправка команды по `Enter`;
+  - история команд стрелками;
+  - автодополнение по `Tab` с циклическим перебором совпадений;
+  - копирование последних `N` строк вывода.
+- Вкладка истории (данные приходят из базы бэкенда).
+- Синхронизация runtime в реальном времени по WebSocket.
+
+### Бэкенд
+
+- Модульные FastAPI-роуты (`/api/*` + `/ws/events`).
+- Runtime-менеджер для последовательного выполнения pipeline и ручных терминалов.
+- Управление command packs (`service/command_packs/*.json`).
+- Управление pipeline flows (`service/pipeline_flows/*.json`).
+- SQLite-персистентность запусков и истории терминалов (`service/data/history.sqlite3`).
+- Модели SQLModel + автозапуск Alembic-миграций при старте.
+- Инициализация структурированного логирования и централизованных настроек (`pydantic-settings`).
+
+## Структура проекта
 
 ```text
 operator_helper/
-  frontend/                    # React app
-  service/                     # FastAPI service
-    command_packs/             # JSON command packs
-    pipeline_flows/            # Saved pipeline flows (JSON)
-    logs/
-      runs/                    # Pipeline run logs
-      terminals/               # Manual terminal logs
+  frontend/
+    src/
+      components/
+      features/
+      hooks/
+      lib/
+      stores/
+  service/
+    src/app/
+      api/routes/
+      core/
+      models/
+      schemas/
+      services/
+    command_packs/
+    pipeline_flows/
     data/
-      history.sqlite3          # History DB
+    logs/
+    alembic/
 ```
 
-## Requirements
+## Требования
 
-- Linux/macOS shell environment
+- Linux/macOS shell-окружение
 - Python 3.11+
-- Node.js 20+ (recommended)
-- pnpm or npm
+- Node.js >= 20.19 (или >= 22.12)
+- `pnpm` или `npm`
 
-## Quick start
+## Запуск приложения
 
-### One command (recommended)
+### Одной командой
 
-From repository root:
+Из корня репозитория:
 
 ```bash
 make dev
 ```
 
-With custom ports/flags:
+С кастомными портами и хостами:
 
 ```bash
-make dev -- --backend-port 9000 --frontend-port 5174
+make dev -- --backend-port 9000 --frontend-port 5174 --backend-host 0.0.0.0 --frontend-host 0.0.0.0
 ```
 
-Useful flags:
+Поддерживаемые флаги `scripts/dev.sh`:
 - `--backend-port <port>`
 - `--frontend-port <port>`
 - `--backend-host <host>`
 - `--frontend-host <host>`
 - `--api-base-url <url>`
+- `--setup-only`
 - `--skip-setup`
 
-`make dev` now checks Node.js toolchain automatically.
-If `node` is missing or too old, `scripts/dev.sh` first tries local user-level install of
-Node.js (`$HOME/.local/operator-helper/node`) from official Node tarball, without
-`apt-get update`.
-On Linux, system package manager install is used only as fallback if tarball install fails.
-
-One-time dependency setup only:
+Полезные команды:
 
 ```bash
-make setup
+make setup     # только установка зависимостей
+make update    # git pull --rebase + очистка локальных frontend-артефактов/кэша
 ```
 
-Quick git update:
+`make dev` автоматически проверяет Node.js и может локально установить Node в
+`$HOME/.local/operator-helper/node`, если системный Node отсутствует или устарел.
 
-```bash
-make update
-```
+### Ручной запуск
 
-`make update` also cleans local frontend artifacts before pull:
-- `frontend/node_modules`
-- `frontend/dist`
-- `frontend/.vite`
-- `frontend/package-lock.json` (if exists)
-
-Direct runner help:
-
-```bash
-./scripts/dev.sh --help
-```
-
-### 1) Backend
+Бэкенд:
 
 ```bash
 cd service
@@ -126,11 +119,7 @@ pip install -r requirements.txt
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API will be available at:
-- `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-
-### 2) Frontend
+Фронтенд:
 
 ```bash
 cd frontend
@@ -138,162 +127,132 @@ pnpm install
 pnpm dev
 ```
 
-If you use npm:
+Документация API: `http://localhost:8000/docs`
+
+## Конфигурация
+
+### Переменные окружения фронтенда
+
+- `VITE_API_BASE_URL` (по умолчанию вычисляется из host/port бэкенда).
+
+### Переменные окружения бэкенда (префикс `OPERATOR_`)
+
+Примеры:
+- `OPERATOR_DATABASE_URL`
+- `OPERATOR_LOGS_DIR`
+- `OPERATOR_DATA_DIR`
+- `OPERATOR_COMMAND_PACKS_DIR`
+- `OPERATOR_PIPELINE_FLOWS_DIR`
+
+Полный список и значения по умолчанию смотрите в `service/src/app/core/settings.py`.
+
+## Хранение данных и логи
+
+- Логи запусков pipeline: `service/logs/runs/run_<id>.log`
+- Логи терминалов: `service/logs/terminals/terminal_<id>.log`
+- БД истории: `service/data/history.sqlite3`
+- Наборы команд: `service/command_packs/*.json`
+- Pipeline flow: `service/pipeline_flows/*.json`
+
+## Обзор API
+
+Базовый URL: `http://localhost:8000`
+
+- Состояние и история:
+  - `GET /health`
+  - `GET /api/state`
+  - `GET /api/history`
+- Запуски (Runs):
+  - `GET /api/runs`
+  - `GET /api/runs/{run_id}`
+  - `POST /api/runs`
+  - `POST /api/runs/{run_id}/stop`
+  - `GET /api/runs/{run_id}/log`
+- Терминалы (Terminals):
+  - `GET /api/terminals`
+  - `POST /api/terminals`
+  - `POST /api/terminals/{terminal_id}/run`
+  - `POST /api/terminals/{terminal_id}/complete`
+  - `PATCH /api/terminals/{terminal_id}`
+  - `POST /api/terminals/{terminal_id}/stop`
+  - `POST /api/terminals/{terminal_id}/clear`
+  - `DELETE /api/terminals/{terminal_id}`
+  - `GET /api/terminals/{terminal_id}/log`
+- Наборы команд (Command packs):
+  - `GET /api/command-packs`
+  - `POST /api/command-packs/templates`
+  - `PATCH /api/command-packs/templates/{template_id}`
+  - `DELETE /api/command-packs/templates/{template_id}`
+  - `POST /api/command-packs/templates/{template_id}/move`
+  - `POST /api/command-packs/import`
+- Pipeline flow:
+  - `GET /api/pipeline-flows`
+  - `POST /api/pipeline-flows`
+  - `PUT /api/pipeline-flows/{flow_id}`
+  - `DELETE /api/pipeline-flows/{flow_id}`
+- WebSocket:
+  - `WS /ws/events`
+
+Специальная команда:
+- `operator:create_terminal` перехватывается бэкендом и создает ручной терминал вместо выполнения shell-команды как текста.
+
+## Тесты и покрытие
+
+### Фронтенд
+
+Команда:
 
 ```bash
-npm install
-npm run dev
+cd frontend
+npm run coverage
 ```
 
-Frontend defaults to backend URL `http://localhost:8000`.
+Последний локальный результат (2026-03-05):
+- файлов с тестами: `37 passed`
+- тестов: `167 passed`
+- покрытие:
+  - statements (инструкции): `96.60%`
+  - branches (ветвления): `84.11%`
+  - functions (функции): `99.42%`
+  - lines (строки): `96.48%`
 
-## Frontend environment
+### Сервис
 
-Optional:
-
-- `VITE_API_BASE_URL` - backend base URL.
-
-Example:
+Команда:
 
 ```bash
-VITE_API_BASE_URL=http://127.0.0.1:8000 pnpm dev
+cd service
+source .venv/bin/activate
+pytest --cov=src/app --cov-report=term-missing
 ```
 
-## Data, logs, and persistence
+Последний локальный результат (2026-03-05):
+- тестов: `51 passed`
+- общее покрытие: `90%` (`1844` statements, `176` missed)
 
-All persistent files are in `service/`:
+## Безопасность
 
-- Run logs: `service/logs/runs/run_<id>.log`
-- Terminal logs: `service/logs/terminals/terminal_<id>.log`
-- History DB: `service/data/history.sqlite3`
-- Command packs: `service/command_packs/*.json`
-- Pipeline flows: `service/pipeline_flows/*.json`
+- По дизайну отсутствуют auth и sandbox для команд.
+- Не открывайте сервис в недоверенные сети.
+- Используйте только в доверенной локальной/внутренней среде.
 
-`service/.gitignore` already ignores `logs/*` and `data/*`.
+## Решение проблем
 
-## Command pack format (JSON)
+### Фронтенд падает из-за версии Node.js
 
-Place file in `service/command_packs/` or import from UI.
+Vite требует Node `>=20.19` или `>=22.12`.
+Запустите `make dev` (авто-bootstrap) или установите более новую Node вручную.
 
-Example:
+### Ошибка импорта в бэкенде (`No module named 'app'`)
 
-```json
-{
-  "pack_id": "ops_pack",
-  "pack_name": "Ops Pack",
-  "description": "Reusable operator commands",
-  "commands": [
-    {
-      "id": "open_terminal",
-      "name": "Open terminal shell",
-      "command": "operator:create_terminal",
-      "description": "Create interactive terminal in app"
-    },
-    {
-      "name": "Check disk",
-      "command": "df -h",
-      "description": "Disk usage report"
-    }
-  ]
-}
-```
-
-Notes:
-- `id` for a command is optional; backend generates/normalizes it.
-- Core pack is `pack_id: "core"`.
-
-## Pipeline flow format (JSON)
-
-Saved flows are written to `service/pipeline_flows/*.json`.
-
-Example:
-
-```json
-{
-  "flow_id": "release_check",
-  "flow_name": "Release Check",
-  "created_at": "2026-03-04T10:00:00Z",
-  "updated_at": "2026-03-04T10:05:00Z",
-  "steps": [
-    { "type": "template", "label": "Open terminal shell", "command": "operator:create_terminal" },
-    { "type": "custom", "label": "Pull repo", "command": "git pull --rebase" }
-  ]
-}
-```
-
-## API overview
-
-Base URL: `http://localhost:8000`
-
-- `GET /health` - service status
-- `GET /api/state` - runtime snapshot
-- `GET /api/history` - run/terminal history from SQLite
-
-Runs:
-- `GET /api/runs`
-- `GET /api/runs/{run_id}`
-- `POST /api/runs` (create sequential run)
-- `POST /api/runs/{run_id}/stop`
-- `GET /api/runs/{run_id}/log`
-
-Manual terminals:
-- `GET /api/terminals`
-- `POST /api/terminals`
-- `POST /api/terminals/{terminal_id}/run`
-- `POST /api/terminals/{terminal_id}/complete`
-- `PATCH /api/terminals/{terminal_id}`
-- `POST /api/terminals/{terminal_id}/stop`
-- `POST /api/terminals/{terminal_id}/clear`
-- `DELETE /api/terminals/{terminal_id}`
-- `GET /api/terminals/{terminal_id}/log`
-
-Command packs:
-- `GET /api/command-packs`
-- `POST /api/command-packs/templates`
-- `PATCH /api/command-packs/templates/{template_id}`
-- `DELETE /api/command-packs/templates/{template_id}`
-- `POST /api/command-packs/templates/{template_id}/move`
-- `POST /api/command-packs/import`
-
-Pipeline flows:
-- `GET /api/pipeline-flows`
-- `POST /api/pipeline-flows`
-- `PUT /api/pipeline-flows/{flow_id}`
-- `DELETE /api/pipeline-flows/{flow_id}`
-
-WebSocket:
-- `WS /ws/events`
-
-## Special pipeline command
-
-`operator:create_terminal` is intercepted by backend as a special pipeline step.
-It does not run in shell; it creates an interactive manual terminal instance in the app.
-
-## Safety notes
-
-- No auth, no RBAC, no sandbox for command execution.
-- Commands run via backend shell on local host.
-- Use only in trusted local environment.
-- Do not expose backend port to untrusted network.
-
-## Troubleshooting
-
-### `ModuleNotFoundError: No module named 'app'`
-
-Run backend from `service/` directory with:
+Запускайте бэкенд из `service/` и используйте:
 
 ```bash
 uvicorn src.main:app --reload
 ```
 
-### Frontend cannot connect to API
+### Пустая история
 
-- ensure backend is running on port `8000`;
-- check `VITE_API_BASE_URL`;
-- open browser devtools and verify calls to `/api/*`.
-
-### History is empty
-
-- run at least one pipeline/manual command;
-- check that `service/data/history.sqlite3` exists;
-- ensure backend has write permissions for `service/data` and `service/logs`.
+- выполните хотя бы один pipeline или команду в ручном терминале;
+- проверьте, что существует `service/data/history.sqlite3`;
+- проверьте права на запись в `service/data` и `service/logs`.
