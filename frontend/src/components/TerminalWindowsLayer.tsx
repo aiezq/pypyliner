@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { ManualTerminal, TerminalLine, TerminalSession } from '../types'
 
+
 interface TerminalWindowsLayerProps {
   runSessions: TerminalSession[]
   manualTerminals: ManualTerminal[]

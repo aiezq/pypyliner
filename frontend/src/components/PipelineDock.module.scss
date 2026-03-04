@@ -1,0 +1,240 @@
+  .pipelineDock {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 0.8rem;
+    max-height: 72vh;
+    min-height: 520px;
+    min-width: 0;
+  }
+
+  .pipelineDockPanels {
+    height: 100%;
+    min-height: 0;
+    border: 1px solid rgba(112, 152, 216, 0.24);
+    border-radius: 14px;
+    padding: 0.5rem;
+    background: rgba(4, 12, 24, 0.62);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    align-items: stretch;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .pipelineDock,
+  .pipelineDockPanels,
+  .dockPanel {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(104, 148, 220, 0.55) rgba(6, 12, 23, 0.8);
+  }
+
+  .pipelineDock::-webkit-scrollbar,
+  .pipelineDockPanels::-webkit-scrollbar,
+  .dockPanel::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .pipelineDock::-webkit-scrollbar-track,
+  .pipelineDockPanels::-webkit-scrollbar-track,
+  .dockPanel::-webkit-scrollbar-track {
+    background: rgba(6, 12, 23, 0.68);
+    border-radius: 999px;
+  }
+
+  .pipelineDock::-webkit-scrollbar-thumb,
+  .pipelineDockPanels::-webkit-scrollbar-thumb,
+  .dockPanel::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(102, 181, 243, 0.72), rgba(79, 214, 167, 0.72));
+    border-radius: 999px;
+  }
+
+  .dockPanel {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .dockPanel--static {
+    min-height: fit-content;
+  }
+
+  .dockSection {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(6, 16, 34, 0.62);
+    padding: 0.55rem 0.65rem;
+    min-width: 0;
+  }
+
+  .dockSection[open] {
+    display: block;
+  }
+
+  .dockSection summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .dockSection[open] summary {
+    margin-bottom: 0.65rem;
+  }
+
+  .dockSectionHint {
+    margin: 0 0 0.55rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .dockHeadActions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .dockHeadActions span {
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .templatesSlim {
+    display: grid;
+    gap: 0.44rem;
+  }
+
+  .templateChip {
+    display: grid;
+    gap: 0.45rem;
+    background: rgba(8, 26, 46, 0.92);
+    border: 1px solid rgba(91, 128, 184, 0.48);
+    border-radius: 12px;
+    padding: 0.55rem;
+  }
+
+  .templateChipHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .templateChipMeta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .templateMoveToggle {
+    opacity: 0;
+    pointer-events: none;
+    padding: 0.22rem 0.48rem;
+    font-size: 0.8rem;
+    border-radius: 10px;
+    border-color: rgba(122, 160, 216, 0.46);
+    background: rgba(7, 23, 44, 0.95);
+  }
+
+  .templateChipHead:hover .templateMoveToggle,
+  .templateChipMeta:focus-within .templateMoveToggle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .templateChipActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .templateOriginBadge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .templateOriginBadge--core {
+    border-color: rgba(123, 184, 255, 0.54);
+    background: rgba(40, 101, 171, 0.28);
+    color: #c7e3ff;
+  }
+
+  .templateAddButton,
+  .templateDeleteButton {
+    padding: 0.36rem 0.62rem;
+    font-size: 0.74rem;
+  }
+
+  .templateDeleteButton {
+    border-color: rgba(230, 115, 115, 0.62);
+    background: linear-gradient(135deg, rgba(84, 24, 24, 0.9), rgba(106, 30, 30, 0.9));
+  }
+
+  .templateMovePanel {
+    display: grid;
+    gap: 0.45rem;
+    border: 1px solid rgba(108, 147, 208, 0.34);
+    border-radius: 10px;
+    background: rgba(5, 15, 30, 0.58);
+    padding: 0.5rem;
+  }
+
+  .templateMoveInputRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: center;
+  }
+
+  .templateMoveInputRow input {
+    padding: 0.4rem 0.55rem;
+  }
+
+  .templatePackList {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .templatePackList > span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .templatePackListItems {
+    display: flex;
+    gap: 0.36rem;
+    flex-wrap: wrap;
+  }
+
+  .templatePackChip {
+    padding: 0.26rem 0.52rem;
+    font-size: 0.72rem;
+    border-radius: 999px;
+  }
+
+  @media (max-width: 1060px) {
+    .pipelineDock {
+      max-height: none;
+      min-height: 0;
+    }
+
+    .pipelineDockPanels {
+      height: auto;
+      min-height: 0;
+    }
+  }

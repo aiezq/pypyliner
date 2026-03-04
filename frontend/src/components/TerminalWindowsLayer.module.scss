@@ -1,0 +1,440 @@
+  .terminalWindowsLayer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 850;
+  }
+
+  .terminalWindow {
+    position: fixed;
+    pointer-events: auto;
+    min-width: min(360px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    border: 1px solid rgba(110, 161, 229, 0.34);
+    border-radius: 14px;
+    background: linear-gradient(165deg, rgba(8, 18, 36, 0.96), rgba(3, 9, 20, 0.98));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  .terminalWindow--manual {
+    border-color: rgba(102, 206, 159, 0.36);
+  }
+
+  .terminalWindow--run {
+    border-color: rgba(110, 161, 229, 0.34);
+  }
+
+  .terminalWindow__dragbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.52rem 0.7rem;
+    border-bottom: 1px solid rgba(112, 158, 223, 0.28);
+    background: linear-gradient(120deg, rgba(13, 32, 60, 0.96), rgba(9, 26, 47, 0.94));
+    cursor: grab;
+    user-select: none;
+  }
+
+  .terminalWindow__dragbar:active {
+    cursor: grabbing;
+  }
+
+  .terminalWindow__title {
+    display: grid;
+    gap: 0.08rem;
+    min-width: 0;
+  }
+
+  .terminalWindow__titleMain {
+    display: flex;
+    align-items: center;
+    gap: 0.42rem;
+    min-width: 0;
+  }
+
+  .terminalWindow__titleMain strong {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .terminalWindow__titleInputRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.4rem;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .terminalWindow__titleInputRow input {
+    min-width: 0;
+    padding: 0.38rem 0.52rem;
+    border-radius: 9px;
+  }
+
+  .terminalWindow__titleInputRow .templateSaveButton {
+    padding: 0.3rem 0.52rem;
+    border-radius: 9px;
+  }
+
+  .terminalTitleEditButton {
+    padding: 0.24rem 0.46rem;
+    font-size: 0.82rem;
+    border-radius: 9px;
+  }
+
+  .terminalWindow__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .terminalWindowControl {
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border-color: rgba(132, 173, 231, 0.5);
+    background: rgba(9, 31, 58, 0.95);
+    color: var(--text);
+    line-height: 1;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .terminalWindowControl--danger {
+    border-color: rgba(236, 121, 121, 0.6);
+    background: rgba(102, 28, 34, 0.95);
+    color: #ffd2d2;
+  }
+
+  .terminalWindowControl--warning {
+    border-color: rgba(243, 179, 94, 0.62);
+    background: rgba(105, 66, 21, 0.95);
+    color: #ffe1b5;
+  }
+
+  .terminalWindowControl--pin {
+    border-color: rgba(109, 178, 243, 0.62);
+    background: rgba(25, 62, 111, 0.95);
+    color: #d5e9ff;
+  }
+
+  .terminalWindow__hint {
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+
+  .terminalWindow__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.52rem;
+    padding: 0.66rem;
+    min-height: 0;
+  }
+
+  .terminalWindow__meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  .terminalWindow .terminalBody {
+    max-height: none;
+    min-height: 0;
+    height: 100%;
+    flex: 1;
+  }
+
+  .terminalActions {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .terminalPrompt {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: #a5f4c8;
+    border: 1px solid rgba(94, 162, 126, 0.35);
+    border-radius: 10px;
+    background: rgba(16, 42, 33, 0.55);
+    padding: 0.56rem 0.65rem;
+    white-space: nowrap;
+  }
+
+  .terminalCommandInputWrap {
+    position: relative;
+    flex: 1 1 320px;
+    min-width: 220px;
+  }
+
+  .terminalCommandInputWrap input {
+    width: 100%;
+    padding-right: 4.9rem;
+  }
+
+  .terminalInputActions {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+  }
+
+  .terminalInputAction {
+    width: 1.85rem;
+    height: 1.85rem;
+    padding: 0;
+    border-radius: 9px;
+    border-color: rgba(126, 168, 231, 0.45);
+    background: rgba(8, 28, 52, 0.94);
+    display: grid;
+    place-items: center;
+  }
+
+  .terminalInputAction:hover:enabled {
+    transform: none;
+  }
+
+  .terminalInputActionIcon {
+    display: block;
+    line-height: 1;
+    font-size: 0.88rem;
+  }
+
+  .terminalInputAction--clear {
+    border-color: rgba(209, 126, 126, 0.56);
+    background: rgba(82, 30, 35, 0.95);
+    color: #ffd7d7;
+  }
+
+  .terminalInputAction--send {
+    border-color: rgba(96, 190, 126, 0.75);
+    background: linear-gradient(140deg, rgba(30, 144, 86, 0.96), rgba(28, 168, 93, 0.98));
+    color: #fff;
+  }
+
+  .terminalInputAction--send .terminalInputActionIcon {
+    font-size: 0.96rem;
+  }
+
+  .terminalFooterActions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .terminalCopyTailControl {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .terminalCopyTailControl input {
+    width: 4.5rem;
+    padding: 0.34rem 0.44rem;
+    border-radius: 8px;
+    text-align: right;
+  }
+
+  .terminalFooterCopyButton {
+    padding: 0.42rem 0.62rem;
+    border-radius: 9px;
+    border-color: rgba(122, 167, 229, 0.48);
+    background: rgba(9, 30, 56, 0.94);
+    font-size: 0.76rem;
+  }
+
+  .resizeHandle {
+    position: absolute;
+    z-index: 10;
+  }
+
+  .resizeHandle--n,
+  .resizeHandle--s {
+    left: 14px;
+    right: 14px;
+    height: 8px;
+  }
+
+  .resizeHandle--n {
+    top: 0;
+    cursor: ns-resize;
+  }
+
+  .resizeHandle--s {
+    bottom: 0;
+    cursor: ns-resize;
+  }
+
+  .resizeHandle--e,
+  .resizeHandle--w {
+    top: 14px;
+    bottom: 14px;
+    width: 8px;
+  }
+
+  .resizeHandle--e {
+    right: 0;
+    cursor: ew-resize;
+  }
+
+  .resizeHandle--w {
+    left: 0;
+    cursor: ew-resize;
+  }
+
+  .resizeHandle--ne,
+  .resizeHandle--nw,
+  .resizeHandle--se,
+  .resizeHandle--sw {
+    width: 14px;
+    height: 14px;
+  }
+
+  .resizeHandle--ne {
+    top: 0;
+    right: 0;
+    cursor: nesw-resize;
+  }
+
+  .resizeHandle--nw {
+    top: 0;
+    left: 0;
+    cursor: nwse-resize;
+  }
+
+  .resizeHandle--se {
+    right: 0;
+    bottom: 0;
+    cursor: nwse-resize;
+  }
+
+  .resizeHandle--sw {
+    left: 0;
+    bottom: 0;
+    cursor: nesw-resize;
+  }
+
+  .terminalDock {
+    position: fixed;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    z-index: 920;
+    pointer-events: none;
+  }
+
+  .terminalDock__list {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.55rem;
+    padding: 0.5rem 0.62rem;
+    border: 1px solid rgba(109, 157, 226, 0.34);
+    border-radius: 18px;
+    background: linear-gradient(140deg, rgba(10, 25, 48, 0.9), rgba(6, 17, 34, 0.92));
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(6px);
+  }
+
+  .terminalDock__item {
+    display: grid;
+    justify-items: center;
+    gap: 0.24rem;
+    width: 86px;
+    padding: 0.34rem 0.26rem 0.3rem;
+    border-radius: 12px;
+    border-color: rgba(109, 157, 226, 0.35);
+    background: linear-gradient(145deg, rgba(16, 45, 77, 0.92), rgba(10, 29, 54, 0.92));
+  }
+
+  .terminalDock__item:hover {
+    transform: translateY(-5px) scale(1.05);
+  }
+
+  .terminalDock__icon {
+    width: 1.68rem;
+    height: 1.68rem;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(128, 184, 247, 0.45);
+    background: rgba(18, 64, 98, 0.85);
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+
+  .terminalDock__label {
+    display: block;
+    max-width: 100%;
+    color: var(--muted);
+    font-size: 0.68rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .terminalBody {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(104, 148, 220, 0.55) rgba(6, 12, 23, 0.8);
+  }
+
+  .terminalBody::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .terminalBody::-webkit-scrollbar-track {
+    background: rgba(6, 12, 23, 0.68);
+    border-radius: 999px;
+  }
+
+  .terminalBody::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(102, 181, 243, 0.72), rgba(79, 214, 167, 0.72));
+    border-radius: 999px;
+  }
+
+  @media (max-width: 1060px) {
+    .terminalActions {
+      align-items: stretch;
+    }
+
+    .terminalCommandInputWrap {
+      flex-basis: 100%;
+      min-width: 0;
+    }
+
+    .terminalFooterActions {
+      justify-content: flex-start;
+    }
+
+    .terminalDock {
+      left: 8px;
+      right: 8px;
+      bottom: 10px;
+      transform: none;
+    }
+
+    .terminalDock__list {
+      width: 100%;
+      overflow-x: auto;
+    }
+  }

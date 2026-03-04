@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { formatTime } from '../lib/mappers'
 import type { BackendPipelineFlow } from '../types'
+
 
 interface PipelineFlowSettingsModalProps {
   isOpen: boolean
@@ -27,14 +28,16 @@ function PipelineFlowSettingsModal({
   const [editingName, setEditingName] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen) {
-      return
-    }
+  const resetLocalState = useCallback((): void => {
     setEditingFlowId(null)
     setEditingName('')
     setSubmitError(null)
-  }, [isOpen])
+  }, [])
+
+  const handleClose = useCallback((): void => {
+    resetLocalState()
+    onClose()
+  }, [onClose, resetLocalState])
 
   useEffect(() => {
     if (!isOpen) {
@@ -43,7 +46,7 @@ function PipelineFlowSettingsModal({
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && !isMutating) {
-        onClose()
+        handleClose()
       }
     }
 
@@ -51,7 +54,7 @@ function PipelineFlowSettingsModal({
     return () => {
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [isMutating, isOpen, onClose])
+  }, [handleClose, isMutating, isOpen])
 
   if (!isOpen) {
     return null
@@ -123,7 +126,7 @@ function PipelineFlowSettingsModal({
       className="modalBackdrop"
       onClick={() => {
         if (!isMutating) {
-          onClose()
+          handleClose()
         }
       }}
     >
@@ -138,7 +141,7 @@ function PipelineFlowSettingsModal({
           <button
             type="button"
             className="buttonGhost"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isMutating}
           >
             Close

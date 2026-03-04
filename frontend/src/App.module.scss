@@ -1,0 +1,27 @@
+  .app {
+    width: min(1500px, 96vw);
+    margin: 0 auto;
+    padding: 1.6rem 0 2.6rem;
+    display: grid;
+    gap: 1.1rem;
+    animation: fadeIn 400ms ease-out;
+  }
+
+  .appTabs {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .appTabButton {
+    border-color: rgba(118, 160, 223, 0.38);
+    background: rgba(7, 20, 40, 0.9);
+    color: var(--muted);
+    padding: 0.45rem 0.78rem;
+  }
+
+  .appTabButton--active {
+    border-color: rgba(100, 225, 177, 0.58);
+    background: linear-gradient(130deg, rgba(20, 97, 71, 0.9), rgba(20, 125, 88, 0.9));
+    color: #e9fff4;
+  }
