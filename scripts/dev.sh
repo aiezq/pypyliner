@@ -42,6 +42,94 @@ Examples:
 EOF
 }
 
+run_privileged() {
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    "$@"
+    return
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+    return
+  fi
+  echo "Need elevated privileges to install system packages, but sudo is not available." >&2
+  exit 1
+}
+
+install_node_macos() {
+  if command -v brew >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via Homebrew"
+    brew install node
+    return
+  fi
+  echo "Automatic Node.js install on macOS requires Homebrew." >&2
+  echo "Install Homebrew first, or install Node.js manually: https://nodejs.org/" >&2
+  exit 1
+}
+
+install_node_linux() {
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via apt-get"
+    run_privileged apt-get update
+    run_privileged apt-get install -y nodejs npm
+    return
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via dnf"
+    run_privileged dnf install -y nodejs npm
+    return
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via yum"
+    run_privileged yum install -y nodejs npm
+    return
+  fi
+  if command -v pacman >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via pacman"
+    run_privileged pacman -Sy --noconfirm nodejs npm
+    return
+  fi
+  if command -v zypper >/dev/null 2>&1; then
+    echo "[setup] Installing Node.js via zypper"
+    run_privileged zypper --non-interactive install nodejs npm
+    return
+  fi
+  echo "Could not detect supported package manager to install Node.js automatically." >&2
+  echo "Install Node.js manually: https://nodejs.org/" >&2
+  exit 1
+}
+
+ensure_node_toolchain() {
+  if command -v node >/dev/null 2>&1 && \
+    (command -v pnpm >/dev/null 2>&1 || command -v npm >/dev/null 2>&1); then
+    return
+  fi
+
+  echo "[setup] Node.js toolchain is missing. Attempting automatic install..."
+
+  case "$(uname -s)" in
+    Darwin)
+      install_node_macos
+      ;;
+    Linux)
+      install_node_linux
+      ;;
+    *)
+      echo "Unsupported OS for automatic Node.js installation: $(uname -s)" >&2
+      echo "Install Node.js manually: https://nodejs.org/" >&2
+      exit 1
+      ;;
+  esac
+
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Node.js installation finished, but 'node' is still not available in PATH." >&2
+    exit 1
+  fi
+  if ! command -v pnpm >/dev/null 2>&1 && ! command -v npm >/dev/null 2>&1; then
+    echo "Node.js installation finished, but neither npm nor pnpm is available." >&2
+    exit 1
+  fi
+}
+
 is_valid_port() {
   local value="$1"
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
@@ -144,6 +232,7 @@ ensure_backend_env() {
 }
 
 ensure_frontend_deps() {
+  ensure_node_toolchain
   pick_frontend_pm
   if [[ -d "$FRONTEND_DIR/node_modules" ]]; then
     return
