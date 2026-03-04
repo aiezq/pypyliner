@@ -1,3 +1,5 @@
+import type { SocketEvent as RuntimeSocketEventFromSchema } from './lib/schemas'
+
 export type StepType = 'template' | 'custom'
 export type StreamType = 'out' | 'err' | 'meta'
 export type SessionStatus =
@@ -187,7 +189,4 @@ export interface BackendHistory {
   manual_terminal_history: BackendManualTerminalHistory[]
 }
 
-export interface SocketEvent {
-  type: string
-  data: unknown
-}
+export type SocketEvent = RuntimeSocketEventFromSchema

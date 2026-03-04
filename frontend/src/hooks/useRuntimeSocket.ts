@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { WS_EVENTS_URL } from '../lib/api'
-import { SocketEventSchema } from '../lib/schemas'
-import type { SocketEvent } from '../types'
+import {
+  RuntimeSocketEventSchema,
+  type RuntimeSocketEvent,
+} from '../lib/schemas'
 
 interface UseRuntimeSocketOptions {
-  onEvent: (event: SocketEvent) => void
+  onEvent: (event: RuntimeSocketEvent) => void
   onOpen?: () => void | Promise<void>
   onOpenError?: (error: unknown) => void
   onErrorMessage?: (message: string) => void
@@ -48,7 +50,7 @@ export const useRuntimeSocket = ({
         }
         try {
           const rawPayload = JSON.parse(message.data) as unknown
-          const parsedEvent = SocketEventSchema.safeParse(rawPayload)
+          const parsedEvent = RuntimeSocketEventSchema.safeParse(rawPayload)
           if (!parsedEvent.success) {
             onErrorMessage?.('Failed to parse WebSocket event payload')
             return

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
 import PipelineDock from '../PipelineDock'
 import PipelineFlowPanel from '../PipelineFlowPanel'
+import TerminalPanel from '../TerminalPanel'
 import {
   WORKBENCH_PANEL_DOCK,
   WORKBENCH_PANEL_FLOW,
@@ -14,15 +14,10 @@ import type {
   ManualTerminal,
   PipelineStep,
   RunState,
-  TerminalLine,
 } from '../../types'
 
 
 type TerminalHistoryDirection = 'up' | 'down'
-
-interface PinnedTerminalOutputProps {
-  lines: TerminalLine[]
-}
 
 export interface WorkbenchPanelContentProps {
   panel: WorkbenchPanelKey
@@ -84,32 +79,6 @@ export interface WorkbenchPanelContentProps {
 }
 
 export type WorkbenchPanelBodyProps = Omit<WorkbenchPanelContentProps, 'panel'>
-
-function PinnedTerminalOutput({ lines }: PinnedTerminalOutputProps) {
-  const bodyRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const element = bodyRef.current
-    if (!element) {
-      return
-    }
-    element.scrollTop = element.scrollHeight
-  }, [lines.length])
-
-  return (
-    <div className="terminalBody" ref={bodyRef}>
-      {lines.map((line) => (
-        <p
-          key={line.id}
-          className={`line line--${line.stream}`}
-          title={new Date(line.createdAt).toLocaleTimeString()}
-        >
-          {line.text}
-        </p>
-      ))}
-    </div>
-  )
-}
 
 function WorkbenchPanelContent({
   panel,
@@ -233,23 +202,24 @@ function WorkbenchPanelContent({
     const session = windowItem.runSession
     return (
       <section className="panel pinnedTerminalPanel">
-        <div className="section__head">
-          <h2>{session.title}</h2>
-          <div className="pinnedTerminalHeadActions">
-            <button
-              type="button"
-              className="terminalWindowControl terminalWindowControl--pin"
-              onClick={() => onTogglePinTerminalWindow(windowItem.windowId)}
-              title="Unpin from workflow"
-            >
-              P
-            </button>
-            <span className={`status status--${session.status}`}>{session.status}</span>
-          </div>
-        </div>
-        <p className="terminalWindow__meta">exit: {session.exitCode ?? '...'}</p>
-        <code>{session.command}</code>
-        <PinnedTerminalOutput lines={session.lines} />
+        <TerminalPanel
+          variant="pinned"
+          kind="run"
+          session={session}
+          controls={
+            <>
+              <button
+                type="button"
+                className="terminalWindowControl terminalWindowControl--pin"
+                onClick={() => onTogglePinTerminalWindow(windowItem.windowId)}
+                title="Unpin from workflow"
+              >
+                P
+              </button>
+              <span className={`status status--${session.status}`}>{session.status}</span>
+            </>
+          }
+        />
       </section>
     )
   }
@@ -267,194 +237,81 @@ function WorkbenchPanelContent({
 
   return (
     <section className="panel pinnedTerminalPanel">
-      <div className="section__head">
-        <div className="pinnedTerminalTitle terminalTitleEditable templateEditable">
-          {isEditingTitle ? (
-            <div className="templateEditInline">
-              <input
-                value={terminal.titleDraft}
-                onChange={(event) => onUpdateManualTitle(terminal.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    void onSavePinnedTerminalTitleEdit(terminal)
-                    return
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault()
-                    onCancelPinnedTerminalTitleEdit(terminal)
-                  }
-                }}
-                placeholder="Terminal name"
-                autoFocus
-              />
-              <button
-                type="button"
-                className="templateSaveButton"
-                onClick={() => {
-                  void onSavePinnedTerminalTitleEdit(terminal)
-                }}
-                disabled={
-                  !terminal.titleDraft.trim() ||
-                  terminal.titleDraft.trim() === terminal.title
-                }
-                title={`Save terminal name: ${terminal.title}`}
-              >
-                ✓
-              </button>
-            </div>
-          ) : (
-            <div className="pinnedTerminalTitleMain">
-              <h2>{terminal.title}</h2>
-              <button
-                type="button"
-                className="templateEditButton terminalTitleEditButton"
-                onClick={() => onStartPinnedTerminalTitleEdit(terminal)}
-                aria-label={`Edit terminal name: ${terminal.title}`}
-              >
-                ✎
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="pinnedTerminalHeadActions">
-          <button
-            type="button"
-            className="terminalWindowControl terminalWindowControl--pin"
-            onClick={() => onTogglePinTerminalWindow(windowItem.windowId)}
-            title="Unpin from workflow"
-          >
-            P
-          </button>
-          <button
-            type="button"
-            className="terminalWindowControl"
-            onClick={() => onMinimizePinnedTerminalWindow(windowItem.windowId)}
-            title="Minimize to dock"
-          >
-            -
-          </button>
-          <button
-            type="button"
-            className="terminalWindowControl terminalWindowControl--warning"
-            onClick={() => {
-              void onStopManualTerminal(terminal.id)
-            }}
-            title="Stop terminal"
-            disabled={terminal.status !== 'running'}
-          >
-            ‖
-          </button>
-          <button
-            type="button"
-            className="terminalWindowControl terminalWindowControl--danger"
-            onClick={() => {
-              void onRemoveManualTerminal(terminal.id)
-            }}
-            title="Close terminal"
-          >
-            ×
-          </button>
-          <span className={`status status--${terminal.status}`}>{terminal.status}</span>
-        </div>
-      </div>
-
-      <p className="terminalWindow__meta">exit: {terminal.exitCode ?? '...'}</p>
-
-      <div className="terminalActions">
-        <span
-          className="terminalPrompt"
-          title={`${terminal.promptUser}:${terminal.promptCwd}`}
-        >
-          {terminal.promptUser}:{terminal.promptCwd}$
-        </span>
-        <div className="terminalCommandInputWrap">
-          <input
-            value={terminal.draftCommand}
-            onChange={(event) => onUpdateManualCommand(terminal.id, event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Tab' && !event.shiftKey) {
-                event.preventDefault()
-                void onAutocompleteManualCommand(terminal.id)
-                return
-              }
-              if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-                event.preventDefault()
-                onNavigateManualHistory(
-                  terminal.id,
-                  event.key === 'ArrowUp' ? 'up' : 'down',
-                  terminal.draftCommand,
-                )
-                return
-              }
-              if (event.key !== 'Enter') {
-                return
-              }
-              if (event.nativeEvent.isComposing || !terminal.draftCommand.trim()) {
-                return
-              }
-              event.preventDefault()
-              void onRunManualCommand(terminal.id)
-            }}
-            placeholder="Type command, e.g. ls -la /opt/app"
-          />
-          <div className="terminalInputActions">
+      <TerminalPanel
+        variant="pinned"
+        kind="manual"
+        terminal={terminal}
+        isEditingTitle={isEditingTitle}
+        onUpdateTitleDraft={(title) => onUpdateManualTitle(terminal.id, title)}
+        onStartTitleEdit={() => onStartPinnedTerminalTitleEdit(terminal)}
+        onCancelTitleEdit={() => onCancelPinnedTerminalTitleEdit(terminal)}
+        onSaveTitleEdit={() => {
+          void onSavePinnedTerminalTitleEdit(terminal)
+        }}
+        onUpdateCommand={(command) => onUpdateManualCommand(terminal.id, command)}
+        onAutocompleteCommand={() => {
+          void onAutocompleteManualCommand(terminal.id)
+        }}
+        onNavigateHistory={(direction, currentDraft) =>
+          onNavigateManualHistory(terminal.id, direction, currentDraft)
+        }
+        onRunCommand={() => {
+          void onRunManualCommand(terminal.id)
+        }}
+        onClearTerminal={() => {
+          void onClearManualTerminal(terminal.id)
+        }}
+        copyTailLineCount={getCopyTailLineCount(terminal.id)}
+        onUpdateCopyTailLineCount={(rawValue) =>
+          onUpdateCopyTailLineCount(terminal.id, rawValue)
+        }
+        onCopyTail={() => {
+          void onCopyManualTerminalTail(terminal.id)
+        }}
+        isCopyTailRecentlyCopied={isCopyTailRecentlyCopied(terminal.id)}
+        controls={
+          <>
             <button
               type="button"
-              className="terminalInputAction terminalInputAction--clear"
-              onClick={() => {
-                void onClearManualTerminal(terminal.id)
-              }}
-              title="Clear output"
-              aria-label="Clear output"
+              className="terminalWindowControl terminalWindowControl--pin"
+              onClick={() => onTogglePinTerminalWindow(windowItem.windowId)}
+              title="Unpin from workflow"
             >
-              <span className="terminalInputActionIcon" aria-hidden="true">
-                🗑
-              </span>
+              P
             </button>
             <button
               type="button"
-              className="terminalInputAction terminalInputAction--send"
-              onClick={() => {
-                void onRunManualCommand(terminal.id)
-              }}
-              disabled={!terminal.draftCommand.trim()}
-              title="Send command"
-              aria-label="Send command"
+              className="terminalWindowControl"
+              onClick={() => onMinimizePinnedTerminalWindow(windowItem.windowId)}
+              title="Minimize to dock"
             >
-              <span className="terminalInputActionIcon" aria-hidden="true">
-                ➜
-              </span>
+              -
             </button>
-          </div>
-        </div>
-      </div>
-
-      <PinnedTerminalOutput lines={terminal.lines} />
-      <div className="terminalFooterActions">
-        <label className="terminalCopyTailControl">
-          <span>Last</span>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={getCopyTailLineCount(terminal.id)}
-            onChange={(event) => onUpdateCopyTailLineCount(terminal.id, event.target.value)}
-            title="Number of lines to copy"
-          />
-          <span>lines</span>
-        </label>
-        <button
-          type="button"
-          className="terminalFooterCopyButton"
-          onClick={() => {
-            void onCopyManualTerminalTail(terminal.id)
-          }}
-          title="Copy last lines to clipboard"
-        >
-          {isCopyTailRecentlyCopied(terminal.id) ? 'Copied' : 'Copy tail'}
-        </button>
-      </div>
+            <button
+              type="button"
+              className="terminalWindowControl terminalWindowControl--warning"
+              onClick={() => {
+                void onStopManualTerminal(terminal.id)
+              }}
+              title="Stop terminal"
+              disabled={terminal.status !== 'running'}
+            >
+              ‖
+            </button>
+            <button
+              type="button"
+              className="terminalWindowControl terminalWindowControl--danger"
+              onClick={() => {
+                void onRemoveManualTerminal(terminal.id)
+              }}
+              title="Close terminal"
+            >
+              ×
+            </button>
+            <span className={`status status--${terminal.status}`}>{terminal.status}</span>
+          </>
+        }
+      />
     </section>
   )
 }

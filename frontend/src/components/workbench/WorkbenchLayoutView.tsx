@@ -10,7 +10,7 @@ import {
 } from '../../hooks/useWorkbenchLayout'
 
 
-interface WorkbenchLayoutViewProps {
+export interface WorkbenchLayoutViewProps {
   visibleWorkbenchPanelOrder: WorkbenchPanelKey[]
   draggingWorkbenchPanel: WorkbenchPanelKey | null
   dragOverWorkbenchPanel: WorkbenchPanelKey | null

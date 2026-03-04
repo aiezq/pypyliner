@@ -5,16 +5,10 @@ import {
   toTerminalLine,
   upsertManualTerminal,
 } from './mappers'
-import { BackendSnapshotSchema } from './schemas'
+import type { RuntimeSocketEvent } from './schemas'
 import type {
-  BackendLine,
-  BackendManualTerminal,
-  BackendRun,
   ManualTerminal,
   RunState,
-  RunStatus,
-  SessionStatus,
-  SocketEvent,
 } from '../types'
 
 interface TerminalCommandHistory {
@@ -30,7 +24,6 @@ interface TerminalCompletionCycle {
 }
 
 interface ApplyRuntimeSocketEventContext {
-  setBackendError: Dispatch<SetStateAction<string | null>>
   setRun: Dispatch<SetStateAction<RunState | null>>
   setManualTerminals: Dispatch<SetStateAction<ManualTerminal[]>>
   manualCommandHistoryRef: MutableRefObject<Record<string, TerminalCommandHistory>>
@@ -45,11 +38,10 @@ interface ApplyRuntimeSocketEventContext {
 }
 
 export const applyRuntimeSocketEvent = (
-  event: SocketEvent,
+  event: RuntimeSocketEvent,
   context: ApplyRuntimeSocketEventContext,
 ): void => {
   const {
-    setBackendError,
     setRun,
     setManualTerminals,
     manualCommandHistoryRef,
@@ -63,12 +55,7 @@ export const applyRuntimeSocketEvent = (
 
   switch (event.type) {
     case 'snapshot': {
-      const parsedSnapshot = BackendSnapshotSchema.safeParse(event.data)
-      if (!parsedSnapshot.success) {
-        setBackendError('Failed to parse snapshot payload')
-        break
-      }
-      const data = parsedSnapshot.data
+      const data = event.data
       const latestRun = data.runs
         .map(toRunState)
         .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0]
@@ -99,17 +86,13 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'run_created': {
-      const data = event.data as { run: BackendRun }
+      const data = event.data
       const nextRun = toRunState(data.run)
       setRun(nextRun)
       break
     }
     case 'run_status': {
-      const data = event.data as {
-        run_id: string
-        status: RunStatus
-        finished_at: string | null
-      }
+      const data = event.data
       setRun((prev) => {
         if (!prev || prev.id !== data.run_id) {
           return prev
@@ -123,12 +106,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'run_session_status': {
-      const data = event.data as {
-        run_id: string
-        session_id: string
-        status: SessionStatus
-        exit_code: number | null
-      }
+      const data = event.data
       setRun((prev) => {
         if (!prev || prev.id !== data.run_id) {
           return prev
@@ -149,11 +127,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'run_session_line': {
-      const data = event.data as {
-        run_id: string
-        session_id: string
-        line: BackendLine
-      }
+      const data = event.data
       const nextLine = toTerminalLine(data.line)
       setRun((prev) => {
         if (!prev || prev.id !== data.run_id) {
@@ -174,7 +148,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'terminal_created': {
-      const data = event.data as { terminal: BackendManualTerminal }
+      const data = event.data
       const terminal = toManualTerminal(data.terminal)
       setManualTerminals((prev) => upsertManualTerminal(prev, terminal))
       if (!(terminal.id in manualCommandHistoryRef.current)) {
@@ -191,7 +165,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'terminal_updated': {
-      const data = event.data as { terminal: BackendManualTerminal }
+      const data = event.data
       const terminal = toManualTerminal(data.terminal)
       setManualTerminals((prev) => upsertManualTerminal(prev, terminal))
       if (!(terminal.id in manualCommandHistoryRef.current)) {
@@ -208,11 +182,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'terminal_status': {
-      const data = event.data as {
-        terminal_id: string
-        status: SessionStatus
-        exit_code: number | null
-      }
+      const data = event.data
       setManualTerminals((prev) =>
         prev.map((terminal) =>
           terminal.id === data.terminal_id
@@ -227,10 +197,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'terminal_line': {
-      const data = event.data as {
-        terminal_id: string
-        line: BackendLine
-      }
+      const data = event.data
       const nextLine = toTerminalLine(data.line)
       setManualTerminals((prev) =>
         prev.map((terminal) =>
@@ -245,7 +212,7 @@ export const applyRuntimeSocketEvent = (
       break
     }
     case 'terminal_closed': {
-      const data = event.data as { terminal_id: string }
+      const data = event.data
       setManualTerminals((prev) =>
         prev.filter((terminal) => terminal.id !== data.terminal_id),
       )
