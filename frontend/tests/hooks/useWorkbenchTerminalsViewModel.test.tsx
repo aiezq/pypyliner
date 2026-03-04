@@ -78,10 +78,13 @@ describe('useWorkbenchTerminalsViewModel', () => {
     expect(result.current.terminalInstancesCount).toBe(2)
 
     act(() => {
+      result.current.dismissRunSessionWindow('run:session_regular')
       result.current.requestMinimizeTerminalWindow('manual:1')
       result.current.consumeRequestedMinimizeTerminalWindow('run:session_regular')
     })
     expect(setRequestedMinimizedTerminalWindowIds).toHaveBeenCalledTimes(2)
+    expect(result.current.visibleRunSessions).toHaveLength(0)
+    expect(result.current.terminalInstancesCount).toBe(1)
 
     act(() => {
       result.current.startPinnedTerminalTitleEdit(makeManual('1'))

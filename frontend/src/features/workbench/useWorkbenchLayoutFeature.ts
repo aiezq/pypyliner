@@ -35,6 +35,7 @@ export const useWorkbenchLayoutFeature = ({
     pinnedTerminalPanelKeys,
     terminalInstancesCount,
     requestMinimizeTerminalWindow,
+    dismissRunSessionWindow,
     consumeRequestedMinimizeTerminalWindow,
     editingPinnedTerminalTitleId,
     startPinnedTerminalTitleEdit,
@@ -120,6 +121,7 @@ export const useWorkbenchLayoutFeature = ({
       requestedMinimizedWindowIds: effectiveRequestedMinimizedTerminalWindowIds,
       onConsumeRequestedMinimizeWindow: consumeRequestedMinimizeTerminalWindow,
       onTogglePinWindow: togglePinTerminalWindow,
+      onDismissRunSessionWindow: dismissRunSessionWindow,
     },
     shouldRenderTerminalWindowsLayer:
       visibleRunSessions.length > 0 || manualTerminals.length > 0,

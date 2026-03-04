@@ -56,6 +56,7 @@ export interface WorkbenchPanelContentProps {
   terminalWindowMap: Map<string, WorkbenchTerminalWindowItem>
   editingPinnedTerminalTitleId: string | null
   onTogglePinTerminalWindow: (windowId: string) => void
+  onDismissRunSessionWindow: (windowId: string) => void
   onMinimizePinnedTerminalWindow: (windowId: string) => void
   onUpdateManualTitle: (terminalId: string, title: string) => void
   onStartPinnedTerminalTitleEdit: (terminal: ManualTerminal) => void
@@ -114,6 +115,7 @@ function WorkbenchPanelContent({
   terminalWindowMap,
   editingPinnedTerminalTitleId,
   onTogglePinTerminalWindow,
+  onDismissRunSessionWindow,
   onMinimizePinnedTerminalWindow,
   onUpdateManualTitle,
   onStartPinnedTerminalTitleEdit,
@@ -215,6 +217,14 @@ function WorkbenchPanelContent({
                 title="Unpin from workflow"
               >
                 P
+              </button>
+              <button
+                type="button"
+                className="terminalWindowControl terminalWindowControl--danger"
+                onClick={() => onDismissRunSessionWindow(windowItem.windowId)}
+                title="Close output window"
+              >
+                ×
               </button>
               <span className={`status status--${session.status}`}>{session.status}</span>
             </>

@@ -19,6 +19,7 @@ interface FloatingTerminalWindowProps {
     event: ReactMouseEvent<HTMLElement>,
   ) => void
   onTogglePin: () => void
+  onDismissRunSession: () => void
   onMinimize: () => void
   getCopyTailLineCount: (terminalId: string) => number
   isCopyTailRecentlyCopied: (terminalId: string) => boolean
@@ -50,6 +51,7 @@ function FloatingTerminalWindow({
   onBeginDrag,
   onBeginResize,
   onTogglePin,
+  onDismissRunSession,
   onMinimize,
   getCopyTailLineCount,
   isCopyTailRecentlyCopied,
@@ -106,6 +108,15 @@ function FloatingTerminalWindow({
                 title="Minimize"
               >
                 -
+              </button>
+              <button
+                type="button"
+                className="terminalWindowControl terminalWindowControl--danger"
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={onDismissRunSession}
+                title="Close output window"
+              >
+                ×
               </button>
               <span className={`status status--${session.status}`}>{session.status}</span>
             </>
