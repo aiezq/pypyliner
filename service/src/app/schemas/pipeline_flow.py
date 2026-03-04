@@ -9,9 +9,13 @@ class PipelineFlowStepPayload(BaseModel):
     command: str = Field(default="", max_length=5000)
 
 
+def _new_steps() -> list[PipelineFlowStepPayload]:
+    return []
+
+
 class PipelineFlowCreatePayload(BaseModel):
     flow_name: str = Field(min_length=1, max_length=200)
-    steps: list[PipelineFlowStepPayload] = Field(default_factory=list, max_length=500)
+    steps: list[PipelineFlowStepPayload] = Field(default_factory=_new_steps, max_length=500)
 
 
 class PipelineFlowFilePayload(BaseModel):
@@ -19,4 +23,4 @@ class PipelineFlowFilePayload(BaseModel):
     flow_name: str = Field(min_length=1, max_length=200)
     created_at: str = Field(min_length=1, max_length=80)
     updated_at: str = Field(min_length=1, max_length=80)
-    steps: list[PipelineFlowStepPayload] = Field(default_factory=list, max_length=500)
+    steps: list[PipelineFlowStepPayload] = Field(default_factory=_new_steps, max_length=500)

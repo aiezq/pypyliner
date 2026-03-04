@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from src.app.core.constants import PIPELINE_FLOWS_DIR
 from src.app.schemas.pipeline_flow import (
@@ -44,7 +44,7 @@ class PipelineFlowManager:
 
         if not isinstance(payload, dict):
             raise ServiceError(status_code=400, detail=f"Pipeline flow file '{path.name}' must contain a JSON object")
-        return payload
+        return cast(dict[str, Any], payload)
 
     @staticmethod
     def _write_json_file(path: Path, payload: dict[str, Any]) -> None:

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
@@ -18,12 +19,12 @@ def _read_text(path: Path) -> str:
 
 
 @router.get("")
-async def get_runs(runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def get_runs(runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, Any]:
     return {"runs": runtime.list_runs()}
 
 
 @router.get("/{run_id}")
-async def get_run(run_id: str, runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def get_run(run_id: str, runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, Any]:
     try:
         return runtime.get_run(run_id)
     except ServiceError as error:
@@ -34,12 +35,12 @@ async def get_run(run_id: str, runtime: RuntimeManager = Depends(get_runtime)) -
 async def create_run(
     payload: PipelineRunCreatePayload,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> dict:
+) -> dict[str, Any]:
     return await runtime.create_pipeline_run(payload)
 
 
 @router.post("/{run_id}/stop")
-async def stop_run(run_id: str, runtime: RuntimeManager = Depends(get_runtime)) -> dict:
+async def stop_run(run_id: str, runtime: RuntimeManager = Depends(get_runtime)) -> dict[str, Any]:
     try:
         return await runtime.stop_pipeline_run(run_id)
     except ServiceError as error:

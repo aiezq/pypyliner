@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from src.app.api.errors import raise_http_error
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/api/pipeline-flows", tags=["pipeline-flows"])
 @router.get("")
 async def list_pipeline_flows(
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict:
+) -> dict[str, Any]:
     return manager.list_flows()
 
 
@@ -20,7 +22,7 @@ async def list_pipeline_flows(
 async def create_pipeline_flow(
     payload: PipelineFlowCreatePayload,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.create_flow(payload)
     except ServiceError as error:
@@ -32,7 +34,7 @@ async def update_pipeline_flow(
     flow_id: str,
     payload: PipelineFlowCreatePayload,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.update_flow(flow_id, payload)
     except ServiceError as error:
@@ -43,7 +45,7 @@ async def update_pipeline_flow(
 async def delete_pipeline_flow(
     flow_id: str,
     manager: PipelineFlowManager = Depends(get_pipeline_flow_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.delete_flow(flow_id)
     except ServiceError as error:

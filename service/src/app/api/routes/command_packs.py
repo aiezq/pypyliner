@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from src.app.api.errors import raise_http_error
@@ -17,7 +19,7 @@ router = APIRouter(prefix="/api/command-packs", tags=["command-packs"])
 @router.get("")
 async def list_command_packs(
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     return manager.list_command_packs()
 
 
@@ -25,7 +27,7 @@ async def list_command_packs(
 async def create_command_template(
     payload: CommandTemplateCreatePayload,
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.create_template(payload)
     except ServiceError as error:
@@ -37,7 +39,7 @@ async def update_command_template(
     template_id: str,
     payload: CommandTemplateUpdatePayload,
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.update_template(template_id, payload)
     except ServiceError as error:
@@ -48,7 +50,7 @@ async def update_command_template(
 async def delete_command_template(
     template_id: str,
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.delete_template(template_id)
     except ServiceError as error:
@@ -60,7 +62,7 @@ async def move_command_template(
     template_id: str,
     payload: CommandTemplateMovePayload,
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.move_template(template_id, payload.target_pack_id)
     except ServiceError as error:
@@ -71,7 +73,7 @@ async def move_command_template(
 async def import_command_pack(
     payload: CommandPackImportPayload,
     manager: CommandPackManager = Depends(get_command_pack_manager),
-) -> dict:
+) -> dict[str, Any]:
     try:
         return manager.import_pack(payload)
     except ServiceError as error:
