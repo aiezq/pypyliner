@@ -10,43 +10,49 @@
   .pipelineDockPanels {
     height: 100%;
     min-height: 0;
-    border: 1px solid rgba(112, 152, 216, 0.24);
+    border: 1px solid rgba(112, 152, 216, 0.22);
     border-radius: 14px;
-    padding: 0.5rem;
-    background: rgba(4, 12, 24, 0.62);
+    padding: 0.55rem;
+    background: rgba(4, 12, 24, 0.58);
+    backdrop-filter: blur(6px);
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
     align-items: stretch;
     overflow-y: auto;
     overflow-x: hidden;
+    transition: border-color 200ms ease;
+  }
+
+  .pipelineDockPanels:hover {
+    border-color: rgba(112, 152, 216, 0.32);
   }
 
   .pipelineDock,
   .pipelineDockPanels,
   .dockPanel {
     scrollbar-width: thin;
-    scrollbar-color: rgba(104, 148, 220, 0.55) rgba(6, 12, 23, 0.8);
+    scrollbar-color: rgba(104, 148, 220, 0.45) rgba(6, 12, 23, 0.6);
   }
 
   .pipelineDock::-webkit-scrollbar,
   .pipelineDockPanels::-webkit-scrollbar,
   .dockPanel::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
 
   .pipelineDock::-webkit-scrollbar-track,
   .pipelineDockPanels::-webkit-scrollbar-track,
   .dockPanel::-webkit-scrollbar-track {
-    background: rgba(6, 12, 23, 0.68);
+    background: rgba(6, 12, 23, 0.5);
     border-radius: 999px;
   }
 
   .pipelineDock::-webkit-scrollbar-thumb,
   .pipelineDockPanels::-webkit-scrollbar-thumb,
   .dockPanel::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(102, 181, 243, 0.72), rgba(79, 214, 167, 0.72));
+    background: linear-gradient(180deg, rgba(102, 181, 243, 0.6), rgba(79, 214, 167, 0.6));
     border-radius: 999px;
   }
 
@@ -62,9 +68,14 @@
   .dockSection {
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: rgba(6, 16, 34, 0.62);
-    padding: 0.55rem 0.65rem;
+    background: rgba(6, 16, 34, 0.65);
+    padding: 0.6rem 0.7rem;
     min-width: 0;
+    transition: border-color 200ms ease;
+  }
+
+  .dockSection:hover {
+    border-color: rgba(110, 146, 199, 0.38);
   }
 
   .dockSection[open] {
@@ -77,6 +88,11 @@
     font-size: 0.84rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+    transition: color 180ms ease;
+  }
+
+  .dockSection summary:hover {
+    color: var(--text);
   }
 
   .dockSection[open] summary {
@@ -104,16 +120,22 @@
 
   .templatesSlim {
     display: grid;
-    gap: 0.44rem;
+    gap: 0.48rem;
   }
 
   .templateChip {
     display: grid;
     gap: 0.45rem;
     background: rgba(8, 26, 46, 0.92);
-    border: 1px solid rgba(91, 128, 184, 0.48);
+    border: 1px solid rgba(91, 128, 184, 0.42);
     border-radius: 12px;
-    padding: 0.55rem;
+    padding: 0.6rem;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+
+  .templateChip:hover {
+    border-color: rgba(120, 160, 220, 0.55);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), 0 0 8px rgba(100, 160, 255, 0.06);
   }
 
   .templateChipHead {
@@ -138,6 +160,7 @@
     border-radius: 10px;
     border-color: rgba(122, 160, 216, 0.46);
     background: rgba(7, 23, 44, 0.95);
+    transition: opacity 180ms ease;
   }
 
   .templateChipHead:hover .templateMoveToggle,
@@ -159,37 +182,45 @@
     align-items: center;
     border: 1px solid transparent;
     border-radius: 999px;
-    padding: 0.2rem 0.55rem;
+    padding: 0.22rem 0.58rem;
     font-size: 0.68rem;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     font-weight: 700;
   }
 
   .templateOriginBadge--core {
-    border-color: rgba(123, 184, 255, 0.54);
-    background: rgba(40, 101, 171, 0.28);
+    border-color: rgba(123, 184, 255, 0.5);
+    background: rgba(40, 101, 171, 0.3);
     color: #c7e3ff;
+    box-shadow: 0 0 8px rgba(123, 184, 255, 0.08);
   }
 
   .templateAddButton,
   .templateDeleteButton {
-    padding: 0.36rem 0.62rem;
+    padding: 0.38rem 0.64rem;
     font-size: 0.74rem;
   }
 
   .templateDeleteButton {
-    border-color: rgba(230, 115, 115, 0.62);
-    background: linear-gradient(135deg, rgba(84, 24, 24, 0.9), rgba(106, 30, 30, 0.9));
+    border-color: rgba(230, 115, 115, 0.55);
+    background: var(--gradient-danger);
+    transition: transform 120ms ease, box-shadow 200ms ease, border-color 160ms ease;
+  }
+
+  .templateDeleteButton:hover:enabled {
+    border-color: rgba(255, 130, 130, 0.65);
+    box-shadow: 0 2px 12px rgba(200, 50, 50, 0.25), 0 0 8px rgba(255, 100, 100, 0.1);
   }
 
   .templateMovePanel {
     display: grid;
     gap: 0.45rem;
-    border: 1px solid rgba(108, 147, 208, 0.34);
+    border: 1px solid rgba(108, 147, 208, 0.3);
     border-radius: 10px;
-    background: rgba(5, 15, 30, 0.58);
-    padding: 0.5rem;
+    background: rgba(5, 15, 30, 0.6);
+    padding: 0.55rem;
+    backdrop-filter: blur(4px);
   }
 
   .templateMoveInputRow {
@@ -212,7 +243,8 @@
     color: var(--muted);
     font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    font-weight: 500;
   }
 
   .templatePackListItems {
@@ -222,7 +254,7 @@
   }
 
   .templatePackChip {
-    padding: 0.26rem 0.52rem;
+    padding: 0.28rem 0.55rem;
     font-size: 0.72rem;
     border-radius: 999px;
   }

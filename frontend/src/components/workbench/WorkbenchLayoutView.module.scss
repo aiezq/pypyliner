@@ -35,16 +35,24 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.26rem 0.56rem;
-    border: 1px solid rgba(126, 168, 231, 0.42);
+    padding: 0.28rem 0.58rem;
+    border: 1px solid rgba(126, 168, 231, 0.38);
     border-radius: 999px;
-    background: rgba(7, 22, 43, 0.9);
+    background: rgba(7, 22, 43, 0.88);
     color: var(--muted);
     font-size: 0.72rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    font-weight: 500;
     user-select: none;
     cursor: grab;
+    transition: border-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+  }
+
+  .workbenchSlotHandle:hover {
+    border-color: rgba(150, 190, 250, 0.55);
+    color: var(--text);
+    box-shadow: 0 0 10px rgba(130, 170, 240, 0.1);
   }
 
   .workbenchSlotHandle:active {
@@ -52,13 +60,20 @@
   }
 
   .workbenchSlotToggle {
-    padding: 0.28rem 0.62rem;
+    padding: 0.3rem 0.64rem;
     border-radius: 999px;
-    border-color: rgba(130, 170, 232, 0.44);
-    background: rgba(10, 27, 52, 0.92);
+    border-color: rgba(130, 170, 232, 0.4);
+    background: rgba(10, 27, 52, 0.9);
     color: var(--muted);
     font-size: 0.72rem;
+    font-weight: 500;
     letter-spacing: 0.03em;
+    transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .workbenchSlotToggle:hover:enabled {
+    border-color: rgba(150, 190, 250, 0.55);
+    color: var(--text);
   }
 
   .workbenchSlot--dragging {
@@ -67,7 +82,7 @@
 
   .workbenchSlot--dragover > .panel {
     border-color: rgba(96, 224, 175, 0.65);
-    box-shadow: var(--shadow), inset 0 0 0 1px rgba(96, 224, 175, 0.44);
+    box-shadow: var(--shadow), inset 0 0 0 1px rgba(96, 224, 175, 0.35), 0 0 24px rgba(96, 224, 175, 0.12);
   }
 
   .workbenchSlotResizeHandle {
@@ -90,9 +105,19 @@
     border-radius: 999px;
     background: linear-gradient(
       180deg,
-      rgba(125, 174, 244, 0.1),
-      rgba(125, 174, 244, 0.7),
-      rgba(125, 174, 244, 0.1)
+      rgba(125, 174, 244, 0.08),
+      rgba(125, 174, 244, 0.55),
+      rgba(125, 174, 244, 0.08)
+    );
+    transition: background 200ms ease;
+  }
+
+  .workbenchSlotResizeHandle:hover::before {
+    background: linear-gradient(
+      180deg,
+      rgba(125, 174, 244, 0.15),
+      rgba(125, 174, 244, 0.85),
+      rgba(125, 174, 244, 0.15)
     );
   }
 
