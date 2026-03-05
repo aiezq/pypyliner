@@ -7,10 +7,16 @@
     margin-top: 0.65rem;
     display: grid;
     gap: 0.45rem;
-    border: 1px solid rgba(112, 152, 216, 0.2);
-    border-radius: 12px;
-    background: rgba(6, 16, 34, 0.56);
-    padding: 0.55rem;
+    border: 1px solid rgba(112, 152, 216, 0.22);
+    border-radius: 14px;
+    background: rgba(6, 16, 34, 0.6);
+    backdrop-filter: blur(8px);
+    padding: 0.6rem;
+    transition: border-color 200ms ease;
+  }
+
+  .flowToolbar:hover {
+    border-color: rgba(112, 152, 216, 0.32);
   }
 
   .flowToolbarRow {
@@ -22,7 +28,7 @@
 
   .flowCompactField {
     display: grid;
-    gap: 0.2rem;
+    gap: 0.22rem;
     min-width: 160px;
   }
 
@@ -34,8 +40,9 @@
   .flowCompactField span {
     color: var(--muted);
     font-size: 0.7rem;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    font-weight: 500;
   }
 
   .flowCompactField select,
@@ -45,8 +52,16 @@
     border: 1px solid rgba(122, 160, 216, 0.35);
     background: rgba(4, 11, 23, 0.92);
     color: var(--text);
-    padding: 0.42rem 0.55rem;
+    padding: 0.44rem 0.58rem;
     font-size: 0.84rem;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .flowCompactField select:focus,
+  .flowCompactField input:focus,
+  .flowSavePackInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(96, 224, 175, 0.1);
   }
 
   .flowSavePackInput {
@@ -55,7 +70,7 @@
 
   .flowToolbarButtons {
     display: flex;
-    gap: 0.38rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
   }
 
@@ -75,18 +90,24 @@
     display: grid;
     place-items: center;
     border-radius: 14px;
+    transition: transform 120ms ease, box-shadow 200ms ease, border-color 160ms ease;
+  }
+
+  .flowScrollButton:hover:enabled {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 12px rgba(100, 160, 255, 0.12);
   }
 
   .pipelineFlow {
     display: flex;
-    gap: 0.6rem;
+    gap: 0.65rem;
     overflow-x: auto;
     overflow-y: hidden;
     padding: 0.2rem 0.1rem 0.5rem;
     align-items: stretch;
     scroll-snap-type: x proximity;
     scrollbar-width: thin;
-    scrollbar-color: rgba(104, 148, 220, 0.55) rgba(6, 12, 23, 0.8);
+    scrollbar-color: rgba(104, 148, 220, 0.45) rgba(6, 12, 23, 0.6);
   }
 
   .pipelineFlow--dragging {
@@ -98,17 +119,17 @@
   }
 
   .pipelineFlow::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
 
   .pipelineFlow::-webkit-scrollbar-track {
-    background: rgba(6, 12, 23, 0.68);
+    background: rgba(6, 12, 23, 0.5);
     border-radius: 999px;
   }
 
   .pipelineFlow::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(102, 181, 243, 0.72), rgba(79, 214, 167, 0.72));
+    background: linear-gradient(180deg, rgba(102, 181, 243, 0.6), rgba(79, 214, 167, 0.6));
     border-radius: 999px;
   }
 
@@ -128,7 +149,7 @@
   .stepCard--dragging {
     opacity: 0.86;
     border-color: rgba(110, 195, 255, 0.55);
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(110, 195, 255, 0.4);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(110, 195, 255, 0.4), 0 0 20px rgba(110, 195, 255, 0.1);
     z-index: 20;
     pointer-events: none;
     cursor: grabbing;
@@ -155,9 +176,16 @@
     color: rgba(154, 191, 246, 0.84);
     cursor: grab;
     user-select: none;
-    border: 1px solid rgba(114, 152, 218, 0.48);
+    border: 1px solid rgba(114, 152, 218, 0.42);
     border-radius: 8px;
-    padding: 0.1rem 0.25rem;
+    padding: 0.12rem 0.28rem;
+    transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .stepDragHandle:hover {
+    border-color: rgba(154, 191, 246, 0.65);
+    color: rgba(180, 210, 255, 0.95);
+    box-shadow: 0 0 8px rgba(130, 170, 240, 0.15);
   }
 
   .stepDragHandle:active {
