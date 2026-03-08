@@ -113,6 +113,7 @@ class PipelineRunState:
 class ManualTerminalState:
     id: str
     title: str
+    is_sequence: bool
     prompt_user: str
     prompt_cwd: str
     status: StatusType
@@ -225,6 +226,7 @@ class RuntimeManager:
         return {
             "id": terminal.id,
             "title": terminal.title,
+            "is_sequence": terminal.is_sequence,
             "prompt_user": terminal.prompt_user,
             "prompt_cwd": terminal.prompt_cwd,
             "status": terminal.status,
@@ -574,6 +576,7 @@ class RuntimeManager:
         self.history_db.upsert_manual_terminal(
             terminal_id=terminal.id,
             title=terminal.title,
+            is_sequence=terminal.is_sequence,
             created_at=terminal.created_at,
             updated_at=updated_at or now_iso(),
             closed_at=closed_at,
@@ -679,9 +682,17 @@ class RuntimeManager:
                     parsed_prompt_state = self._parse_prompt_probe_line(text)
                     if parsed_prompt_state is not None:
                         user, cwd = parsed_prompt_state
+                        changed = False
                         if user != terminal.prompt_user or cwd != terminal.prompt_cwd:
                             terminal.prompt_user = user
                             terminal.prompt_cwd = cwd
+                            changed = True
+                            
+                        if terminal.status == "running":
+                            terminal.status = "idle"
+                            changed = True
+                            
+                        if changed:
                             payload: TerminalUpdatedEventData = {
                                 "terminal": self._serialize_terminal(terminal)
                             }
@@ -884,6 +895,7 @@ class RuntimeManager:
         terminal = ManualTerminalState(
             id=terminal_id,
             title=title,
+            is_sequence=payload.is_sequence,
             prompt_user=os.environ.get("USER", "operator"),
             prompt_cwd="~",
             status="idle",

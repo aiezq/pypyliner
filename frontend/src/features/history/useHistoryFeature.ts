@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiRequest } from '../../lib/api'
-import { getErrorMessage, toRunState } from '../../lib/mappers'
+import { getErrorMessage } from '../../lib/mappers'
 import { BackendHistorySchema } from '../../lib/schemas'
 import type { BackendHistory } from '../../types'
 
@@ -25,7 +25,6 @@ export const useHistoryFeature = ({ isActive }: UseHistoryFeatureOptions) => {
   })
 
   return {
-    runs: (historyQuery.data?.runs ?? []).map(toRunState),
     terminalHistory: historyQuery.data?.manual_terminal_history ?? [],
     isLoading: historyQuery.isLoading || historyQuery.isFetching,
     errorMessage: historyQuery.isError ? getErrorMessage(historyQuery.error) : null,

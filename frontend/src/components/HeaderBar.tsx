@@ -4,16 +4,12 @@ interface HeaderBarProps {
   isSocketConnected: boolean
   terminalInstancesCount: number
   onCreateManualTerminal: () => void
-  onOpenImportModal: () => void
-  onOpenFlowSettingsModal: () => void
 }
 
 function HeaderBar({
   isSocketConnected,
   terminalInstancesCount,
   onCreateManualTerminal,
-  onOpenImportModal,
-  onOpenFlowSettingsModal,
 }: HeaderBarProps) {
   return (
     <header className="hero">
@@ -42,20 +38,7 @@ function HeaderBar({
           >
             New terminal
           </button>
-          <button
-            type="button"
-            className="hero__actionButton"
-            onClick={onOpenImportModal}
-          >
-            Import JSON DLC
-          </button>
-          <button
-            type="button"
-            className="hero__actionButton hero__actionButton--settings"
-            onClick={onOpenFlowSettingsModal}
-          >
-            Workflow settings
-          </button>
+
         </div>
       </div>
     </header>

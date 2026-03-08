@@ -1,0 +1,52 @@
+import { Handle, Position, type NodeProps } from '@xyflow/react'
+import BaseNode from './BaseNode'
+import { HANDLE_IDS, type VariableNodeData } from '../../types'
+import { useGraphStore } from '../../store/graphStore'
+import styles from './BaseNode.module.scss'
+
+type Props = NodeProps & { data: VariableNodeData }
+
+export default function VariableNode({ id, data, selected }: Props) {
+    const updateNodeData = useGraphStore((s) => s.updateNodeData)
+
+    return (
+        <>
+            <BaseNode icon="x" iconVariant="variable" label={data.label} selected={selected}>
+                {/* Variable name */}
+                <div className={styles.nodeField}>
+                    <span className={styles.nodeFieldLabel}>Name</span>
+                    <input
+                        className={styles.nodeInput}
+                        value={data.label}
+                        onChange={(e) =>
+                            updateNodeData<VariableNodeData>(id, { label: e.target.value })
+                        }
+                        onPointerDown={(e) => e.stopPropagation()}
+                    />
+                </div>
+
+                {/* Variable value */}
+                <div className={styles.nodeField}>
+                    <span className={styles.nodeFieldLabel}>Value</span>
+                    <input
+                        className={styles.nodeInput}
+                        value={data.value}
+                        onChange={(e) =>
+                            updateNodeData<VariableNodeData>(id, { value: e.target.value })
+                        }
+                        placeholder="Enter value…"
+                        onPointerDown={(e) => e.stopPropagation()}
+                    />
+                </div>
+            </BaseNode>
+
+            {/* Variable output handle (right) */}
+            <Handle
+                type="source"
+                id={HANDLE_IDS.VARIABLE_OUT}
+                position={Position.Right}
+                style={{ top: 20, background: '#d4a8ff', width: 10, height: 10 }}
+            />
+        </>
+    )
+}

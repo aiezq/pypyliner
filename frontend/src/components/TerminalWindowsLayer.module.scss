@@ -138,15 +138,6 @@
     box-shadow: 0 0 10px rgba(243, 179, 94, 0.2);
   }
 
-  .terminalWindowControl--pin {
-    border-color: rgba(109, 178, 243, 0.62);
-    background: rgba(25, 62, 111, 0.95);
-    color: #d5e9ff;
-  }
-
-  .terminalWindowControl--pin:hover:enabled {
-    box-shadow: 0 0 10px rgba(109, 178, 243, 0.2);
-  }
 
   .terminalWindow__hint {
     color: var(--muted);

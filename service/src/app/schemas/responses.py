@@ -37,6 +37,7 @@ class RunsListResponse(BaseModel):
 class ManualTerminalResponse(BaseModel):
     id: str
     title: str
+    is_sequence: bool = False
     prompt_user: str
     prompt_cwd: str
     status: str
@@ -67,6 +68,7 @@ class ManualTerminalDeleteResponse(BaseModel):
 class ManualTerminalHistoryItemResponse(BaseModel):
     terminal_id: str
     title: str
+    is_sequence: bool = False
     created_at: str
     updated_at: str
     closed_at: str | None = None
