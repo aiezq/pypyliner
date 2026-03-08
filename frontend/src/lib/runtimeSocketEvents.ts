@@ -1,15 +1,11 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import {
   toManualTerminal,
-  toRunState,
   toTerminalLine,
   upsertManualTerminal,
 } from './mappers'
 import type { RuntimeSocketEvent } from './schemas'
-import type {
-  ManualTerminal,
-  RunState,
-} from '../types'
+import type { ManualTerminal } from '../types'
 
 interface TerminalCommandHistory {
   entries: string[]
@@ -24,7 +20,6 @@ interface TerminalCompletionCycle {
 }
 
 interface ApplyRuntimeSocketEventContext {
-  setRun: Dispatch<SetStateAction<RunState | null>>
   setManualTerminals: Dispatch<SetStateAction<ManualTerminal[]>>
   manualCommandHistoryRef: MutableRefObject<Record<string, TerminalCommandHistory>>
   storedManualHistoryRef: MutableRefObject<Record<string, string[]>>
@@ -42,7 +37,6 @@ export const applyRuntimeSocketEvent = (
   context: ApplyRuntimeSocketEventContext,
 ): void => {
   const {
-    setRun,
     setManualTerminals,
     manualCommandHistoryRef,
     storedManualHistoryRef,
@@ -56,12 +50,15 @@ export const applyRuntimeSocketEvent = (
   switch (event.type) {
     case 'snapshot': {
       const data = event.data
-      const latestRun = data.runs
-        .map(toRunState)
-        .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0]
-      setRun(latestRun ?? null)
       const terminals = data.manual_terminals.map(toManualTerminal)
-      setManualTerminals(terminals)
+      setManualTerminals((prev) => {
+        // Preserve frontend-only draftCommand when snapshot replaces state
+        const draftMap = new Map(prev.map((t) => [t.id, t.draftCommand]))
+        return terminals.map((t) => ({
+          ...t,
+          draftCommand: draftMap.get(t.id) ?? t.draftCommand,
+        }))
+      })
 
       const nextHistory: Record<string, TerminalCommandHistory> = {}
       const nextCycles: Record<string, TerminalCompletionCycle> = {}
@@ -85,68 +82,7 @@ export const applyRuntimeSocketEvent = (
       pruneAndPersistStoredHistory(nextHistory)
       break
     }
-    case 'run_created': {
-      const data = event.data
-      const nextRun = toRunState(data.run)
-      setRun(nextRun)
-      break
-    }
-    case 'run_status': {
-      const data = event.data
-      setRun((prev) => {
-        if (!prev || prev.id !== data.run_id) {
-          return prev
-        }
-        return {
-          ...prev,
-          status: data.status,
-          finishedAt: data.finished_at,
-        }
-      })
-      break
-    }
-    case 'run_session_status': {
-      const data = event.data
-      setRun((prev) => {
-        if (!prev || prev.id !== data.run_id) {
-          return prev
-        }
-        return {
-          ...prev,
-          sessions: prev.sessions.map((session) =>
-            session.id === data.session_id
-              ? {
-                  ...session,
-                  status: data.status,
-                  exitCode: data.exit_code,
-                }
-              : session,
-          ),
-        }
-      })
-      break
-    }
-    case 'run_session_line': {
-      const data = event.data
-      const nextLine = toTerminalLine(data.line)
-      setRun((prev) => {
-        if (!prev || prev.id !== data.run_id) {
-          return prev
-        }
-        return {
-          ...prev,
-          sessions: prev.sessions.map((session) =>
-            session.id === data.session_id
-              ? {
-                  ...session,
-                  lines: [...session.lines, nextLine],
-                }
-              : session,
-          ),
-        }
-      })
-      break
-    }
+
     case 'terminal_created': {
       const data = event.data
       const terminal = toManualTerminal(data.terminal)

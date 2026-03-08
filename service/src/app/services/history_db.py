@@ -106,6 +106,7 @@ class HistoryDatabase:
         *,
         terminal_id: str,
         title: str,
+        is_sequence: bool = False,
         created_at: str,
         updated_at: str,
         closed_at: str | None,
@@ -117,6 +118,7 @@ class HistoryDatabase:
                 terminal = ManualTerminalHistoryRecord(
                     terminal_id=terminal_id,
                     title=title,
+                    is_sequence=is_sequence,
                     created_at=created_at,
                     updated_at=updated_at,
                     closed_at=closed_at,
@@ -125,6 +127,7 @@ class HistoryDatabase:
                 session.add(terminal)
             else:
                 terminal.title = title
+                terminal.is_sequence = is_sequence
                 terminal.created_at = created_at
                 terminal.updated_at = updated_at
                 terminal.closed_at = closed_at
@@ -220,6 +223,7 @@ class HistoryDatabase:
                     {
                         "terminal_id": row.terminal_id,
                         "title": row.title,
+                        "is_sequence": row.is_sequence,
                         "created_at": row.created_at,
                         "updated_at": row.updated_at,
                         "closed_at": row.closed_at,

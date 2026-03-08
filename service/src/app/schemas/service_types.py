@@ -33,6 +33,7 @@ class PipelineRunData(TypedDict):
 class ManualTerminalData(TypedDict):
     id: str
     title: str
+    is_sequence: bool
     prompt_user: str
     prompt_cwd: str
     status: str
@@ -46,6 +47,7 @@ class ManualTerminalData(TypedDict):
 class ManualTerminalHistoryItemData(TypedDict):
     terminal_id: str
     title: str
+    is_sequence: bool
     created_at: str
     updated_at: str
     closed_at: str | None

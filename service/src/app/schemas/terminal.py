@@ -2,7 +2,10 @@ from pydantic import BaseModel, Field
 
 
 class ManualTerminalCreatePayload(BaseModel):
-    title: str | None = Field(default=None, max_length=200)
+    title: str | None = None
+    cwd: str | None = None
+    command: str | None = None
+    is_sequence: bool = False
 
 
 class ManualTerminalCommandPayload(BaseModel):

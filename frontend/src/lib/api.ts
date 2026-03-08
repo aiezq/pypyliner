@@ -19,9 +19,13 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
     try {
-      const errorPayload = (await response.json()) as { detail?: string }
+      const errorPayload = (await response.json()) as { detail?: string | any[] }
       if (typeof errorPayload.detail === 'string') {
         detail = errorPayload.detail
+      } else if (Array.isArray(errorPayload.detail)) {
+        detail = errorPayload.detail.map((e) => `${e.loc?.join('.')}: ${e.msg}`).join(', ')
+      } else if (errorPayload.detail) {
+        detail = JSON.stringify(errorPayload.detail)
       }
     } catch {
       const text = await response.text()
