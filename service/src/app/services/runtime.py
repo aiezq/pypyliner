@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import shlex
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Final, Literal, TypeVar
+from typing import Any, Awaitable, Callable, Coroutine, Final, Literal, TypeVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -65,6 +66,7 @@ RUN_LOGS_DIR_PATH: Final[Path] = RUN_LOGS_DIR
 TERMINAL_LOGS_DIR_PATH: Final[Path] = TERMINAL_LOGS_DIR
 MANUAL_TERMINAL_CWD: Final[Path] = DEFAULT_MANUAL_TERMINAL_CWD
 MANUAL_TERMINAL_COMMAND: Final[str] = DEFAULT_MANUAL_TERMINAL_COMMAND
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -185,6 +187,7 @@ class RuntimeManager:
         self.history_db = history_db
         self.events = EventHub()
         self._log_locks: dict[Path, asyncio.Lock] = {}
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
     async def ensure_dirs(self) -> None:
         await asyncio.gather(
@@ -297,6 +300,44 @@ class RuntimeManager:
         lock = self._get_log_lock(path)
         async with lock:
             await asyncio.to_thread(append_text_line, path, line)
+
+    def _track_background_task(
+        self,
+        task: object,
+        *,
+        label: str,
+        on_error: Callable[[Exception], Awaitable[None]] | None = None,
+    ) -> object:
+        if not isinstance(task, asyncio.Task):
+            return task
+
+        self._background_tasks.add(task)
+
+        def _handle_completion(done_task: asyncio.Task[Any]) -> None:
+            self._background_tasks.discard(done_task)
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                return
+            except Exception as error:  # pragma: no cover - exercised via async follow-up
+                LOGGER.exception("Runtime background task failed: %s", label)
+                if on_error is None:
+                    return
+                recovery_task = asyncio.create_task(on_error(error))
+                self._track_background_task(recovery_task, label=f"{label}.recovery")
+
+        task.add_done_callback(_handle_completion)
+        return task
+
+    def _create_background_task(
+        self,
+        coroutine: Coroutine[Any, Any, Any],
+        *,
+        label: str,
+        on_error: Callable[[Exception], Awaitable[None]] | None = None,
+    ) -> object:
+        task = asyncio.create_task(coroutine)
+        return self._track_background_task(task, label=label, on_error=on_error)
 
     async def _terminate_process(self, process: asyncio.subprocess.Process) -> None:
         if process.returncode is not None:
@@ -615,6 +656,67 @@ class RuntimeManager:
         }
         await self.events.broadcast("terminal_status", payload)
 
+    async def _handle_pipeline_run_task_error(
+        self,
+        run: PipelineRunState,
+        error: Exception,
+    ) -> None:
+        if run.finished_at is not None:
+            return
+
+        crashed_message = f"[error] pipeline run crashed: {error}"
+        current_session = next((session for session in run.sessions if session.status == "running"), None)
+
+        if current_session is not None:
+            current_session.status = "stopped" if run.stop_requested else "failed"
+            current_session.exit_code = -1
+            await self._append_pipeline_line(run, current_session, "meta", crashed_message)
+            await self._emit_run_session_status(run, current_session)
+        else:
+            await self._append_log(run.log_file_path, f"[{now_iso()}] [run] {crashed_message}")
+
+        if run.stop_requested:
+            run.status = "stopped"
+            for session in run.sessions:
+                if session.status == "pending":
+                    session.status = "stopped"
+                    session.exit_code = -1
+                    await self._append_pipeline_line(
+                        run,
+                        session,
+                        "meta",
+                        "[skipped] run was stopped before this step",
+                    )
+                    await self._emit_run_session_status(run, session)
+        else:
+            run.status = "failed"
+
+        run.finished_at = now_iso()
+        await self._append_log(
+            run.log_file_path,
+            f"[{run.finished_at}] [run] finished with status: {run.status}",
+        )
+        await self._emit_run_status(run)
+
+    async def _handle_manual_terminal_task_error(
+        self,
+        terminal_id: str,
+        error: Exception,
+    ) -> None:
+        terminal = self.manual_terminals.get(terminal_id)
+        if terminal is None:
+            return
+
+        terminal.current_process = None
+        terminal.status = "stopped" if terminal.stop_requested else "failed"
+        terminal.exit_code = -1
+        await self._append_manual_line(
+            terminal,
+            "meta",
+            f"[error] terminal background task crashed: {error}",
+        )
+        await self._emit_terminal_status(terminal)
+
     @staticmethod
     def _is_process_running(process: asyncio.subprocess.Process | None) -> bool:
         return process is not None and process.returncode is None
@@ -659,9 +761,19 @@ class RuntimeManager:
         )
         await self._emit_terminal_status(terminal)
 
-        asyncio.create_task(self._stream_manual_terminal_output(terminal, process.stdout, "out"))
-        asyncio.create_task(self._stream_manual_terminal_output(terminal, process.stderr, "err"))
-        asyncio.create_task(self._watch_manual_terminal_process(terminal, process))
+        self._create_background_task(
+            self._stream_manual_terminal_output(terminal, process.stdout, "out"),
+            label=f"manual_terminal_stream_out:{terminal.id}",
+        )
+        self._create_background_task(
+            self._stream_manual_terminal_output(terminal, process.stderr, "err"),
+            label=f"manual_terminal_stream_err:{terminal.id}",
+        )
+        self._create_background_task(
+            self._watch_manual_terminal_process(terminal, process),
+            label=f"manual_terminal_watch:{terminal.id}",
+            on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+        )
         await self._request_manual_prompt_probe(terminal)
 
     async def _stream_manual_terminal_output(
@@ -769,7 +881,11 @@ class RuntimeManager:
         await self._append_log(log_file_path, f"[{started_at}] [run] started: {run.pipeline_name}")
         event_payload: RunCreatedEventData = {"run": self._serialize_run(run)}
         await self.events.broadcast("run_created", event_payload)
-        asyncio.create_task(self._execute_pipeline_run(run))
+        self._create_background_task(
+            self._execute_pipeline_run(run),
+            label=f"pipeline_run:{run.id}",
+            on_error=lambda error: self._handle_pipeline_run_task_error(run, error),
+        )
         return self._serialize_run(run)
 
     async def _execute_pipeline_run(self, run: PipelineRunState) -> None:
@@ -883,7 +999,10 @@ class RuntimeManager:
         run.stop_requested = True
         await self._append_log(run.log_file_path, f"[{now_iso()}] [run] stop requested")
         if run.current_process and run.current_process.returncode is None:
-            asyncio.create_task(self._terminate_process(run.current_process))
+            self._create_background_task(
+                self._terminate_process(run.current_process),
+                label=f"terminate_process:{run.id}",
+            )
         return self._serialize_run(run)
 
     async def create_manual_terminal(
