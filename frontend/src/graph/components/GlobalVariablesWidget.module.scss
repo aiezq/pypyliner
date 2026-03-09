@@ -3,12 +3,13 @@
   top: 1rem;
   right: 1rem;
   z-index: 100;
-  width: 220px;
-  border: 1px solid rgba(110, 146, 199, 0.25);
+  width: 252px;
+  border: 1px solid rgba(151, 161, 167, 0.24);
   border-radius: 12px;
-  background: rgba(8, 18, 36, 0.85);
+  background:
+    linear-gradient(180deg, rgba(28, 34, 39, 0.94), rgba(20, 24, 28, 0.98));
   backdrop-filter: blur(16px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   transition: width 0.3s cubic-bezier(0.2, 0, 0, 1);
   overflow: hidden;
   display: flex;
@@ -16,7 +17,7 @@
 }
 
 .widget--open {
-  width: 320px;
+  width: 336px;
 }
 
 /* ── Header ── */
@@ -46,21 +47,23 @@
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 700;
-  background: linear-gradient(135deg, rgba(200, 120, 255, 0.3), rgba(180, 100, 240, 0.2));
-  border: 1px solid rgba(180, 120, 255, 0.4);
-  color: #d4a8ff;
+  background: linear-gradient(135deg, rgba(126, 151, 140, 0.24), rgba(144, 167, 156, 0.18));
+  border: 1px solid rgba(142, 169, 153, 0.34);
+  color: #c7d9d0;
 }
 
 .headerTitle {
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .headerBadge {
   margin-left: auto;
-  background: rgba(180, 120, 255, 0.2);
-  color: #d4a8ff;
+  flex-shrink: 0;
+  background: rgba(142, 169, 153, 0.16);
+  color: #c7d9d0;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 0.15rem 0.4rem;
@@ -73,12 +76,13 @@
   margin-left: 0.2rem;
   width: 1rem;
   text-align: center;
+  flex-shrink: 0;
 }
 
 /* ── Content ── */
 
 .content {
-  border-top: 1px solid rgba(110, 146, 199, 0.15);
+  border-top: 1px solid rgba(151, 161, 167, 0.14);
   display: flex;
   flex-direction: column;
   max-height: 520px;
@@ -91,7 +95,7 @@
 }
 
 .section + .section {
-  border-top: 1px solid rgba(110, 146, 199, 0.15);
+  border-top: 1px solid rgba(151, 161, 167, 0.14);
 }
 
 .sectionHeader {
@@ -111,8 +115,8 @@
 
 .sectionBadge {
   margin-left: auto;
-  background: rgba(110, 146, 199, 0.15);
-  color: #a8d8ff;
+  background: rgba(151, 161, 167, 0.12);
+  color: #c9d2d6;
   font-size: 0.62rem;
   font-weight: 700;
   padding: 0.12rem 0.38rem;
@@ -143,14 +147,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.6rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(151, 161, 167, 0.12);
   border-radius: 8px;
   gap: 0.5rem;
 }
 
 .variableItem:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(151, 161, 167, 0.2);
 }
 
 .variableInfo {
@@ -162,7 +167,7 @@
 
 .variableKey {
   font-size: 0.7rem;
-  color: #d4a8ff;
+  color: #c7d9d0;
   font-family: monospace;
   font-weight: 600;
 }
@@ -178,7 +183,7 @@
 .deleteButton {
   background: transparent;
   border: none;
-  color: #ff9e9e;
+  color: #ddc0c0;
   font-size: 0.8rem;
   opacity: 0.6;
   cursor: pointer;
@@ -189,15 +194,15 @@
 
 .deleteButton:hover {
   opacity: 1;
-  background: rgba(255, 80, 80, 0.15);
+  background: rgba(181, 129, 129, 0.14);
 }
 
 /* ── Add Form ── */
 
 .addForm {
   padding: 0.6rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(110, 146, 199, 0.15);
+  background: rgba(14, 17, 20, 0.34);
+  border-top: 1px solid rgba(151, 161, 167, 0.14);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -218,8 +223,8 @@
   min-width: 0;
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
-  border: 1px solid rgba(110, 146, 199, 0.3);
-  background: rgba(4, 11, 23, 0.9);
+  border: 1px solid rgba(151, 161, 167, 0.24);
+  background: rgba(18, 22, 26, 0.94);
   color: var(--text);
   font-size: 0.75rem;
   transition: border-color 0.2s ease;
@@ -227,7 +232,7 @@
 
 .input:focus {
   outline: none;
-  border-color: #d4a8ff;
+  border-color: var(--accent);
 }
 
 .passwordRow {
@@ -238,8 +243,8 @@
 
 .passwordToggle {
   border-radius: 6px;
-  border: 1px solid rgba(110, 146, 199, 0.3);
-  background: rgba(4, 11, 23, 0.9);
+  border: 1px solid rgba(151, 161, 167, 0.24);
+  background: rgba(18, 22, 26, 0.94);
   color: var(--text);
   padding: 0 0.65rem;
   cursor: pointer;
@@ -249,17 +254,18 @@
   width: 100%;
   padding: 0.4rem;
   border-radius: 6px;
-  border: none;
-  background: rgba(180, 120, 255, 0.15);
-  color: #d4a8ff;
+  border: 1px solid rgba(137, 164, 148, 0.42);
+  background: linear-gradient(135deg, rgba(77, 98, 87, 0.96), rgba(100, 120, 109, 0.94));
+  color: #eef4f0;
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
 }
 
 .addButton:hover:not(:disabled) {
-  background: rgba(180, 120, 255, 0.25);
+  box-shadow: 0 8px 16px rgba(8, 10, 12, 0.14);
+  filter: brightness(1.03);
 }
 
 .addButton:disabled {

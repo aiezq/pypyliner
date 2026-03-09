@@ -10,10 +10,10 @@
     pointer-events: auto;
     min-width: min(360px, calc(100vw - 16px));
     max-width: calc(100vw - 16px);
-    border: 1px solid rgba(110, 161, 229, 0.34);
+    border: 1px solid rgba(151, 161, 167, 0.24);
     border-radius: 16px;
-    background: linear-gradient(165deg, rgba(8, 18, 36, 0.97), rgba(3, 9, 20, 0.99));
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45), 0 0 24px rgba(60, 120, 200, 0.06);
+    background: linear-gradient(180deg, rgba(26, 31, 36, 0.98), rgba(18, 22, 26, 0.99));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
     overflow: hidden;
     display: grid;
     grid-template-rows: auto 1fr;
@@ -21,12 +21,12 @@
   }
 
   .terminalWindow--manual {
-    border-color: rgba(102, 206, 159, 0.38);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45), 0 0 18px rgba(96, 224, 175, 0.06);
+    border-color: rgba(142, 169, 153, 0.34);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
   }
 
   .terminalWindow--run {
-    border-color: rgba(110, 161, 229, 0.34);
+    border-color: rgba(151, 161, 167, 0.24);
   }
 
   .terminalWindow__dragbar {
@@ -35,8 +35,8 @@
     justify-content: space-between;
     gap: 0.6rem;
     padding: 0.55rem 0.72rem;
-    border-bottom: 1px solid rgba(112, 158, 223, 0.24);
-    background: linear-gradient(120deg, rgba(13, 32, 60, 0.97), rgba(9, 26, 47, 0.95));
+    border-bottom: 1px solid rgba(151, 161, 167, 0.18);
+    background: linear-gradient(180deg, rgba(31, 37, 42, 0.97), rgba(24, 29, 33, 0.95));
     cursor: grab;
     user-select: none;
   }
@@ -105,37 +105,37 @@
     display: grid;
     place-items: center;
     border-radius: 999px;
-    border-color: rgba(132, 173, 231, 0.5);
-    background: rgba(9, 31, 58, 0.95);
+    border-color: rgba(151, 161, 167, 0.36);
+    background: rgba(31, 37, 42, 0.96);
     color: var(--text);
     line-height: 1;
     font-size: 0.78rem;
     font-weight: 700;
-    transition: transform 120ms ease, box-shadow 200ms ease, border-color 180ms ease;
+    transition: box-shadow 200ms ease, border-color 180ms ease, background-color 180ms ease;
   }
 
   .terminalWindowControl:hover:enabled {
-    transform: scale(1.1);
+    background: rgba(38, 44, 49, 0.98);
   }
 
   .terminalWindowControl--danger {
-    border-color: rgba(236, 121, 121, 0.6);
-    background: rgba(102, 28, 34, 0.95);
-    color: #ffd2d2;
+    border-color: rgba(181, 129, 129, 0.44);
+    background: rgba(69, 44, 46, 0.96);
+    color: #edd6d6;
   }
 
   .terminalWindowControl--danger:hover:enabled {
-    box-shadow: 0 0 10px rgba(200, 50, 50, 0.2);
+    box-shadow: 0 8px 16px rgba(18, 10, 11, 0.16);
   }
 
   .terminalWindowControl--warning {
-    border-color: rgba(243, 179, 94, 0.62);
-    background: rgba(105, 66, 21, 0.95);
-    color: #ffe1b5;
+    border-color: rgba(181, 165, 126, 0.4);
+    background: rgba(63, 56, 43, 0.96);
+    color: #e6dbbd;
   }
 
   .terminalWindowControl--warning:hover:enabled {
-    box-shadow: 0 0 10px rgba(243, 179, 94, 0.2);
+    box-shadow: 0 8px 16px rgba(19, 15, 8, 0.14);
   }
 
 
@@ -175,13 +175,13 @@
   .terminalPrompt {
     font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', Menlo, Consolas, monospace;
     font-size: 0.78rem;
-    color: #a5f4c8;
-    border: 1px solid rgba(94, 162, 126, 0.35);
+    color: #c7ddd1;
+    border: 1px solid rgba(137, 164, 148, 0.3);
     border-radius: 10px;
-    background: rgba(16, 42, 33, 0.55);
+    background: rgba(38, 46, 42, 0.58);
     padding: 0.56rem 0.65rem;
     white-space: nowrap;
-    box-shadow: 0 0 10px rgba(94, 162, 126, 0.08);
+    box-shadow: none;
   }
 
   .terminalCommandInputWrap {
@@ -210,15 +210,15 @@
     height: 1.85rem;
     padding: 0;
     border-radius: 9px;
-    border-color: rgba(126, 168, 231, 0.45);
-    background: rgba(8, 28, 52, 0.94);
+    border-color: rgba(151, 161, 167, 0.3);
+    background: rgba(31, 37, 42, 0.96);
     display: grid;
     place-items: center;
-    transition: transform 120ms ease, box-shadow 200ms ease, border-color 160ms ease;
+    transition: box-shadow 200ms ease, border-color 160ms ease, background-color 160ms ease;
   }
 
   .terminalInputAction:hover:enabled {
-    transform: none;
+    background: rgba(38, 44, 49, 0.98);
   }
 
   .terminalInputActionIcon {
@@ -228,23 +228,23 @@
   }
 
   .terminalInputAction--clear {
-    border-color: rgba(209, 126, 126, 0.56);
-    background: rgba(82, 30, 35, 0.95);
-    color: #ffd7d7;
+    border-color: rgba(181, 129, 129, 0.42);
+    background: rgba(69, 44, 46, 0.96);
+    color: #edd6d6;
   }
 
   .terminalInputAction--clear:hover:enabled {
-    box-shadow: 0 0 10px rgba(200, 60, 60, 0.15);
+    box-shadow: 0 8px 16px rgba(18, 10, 11, 0.16);
   }
 
   .terminalInputAction--send {
-    border-color: rgba(96, 190, 126, 0.75);
-    background: linear-gradient(140deg, rgba(30, 144, 86, 0.96), rgba(28, 168, 93, 0.98));
+    border-color: rgba(137, 164, 148, 0.46);
+    background: linear-gradient(135deg, rgba(77, 98, 87, 0.96), rgba(100, 120, 109, 0.94));
     color: #fff;
   }
 
   .terminalInputAction--send:hover:enabled {
-    box-shadow: 0 0 12px rgba(96, 224, 175, 0.2);
+    box-shadow: 0 8px 16px rgba(8, 10, 12, 0.14);
   }
 
   .terminalInputAction--send .terminalInputActionIcon {

@@ -1,48 +1,48 @@
-  .hero {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-    border: 1px solid rgba(110, 146, 199, 0.3);
-    border-radius: 14px;
-    background:
-      radial-gradient(circle at 16% 18%, rgba(44, 84, 160, 0.35), transparent 45%),
-      radial-gradient(circle at 88% 75%, rgba(14, 117, 88, 0.3), transparent 48%),
-      radial-gradient(circle at 50% 50%, rgba(30, 60, 120, 0.12), transparent 60%),
-      linear-gradient(130deg, rgba(15, 25, 50, 0.88), rgba(8, 20, 41, 0.94));
-    padding: 0.6rem 1.2rem;
-    box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(10px);
-    transition: border-color 300ms ease;
-  }
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(151, 161, 167, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(94, 110, 120, 0.15), transparent 34%),
+    radial-gradient(circle at 86% 78%, rgba(108, 131, 118, 0.12), transparent 36%),
+    linear-gradient(145deg, rgba(28, 34, 39, 0.96), rgba(19, 23, 27, 0.98));
+  padding: 0.9rem 1.2rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  transition: border-color 300ms ease;
+}
 
-  .hero:hover {
-    border-color: rgba(110, 146, 199, 0.42);
-  }
+.hero:hover {
+  border-color: rgba(175, 184, 189, 0.3);
+}
 
-  .hero h1 {
-    margin: 0;
-    font-size: clamp(1.2rem, 1.8vw, 1.4rem);
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    background: linear-gradient(135deg, #eff7ff 30%, #60e0af 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.2rem, 1.8vw, 1.45rem);
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
 
-  .hero__kicker {
-    margin: 0 0 0.1rem 0;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-size: 0.62rem;
-    font-weight: 600;
-  }
+.hero__kicker {
+  margin: 0 0 0.18rem 0;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
 
-  .hero__subtitle {
-    display: none;
-  }
+.hero__subtitle {
+  display: block;
+  margin: 0.3rem 0 0;
+  max-width: 54ch;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
 
   .hero__badges {
     display: flex;
@@ -57,63 +57,63 @@
     gap: 0.75rem;
   }
 
-  .hero__badges span {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.2rem 0.6rem;
-    color: var(--muted);
-    font-size: 0.7rem;
-    font-weight: 500;
-    backdrop-filter: blur(4px);
-    background: rgba(10, 20, 40, 0.5);
-    transition: border-color 200ms ease, box-shadow 200ms ease;
-  }
+.hero__badges span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.26rem 0.62rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+  background: rgba(28, 34, 39, 0.66);
+  transition: border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
+}
 
-  .badge--ok {
-    border-color: rgba(96, 224, 175, 0.55) !important;
-    color: #86f1c5 !important;
-    box-shadow: 0 0 10px rgba(96, 224, 175, 0.12);
-    animation: glow 3s ease-in-out infinite;
-  }
+.badge--ok {
+  border-color: rgba(142, 169, 153, 0.48) !important;
+  color: #c7ddd1 !important;
+  background: rgba(44, 54, 49, 0.72) !important;
+  animation: glow 3s ease-in-out infinite;
+}
 
-  .badge--warn {
-    border-color: rgba(239, 201, 120, 0.55) !important;
-    color: #ffd983 !important;
-    box-shadow: 0 0 10px rgba(239, 201, 120, 0.12);
-  }
+.badge--warn {
+  border-color: rgba(181, 165, 126, 0.42) !important;
+  color: #e2d4ad !important;
+  background: rgba(58, 52, 38, 0.72) !important;
+}
 
-  .hero__actionButton {
-    border-color: rgba(91, 128, 184, 0.56);
-    background: linear-gradient(130deg, rgba(20, 78, 93, 0.92), rgba(23, 79, 143, 0.95));
-    border-radius: 8px;
-    padding: 0.35rem 0.65rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    white-space: nowrap;
-    transition: transform 120ms ease, filter 160ms ease, box-shadow 200ms ease, border-color 160ms ease;
-  }
+.hero__actionButton {
+  border-color: rgba(151, 161, 167, 0.34);
+  background: linear-gradient(135deg, rgba(52, 64, 71, 0.96), rgba(72, 84, 91, 0.96));
+  border-radius: 10px;
+  padding: 0.42rem 0.72rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: filter 160ms ease, box-shadow 200ms ease, border-color 160ms ease;
+}
 
-  .hero__actionButton:hover {
-    box-shadow: 0 4px 16px rgba(23, 79, 143, 0.4), 0 0 10px rgba(100, 180, 255, 0.1);
-  }
+.hero__actionButton:hover {
+  box-shadow: 0 8px 16px rgba(7, 9, 11, 0.16);
+}
 
-  .hero__actionButton--newTerminal {
-    border-color: rgba(97, 185, 142, 0.58);
-    background: linear-gradient(130deg, rgba(20, 106, 77, 0.92), rgba(16, 132, 90, 0.95));
-  }
+.hero__actionButton--newTerminal {
+  border-color: rgba(137, 164, 148, 0.44);
+  background: linear-gradient(135deg, rgba(74, 97, 85, 0.96), rgba(97, 118, 107, 0.94));
+}
 
-  .hero__actionButton--newTerminal:hover {
-    box-shadow: 0 4px 16px rgba(16, 132, 90, 0.4), 0 0 10px rgba(96, 224, 175, 0.15);
-  }
+.hero__actionButton--newTerminal:hover {
+  box-shadow: 0 8px 16px rgba(7, 9, 11, 0.16);
+}
 
-  .hero__actionButton--settings {
-    border-color: rgba(157, 184, 224, 0.5);
-    background: linear-gradient(130deg, rgba(17, 43, 78, 0.9), rgba(19, 60, 105, 0.93));
-  }
+.hero__actionButton--settings {
+  border-color: rgba(151, 161, 167, 0.34);
+  background: linear-gradient(135deg, rgba(57, 67, 74, 0.96), rgba(76, 85, 92, 0.96));
+}
 
-  .hero__actionButton--settings:hover {
-    box-shadow: 0 4px 16px rgba(19, 60, 105, 0.4), 0 0 10px rgba(130, 170, 240, 0.1);
-  }
+.hero__actionButton--settings:hover {
+  box-shadow: 0 8px 16px rgba(7, 9, 11, 0.16);
+}
 
   .hero__actions {
     display: flex;
@@ -123,9 +123,10 @@
   }
 
   @media (max-width: 1060px) {
-    .hero {
-      flex-direction: column;
-    }
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
     .hero__right,
     .hero__actions,

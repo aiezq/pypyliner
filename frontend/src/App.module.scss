@@ -2,10 +2,10 @@
     width: min(1600px, 98vw);
     height: 100vh;
     margin: 0 auto;
-    padding: 0.8rem 0;
+    padding: 1rem 0 1.1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.9rem;
     animation: fadeIn 400ms ease-out;
   }
 
@@ -16,33 +16,31 @@
   }
 
   .appTabButton {
-    border-color: rgba(118, 160, 223, 0.3);
-    background: rgba(7, 20, 40, 0.85);
+    border-color: rgba(151, 161, 167, 0.28);
+    background: rgba(25, 30, 35, 0.82);
     color: var(--muted);
     padding: 0.48rem 0.88rem;
     border-radius: 999px;
     font-weight: 500;
     font-size: 0.84rem;
     position: relative;
-    transition: all 200ms ease;
+    transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
   }
 
   .appTabButton:hover:enabled {
-    background: rgba(12, 28, 55, 0.9);
-    border-color: rgba(118, 160, 223, 0.48);
+    background: rgba(31, 37, 42, 0.9);
+    border-color: rgba(175, 184, 189, 0.34);
     color: var(--text);
-    transform: none;
-    box-shadow: 0 2px 10px rgba(20, 40, 80, 0.3);
+    box-shadow: 0 8px 16px rgba(6, 8, 10, 0.12);
   }
 
   .appTabButton--active {
-    border-color: rgba(100, 225, 177, 0.58);
-    background: linear-gradient(130deg, rgba(20, 97, 71, 0.92), rgba(20, 125, 88, 0.92));
-    color: #e9fff4;
-    box-shadow: 0 0 14px rgba(96, 224, 175, 0.15), 0 2px 10px rgba(20, 97, 71, 0.3);
+    border-color: rgba(142, 169, 153, 0.48);
+    background: linear-gradient(135deg, rgba(66, 82, 73, 0.94), rgba(90, 107, 97, 0.94));
+    color: #eff5f1;
+    box-shadow: 0 10px 20px rgba(8, 10, 12, 0.14);
   }
 
   .appTabButton--active:hover:enabled {
-    transform: none;
-    box-shadow: 0 0 18px rgba(96, 224, 175, 0.2), 0 2px 12px rgba(20, 97, 71, 0.4);
+    box-shadow: 0 10px 20px rgba(8, 10, 12, 0.18);
   }

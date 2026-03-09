@@ -3,21 +3,23 @@
   max-width: 320px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(165deg, rgba(10, 19, 36, 0.94), rgba(3, 9, 20, 0.98));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(108, 120, 126, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(29, 34, 39, 0.96), rgba(20, 24, 28, 0.99));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   transition: border-color 200ms ease, box-shadow 200ms ease;
   font-size: 0.84rem;
 }
 
 .baseNode:hover {
-  border-color: rgba(130, 170, 230, 0.45);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 12px rgba(100, 160, 255, 0.08);
+  border-color: rgba(176, 184, 190, 0.34);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22);
 }
 
 .baseNode--selected {
-  border-color: rgba(96, 224, 175, 0.6) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 16px rgba(96, 224, 175, 0.15) !important;
+  border-color: rgba(142, 169, 153, 0.52) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(142, 169, 153, 0.14) !important;
 }
 
 /* ── Header ────────────────────────────────────────────── */
@@ -27,7 +29,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.52rem 0.65rem;
-  border-bottom: 1px solid rgba(110, 146, 199, 0.2);
+  border-bottom: 1px solid rgba(151, 161, 167, 0.16);
   font-weight: 600;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
@@ -45,33 +47,33 @@
 }
 
 .nodeIcon--command {
-  background: linear-gradient(135deg, rgba(52, 140, 255, 0.3), rgba(52, 180, 255, 0.2));
-  border: 1px solid rgba(52, 180, 255, 0.45);
-  color: #8cc9ff;
+  background: linear-gradient(135deg, rgba(118, 136, 149, 0.24), rgba(138, 152, 160, 0.18));
+  border: 1px solid rgba(151, 161, 167, 0.34);
+  color: #cad4d8;
 }
 
 .nodeIcon--variable {
-  background: linear-gradient(135deg, rgba(200, 120, 255, 0.3), rgba(180, 100, 240, 0.2));
-  border: 1px solid rgba(180, 120, 255, 0.45);
-  color: #d4a8ff;
+  background: linear-gradient(135deg, rgba(126, 151, 140, 0.24), rgba(144, 167, 156, 0.18));
+  border: 1px solid rgba(142, 169, 153, 0.34);
+  color: #c7d9d0;
 }
 
 .nodeIcon--terminal {
-  background: linear-gradient(135deg, rgba(96, 224, 175, 0.3), rgba(80, 200, 160, 0.2));
-  border: 1px solid rgba(96, 224, 175, 0.45);
-  color: #86f1c5;
+  background: linear-gradient(135deg, rgba(126, 151, 140, 0.24), rgba(144, 167, 156, 0.18));
+  border: 1px solid rgba(142, 169, 153, 0.34);
+  color: #c7d9d0;
 }
 
 .nodeIcon--sshTerminal {
-  background: linear-gradient(135deg, rgba(112, 187, 255, 0.28), rgba(80, 145, 230, 0.22));
-  border: 1px solid rgba(112, 187, 255, 0.45);
-  color: #8bc7ff;
+  background: linear-gradient(135deg, rgba(126, 143, 153, 0.24), rgba(145, 159, 167, 0.18));
+  border: 1px solid rgba(151, 161, 167, 0.34);
+  color: #ccd5d9;
 }
 
 .nodeIcon--sequence {
-  background: linear-gradient(135deg, rgba(243, 179, 94, 0.3), rgba(220, 160, 80, 0.2));
-  border: 1px solid rgba(243, 179, 94, 0.45);
-  color: #f3b35e;
+  background: linear-gradient(135deg, rgba(162, 149, 118, 0.24), rgba(181, 166, 134, 0.18));
+  border: 1px solid rgba(181, 165, 126, 0.34);
+  color: #dacda7;
 }
 
 .nodeLabel {
@@ -96,9 +98,9 @@
 .nodeLabelInput {
   flex: 1;
   min-width: 0;
-  border: 1px solid rgba(110, 146, 199, 0.3);
+  border: 1px solid rgba(151, 161, 167, 0.24);
   border-radius: 8px;
-  background: rgba(4, 11, 23, 0.92);
+  background: rgba(18, 22, 26, 0.94);
   color: var(--text);
   font-size: 0.78rem;
   font-weight: 600;
@@ -135,8 +137,8 @@
   width: 100%;
   padding: 0.36rem 0.5rem;
   border-radius: 8px;
-  border: 1px solid rgba(110, 146, 199, 0.28);
-  background: rgba(4, 11, 23, 0.9);
+  border: 1px solid rgba(151, 161, 167, 0.22);
+  background: rgba(18, 22, 26, 0.92);
   color: var(--text);
   font-size: 0.78rem;
   transition: border-color 150ms ease;
@@ -154,8 +156,8 @@
 }
 
 .nodeInputToggle {
-  border: 1px solid rgba(110, 146, 199, 0.28);
-  background: rgba(4, 11, 23, 0.9);
+  border: 1px solid rgba(151, 161, 167, 0.22);
+  background: rgba(18, 22, 26, 0.92);
   color: var(--text);
   border-radius: 8px;
   padding: 0 0.55rem;
@@ -169,11 +171,15 @@
 }
 
 .nodeCodeBlock {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.74rem;
-  color: #a5f4c8;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(110, 146, 199, 0.15);
+  line-height: 1.45;
+  color: #c4d3cb;
+  background: rgba(15, 18, 21, 0.76);
+  border: 1px solid rgba(151, 161, 167, 0.14);
   border-radius: 8px;
   padding: 0.38rem 0.5rem;
   word-break: break-all;
@@ -188,27 +194,41 @@
 }
 
 .nodeCodeBlock--placeholder {
-  color: rgba(165, 244, 200, 0.55);
+  color: rgba(196, 211, 203, 0.48);
+}
+
+.nodeCodeVariable {
+  color: #c7d9d0;
+  text-decoration-line: underline;
+  text-decoration-color: rgba(199, 217, 208, 0.82);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.12em;
 }
 
 .nodeCodeEditor {
+  display: block;
   width: 100%;
-  min-height: 4.4rem;
-  resize: vertical;
+  min-height: 0;
+  resize: none;
+  box-sizing: border-box;
+  margin: 0;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.74rem;
-  color: #a5f4c8;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(96, 224, 175, 0.35);
-  border-radius: 8px;
-  padding: 0.45rem 0.5rem;
   line-height: 1.45;
+  color: #c4d3cb;
+  background: rgba(15, 18, 21, 0.76);
+  border: 1px solid rgba(151, 161, 167, 0.14);
+  border-radius: 8px;
+  padding: 0.38rem 0.5rem;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .nodeCodeEditor:focus {
   outline: none;
-  border-color: rgba(96, 224, 175, 0.6);
-  box-shadow: 0 0 0 1px rgba(96, 224, 175, 0.12);
+  border-color: rgba(142, 169, 153, 0.48);
+  box-shadow: 0 0 0 1px rgba(142, 169, 153, 0.12);
 }
 
 /* ── Handles ───────────────────────────────────────────── */
@@ -238,7 +258,7 @@
   display: grid;
   gap: 0.35rem;
   padding: 0.35rem 0.65rem 0.5rem;
-  border-top: 1px solid rgba(110, 146, 199, 0.12);
+  border-top: 1px solid rgba(151, 161, 167, 0.12);
 }
 
 .varHandlesTitle {
@@ -261,7 +281,7 @@
 .varHandleName {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.72rem;
-  color: #d4a8ff;
+  color: #c7d9d0;
   padding-left: 8px;
 }
 
@@ -269,7 +289,7 @@
 
 .nodeStatus {
   padding: 0.35rem 0.65rem 0.45rem;
-  border-top: 1px solid rgba(110, 146, 199, 0.12);
+  border-top: 1px solid rgba(151, 161, 167, 0.12);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -283,22 +303,22 @@
 }
 
 .statusDot--idle {
-  background: rgba(160, 180, 210, 0.5);
+  background: rgba(163, 171, 176, 0.56);
 }
 
 .statusDot--closed {
-  background: #f3b35e;
-  box-shadow: 0 0 6px rgba(243, 179, 94, 0.4);
+  background: #c9b281;
+  box-shadow: 0 0 6px rgba(181, 165, 126, 0.24);
 }
 
 .statusDot--connected {
-  background: #64d39b;
-  box-shadow: 0 0 6px rgba(96, 224, 175, 0.4);
+  background: #9bb7a8;
+  box-shadow: 0 0 6px rgba(142, 169, 153, 0.24);
 }
 
 .statusDot--error {
-  background: #ff8c8c;
-  box-shadow: 0 0 6px rgba(255, 100, 100, 0.4);
+  background: #d1a4a4;
+  box-shadow: 0 0 6px rgba(181, 129, 129, 0.24);
 }
 
 .statusText {
@@ -312,23 +332,23 @@
   width: 100%;
   padding: 0.4rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid rgba(96, 224, 175, 0.5);
-  background: linear-gradient(130deg, rgba(20, 106, 77, 0.92), rgba(16, 132, 90, 0.95));
-  color: #e9fff4;
+  border: 1px solid rgba(137, 164, 148, 0.42);
+  background: linear-gradient(135deg, rgba(77, 98, 87, 0.96), rgba(100, 120, 109, 0.94));
+  color: #eef4f0;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: box-shadow 200ms ease, transform 120ms ease;
+  transition: box-shadow 200ms ease, filter 120ms ease;
 }
 
 .runButton:hover {
-  box-shadow: 0 0 14px rgba(96, 224, 175, 0.2);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(8, 10, 12, 0.14);
+  filter: brightness(1.03);
 }
 
 .runButton:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
+  filter: none;
   box-shadow: none;
 }
