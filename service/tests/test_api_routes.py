@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from starlette.responses import Response
 
 from src.app.api.routes.command_packs import (
     create_command_template,
@@ -67,6 +68,17 @@ from src.app.schemas.terminal import (
 from src.app.services.command_packs import CommandPackManager
 from src.app.services.pipeline_flows import PipelineFlowManager
 from src.app.services.runtime import RuntimeManager
+
+
+async def _read_response_text(response: Response) -> str:
+    body = getattr(response, "body", None)
+    if body is not None:
+        return body.decode("utf-8")
+
+    chunks: list[bytes] = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode("utf-8"))
+    return b"".join(chunks).decode("utf-8")
 
 
 def _line() -> TerminalLineData:
@@ -354,7 +366,8 @@ async def test_runs_routes(tmp_path: Path):
         runtime=cast(RuntimeManager, runtime),
     )
     stop_res = await stop_run("run_1", runtime=cast(RuntimeManager, runtime))
-    log_text = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    log_response = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    log_text = await _read_response_text(log_response)
 
     assert runs_res.runs[0].id == "run_1"
     assert run_res.pipeline_name == "Pipeline"
@@ -393,7 +406,8 @@ async def test_terminals_routes(tmp_path: Path):
     stop_res = await stop_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     clear_res = await clear_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     close_res = await close_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
-    log_text = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+    log_response = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+    log_text = await _read_response_text(log_response)
 
     assert terminals_res.manual_terminals[0].id == "terminal_1"
     assert created_res.id == "terminal_1"
@@ -404,6 +418,19 @@ async def test_terminals_routes(tmp_path: Path):
     assert clear_res.lines == []
     assert close_res.deleted is True
     assert log_text == "terminal-log"
+
+
+@pytest.mark.asyncio
+async def test_log_routes_return_empty_text_for_missing_files(tmp_path: Path):
+    runtime = RuntimeStub()
+    runtime.get_run_log_path = lambda _run_id: tmp_path / "missing-run.log"  # type: ignore[method-assign]
+    runtime.get_terminal_log_path = lambda _terminal_id: tmp_path / "missing-terminal.log"  # type: ignore[method-assign]
+
+    run_log_response = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    terminal_log_response = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+
+    assert await _read_response_text(run_log_response) == ""
+    assert await _read_response_text(terminal_log_response) == ""
 
 
 @pytest.mark.asyncio

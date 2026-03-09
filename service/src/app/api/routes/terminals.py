@@ -1,7 +1,8 @@
+import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from src.app.deps import get_runtime
 from src.app.schemas.terminal import (
@@ -21,10 +22,22 @@ from src.app.services.runtime import RuntimeManager
 router = APIRouter(prefix="/api/terminals", tags=["terminals"])
 
 
-def _read_text(path: Path) -> str:
+async def _iter_file_chunks(path: Path, chunk_size: int = 64 * 1024):
+    file = await asyncio.to_thread(path.open, "rb")
+    try:
+        while True:
+            chunk = await asyncio.to_thread(file.read, chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    finally:
+        await asyncio.to_thread(file.close)
+
+
+def _stream_text(path: Path) -> PlainTextResponse | StreamingResponse:
     if not path.exists():
-        return ""
-    return path.read_text(encoding="utf-8")
+        return PlainTextResponse("")
+    return StreamingResponse(_iter_file_chunks(path), media_type="text/plain; charset=utf-8")
 
 
 @router.get("", response_model=ManualTerminalsListResponse)
@@ -100,9 +113,9 @@ async def close_terminal(
     return ManualTerminalDeleteResponse.model_validate({"deleted": True, "terminal_id": terminal_id})
 
 
-@router.get("/{terminal_id}/log", response_class=PlainTextResponse)
+@router.get("/{terminal_id}/log", response_model=None)
 async def get_terminal_log(
     terminal_id: str,
     runtime: RuntimeManager = Depends(get_runtime),
-) -> str:
-    return _read_text(runtime.get_terminal_log_path(terminal_id))
+) -> Response:
+    return _stream_text(runtime.get_terminal_log_path(terminal_id))
