@@ -8,6 +8,14 @@
     linear-gradient(180deg, rgba(26, 31, 36, 0.98), rgba(18, 22, 26, 1));
   box-shadow: var(--shadow);
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.panelOverlay {
+  height: calc(100vh - 2rem);
+  max-height: calc(100vh - 2rem);
 }
 
 .header {
@@ -15,7 +23,14 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
-  margin-bottom: 1rem;
+}
+
+.headerActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
 }
 
 .kicker {
@@ -40,6 +55,14 @@
   border-radius: 14px;
   border: 1px solid rgba(110, 146, 199, 0.22);
   background: rgba(24, 29, 33, 0.86);
+}
+
+.footerBar {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: 0.4rem;
 }
 
 .runtimeOk,
@@ -107,6 +130,19 @@
   margin: 0.25rem 0 0;
   color: var(--muted);
   text-transform: capitalize;
+}
+
+.selectedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.64rem;
+  border-radius: 999px;
+  border: 1px solid rgba(142, 169, 153, 0.34);
+  background: rgba(44, 54, 49, 0.52);
+  color: #c7ddd1;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .metaList {
@@ -357,5 +393,15 @@
   .header,
   .previewHeader {
     flex-direction: column;
+  }
+
+  .panelOverlay {
+    height: calc(100vh - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

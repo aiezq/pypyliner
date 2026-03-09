@@ -1,11 +1,11 @@
-import { Suspense, lazy, useState, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import HeaderBar from './components/HeaderBar'
 import { GraphEditor, useGraphStore } from './graph'
 import { useHistoryFeature } from './features/history/useHistoryFeature'
 import { useWorkbenchFeature } from './features/workbench/useWorkbenchFeature'
 import type { SessionStatus } from './types'
 
-type AppView = 'graph' | 'history' | 'ai'
+type AppView = 'graph' | 'history'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 const TerminalWindowsLayer = lazy(() => import('./components/TerminalWindowsLayer'))
@@ -13,6 +13,7 @@ const LocalAiPanel = lazy(() => import('./features/ai/LocalAiPanel'))
 
 function App() {
   const [activeView, setActiveView] = useState<AppView>('graph')
+  const [isLocalAiOpen, setIsLocalAiOpen] = useState(false)
 
   const workbench = useWorkbenchFeature()
 
@@ -34,12 +35,29 @@ function App() {
     setTerminalStatuses(statuses)
   }, [workbench.terminalWindowsLayerProps.manualTerminals, setActiveTerminalIds, setTerminalStatuses])
 
+  useEffect(() => {
+    if (!isLocalAiOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsLocalAiOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isLocalAiOpen])
+
   return (
     <div className="app">
       <HeaderBar
         isSocketConnected={workbench.isSocketConnected}
         terminalInstancesCount={workbench.terminalInstancesCount}
-        onOpenLocalAi={() => setActiveView('ai')}
+        onOpenLocalAi={() => setIsLocalAiOpen(true)}
         onCreateManualTerminal={() => {
           void workbench.createManualTerminal()
         }}
@@ -49,39 +67,41 @@ function App() {
         <p className="errorBanner">{workbench.errorBannerMessage}</p>
       ) : null}
 
-      <div className="appTabs" role="tablist" aria-label="Main views">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'graph'}
-          className={`appTabButton${activeView === 'graph' ? ' appTabButton--active' : ''}`}
-          onClick={() => setActiveView('graph')}
-        >
-          Graph Editor
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'history'}
-          className={`appTabButton${activeView === 'history' ? ' appTabButton--active' : ''}`}
-          onClick={() => setActiveView('history')}
-        >
-          History
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'ai'}
-          className={`appTabButton${activeView === 'ai' ? ' appTabButton--active' : ''}`}
-          onClick={() => setActiveView('ai')}
-        >
-          Local AI
-        </button>
+      <div className="appTabsRow">
+        <div className="appTabs" role="tablist" aria-label="Main views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'graph'}
+            className={`appTabButton${activeView === 'graph' ? ' appTabButton--active' : ''}`}
+            onClick={() => setActiveView('graph')}
+          >
+            Graph Editor
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'history'}
+            className={`appTabButton${activeView === 'history' ? ' appTabButton--active' : ''}`}
+            onClick={() => setActiveView('history')}
+          >
+            History
+          </button>
+        </div>
+        <div className="appQuickActions">
+          <button
+            type="button"
+            className="appTabButton"
+            onClick={() => setIsLocalAiOpen(true)}
+          >
+            Open Local AI
+          </button>
+        </div>
       </div>
 
       {activeView === 'graph' ? (
         <GraphEditor />
-      ) : activeView === 'history' ? (
+      ) : (
         <Suspense fallback={<p className="empty">Loading history...</p>}>
           <HistoryPanel
             terminalHistory={history.terminalHistory}
@@ -89,11 +109,33 @@ function App() {
             errorMessage={history.errorMessage}
           />
         </Suspense>
-      ) : (
-        <Suspense fallback={<p className="empty">Loading Local AI...</p>}>
-          <LocalAiPanel onImportComplete={() => setActiveView('graph')} />
-        </Suspense>
       )}
+
+      {isLocalAiOpen ? (
+        <div
+          className="appOverlay"
+          role="presentation"
+          onClick={() => setIsLocalAiOpen(false)}
+        >
+          <div
+            className="appOverlayPanel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Local AI panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Suspense fallback={<p className="empty">Loading Local AI...</p>}>
+              <LocalAiPanel
+                onClose={() => setIsLocalAiOpen(false)}
+                onImportComplete={() => {
+                  setIsLocalAiOpen(false)
+                  setActiveView('graph')
+                }}
+              />
+            </Suspense>
+          </div>
+        </div>
+      ) : null}
 
       {workbench.shouldRenderTerminalWindowsLayer ? (
         <Suspense fallback={null}>

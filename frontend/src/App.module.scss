@@ -15,6 +15,20 @@
     align-items: center;
   }
 
+  .appTabsRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .appQuickActions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
   .appTabButton {
     border-color: rgba(151, 161, 167, 0.28);
     background: rgba(25, 30, 35, 0.82);
@@ -43,4 +57,52 @@
 
   .appTabButton--active:hover:enabled {
     box-shadow: 0 10px 20px rgba(8, 10, 12, 0.18);
+  }
+
+  .appOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 920;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 1rem;
+    background: rgba(9, 11, 14, 0.48);
+    backdrop-filter: blur(8px);
+    animation: fadeIn 180ms ease-out;
+  }
+
+  .appOverlayPanel {
+    width: min(1100px, 100%);
+    max-height: 100%;
+    animation: appSheetIn 220ms ease-out;
+  }
+
+  @keyframes appSheetIn {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .appTabsRow {
+      align-items: stretch;
+    }
+
+    .appQuickActions {
+      width: 100%;
+    }
+
+    .appOverlay {
+      padding: 0.75rem;
+    }
+
+    .appOverlayPanel {
+      width: 100%;
+    }
   }

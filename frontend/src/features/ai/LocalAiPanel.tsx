@@ -22,6 +22,7 @@ import styles from './LocalAiPanel.module.scss'
 
 interface LocalAiPanelProps {
   onImportComplete: () => void
+  onClose?: () => void
 }
 
 function formatBytesToGb(bytes: number): string {
@@ -48,7 +49,7 @@ function mergeModel(models: AIModel[], nextModel: AIModel): AIModel[] {
   return models.map((model) => (model.model_id === nextModel.model_id ? nextModel : model))
 }
 
-export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
+export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanelProps) {
   const importPipelineDraft = useGraphStore((state) => state.importPipelineDraft)
 
   const [runtimeAvailable, setRuntimeAvailable] = useState(false)
@@ -250,7 +251,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
     : clarificationWarnings
 
   return (
-    <section className={styles.panel}>
+    <section className={`${styles.panel}${onClose ? ` ${styles.panelOverlay}` : ''}`}>
       <div className={styles.header}>
         <div>
           <p className={styles.kicker}>Local AI</p>
@@ -259,13 +260,12 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
             Install a local model, paste operator documentation, answer clarification questions, review the draft, then import it into the graph.
           </p>
         </div>
-        <div className={styles.runtimeCard}>
-          <span className={runtimeAvailable ? styles.runtimeOk : styles.runtimeWarn}>
-            {runtimeName} {runtimeAvailable ? 'available' : 'not installed'}
-          </span>
-          <button type="button" className="buttonGhost" onClick={() => void refreshModels()}>
-            Refresh
-          </button>
+        <div className={styles.headerActions}>
+          {onClose ? (
+            <button type="button" className="buttonGhost" onClick={onClose}>
+              Close
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -284,24 +284,29 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
           {models.map((model) => {
             const isBusy = activeActionModelId === model.model_id
             const canGenerate = model.model_state === 'ready'
+            const isSelected = selectedModelId === model.model_id
 
             return (
               <article
                 key={model.model_id}
-                className={`${styles.modelCard}${selectedModelId === model.model_id ? ` ${styles.modelCardActive}` : ''}`}
+                className={`${styles.modelCard}${isSelected ? ` ${styles.modelCardActive}` : ''}`}
               >
                 <div className={styles.modelHead}>
                   <div>
                     <h3>{model.display_name}</h3>
                     <p>{model.provider}</p>
                   </div>
-                  <button
-                    type="button"
-                    className="buttonGhost"
-                    onClick={() => setSelectedModelId(model.model_id)}
-                  >
-                    Select
-                  </button>
+                  {isSelected ? (
+                    <span className={styles.selectedBadge}>Selected</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="buttonGhost"
+                      onClick={() => setSelectedModelId(model.model_id)}
+                    >
+                      Select
+                    </button>
+                  )}
                 </div>
 
                 <dl className={styles.metaList}>
@@ -643,6 +648,17 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
           </div>
         </div>
       ) : null}
+
+      <div className={styles.footerBar}>
+        <div className={styles.runtimeCard}>
+          <span className={runtimeAvailable ? styles.runtimeOk : styles.runtimeWarn}>
+            {runtimeName} {runtimeAvailable ? 'available' : 'not installed'}
+          </span>
+          <button type="button" className="buttonGhost" onClick={() => void refreshModels()}>
+            Refresh
+          </button>
+        </div>
+      </div>
     </section>
   )
 }
