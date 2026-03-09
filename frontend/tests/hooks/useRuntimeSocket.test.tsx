@@ -20,7 +20,8 @@ class MockWebSocket {
   onclose: (() => void) | null = null
   close = vi.fn()
 
-  constructor(_url: string) {
+  constructor(url: string) {
+    void url
     MockWebSocket.instances.push(this)
   }
 }

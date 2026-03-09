@@ -14,11 +14,8 @@ function TerminalWindowsDock({ windows, onRestoreWindow }: TerminalWindowsDockPr
     <aside className="terminalDock" aria-label="Minimized terminals dock">
       <div className="terminalDock__list">
         {windows.map((windowItem) => {
-          const title =
-            windowItem.kind === 'manual'
-              ? windowItem.terminal.title || 'Manual terminal'
-              : windowItem.session.title || 'Pipeline terminal'
-          const badge = windowItem.kind === 'manual' ? 'M' : 'P'
+          const title = windowItem.terminal.title || 'Manual terminal'
+          const badge = windowItem.terminal.isSequence ? 'S' : 'M'
           return (
             <button
               key={windowItem.windowId}

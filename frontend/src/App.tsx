@@ -3,6 +3,7 @@ import HeaderBar from './components/HeaderBar'
 import { GraphEditor, useGraphStore } from './graph'
 import { useHistoryFeature } from './features/history/useHistoryFeature'
 import { useWorkbenchFeature } from './features/workbench/useWorkbenchFeature'
+import type { SessionStatus } from './types'
 
 type AppView = 'graph' | 'history'
 
@@ -25,7 +26,7 @@ function App() {
     const terminals = workbench.terminalWindowsLayerProps.manualTerminals
     setActiveTerminalIds(terminals.map(t => t.id))
 
-    const statuses: Record<string, any> = {}
+    const statuses: Record<string, SessionStatus> = {}
     terminals.forEach(t => {
       statuses[t.id] = t.status
     })
