@@ -113,13 +113,13 @@ class PipelineRunState:
 class ManualTerminalState:
     id: str
     title: str
-    is_sequence: bool
     prompt_user: str
     prompt_cwd: str
     status: StatusType
     exit_code: int | None
     created_at: str
     log_file_path: Path
+    is_sequence: bool = False
     draft_command: str = ""
     lines: list[TerminalLine] = field(default_factory=_new_line_buffer)
     stop_requested: bool = False
