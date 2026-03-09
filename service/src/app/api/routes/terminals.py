@@ -47,6 +47,14 @@ async def get_terminals(runtime: RuntimeManager = Depends(get_runtime)) -> Manua
     )
 
 
+@router.get("/{terminal_id}", response_model=ManualTerminalResponse)
+async def get_terminal(
+    terminal_id: str,
+    runtime: RuntimeManager = Depends(get_runtime),
+) -> ManualTerminalResponse:
+    return ManualTerminalResponse.model_validate(runtime.get_manual_terminal(terminal_id))
+
+
 @router.post("", response_model=ManualTerminalResponse)
 async def create_terminal(
     payload: ManualTerminalCreatePayload,

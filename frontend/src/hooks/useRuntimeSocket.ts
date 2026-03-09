@@ -12,6 +12,9 @@ interface UseRuntimeSocketOptions {
   onErrorMessage?: (message: string) => void
 }
 
+const RECONNECT_DELAY_MS = 1500
+const DISCONNECT_ERROR_DELAY_MS = 3500
+
 export const useRuntimeSocket = ({
   onEvent,
   onOpen,
@@ -53,6 +56,7 @@ export const useRuntimeSocket = ({
   useEffect(() => {
     let isDisposed = false
     let reconnectTimerId: number | null = null
+    let disconnectErrorTimerId: number | null = null
     let socket: WebSocket | null = null
 
     const connectSocket = (): void => {
@@ -61,6 +65,10 @@ export const useRuntimeSocket = ({
       socket.onopen = () => {
         if (isDisposed) {
           return
+        }
+        if (disconnectErrorTimerId !== null) {
+          window.clearTimeout(disconnectErrorTimerId)
+          disconnectErrorTimerId = null
         }
         setIsSocketConnected(true)
         void handleOpen()
@@ -73,19 +81,23 @@ export const useRuntimeSocket = ({
         handleMessage(message.data)
       }
 
-      socket.onerror = () => {
-        if (isDisposed) {
-          return
-        }
-        handleDisconnect()
-      }
+      socket.onerror = () => undefined
 
       socket.onclose = () => {
         if (isDisposed) {
           return
         }
         setIsSocketConnected(false)
-        reconnectTimerId = window.setTimeout(connectSocket, 1500)
+        if (disconnectErrorTimerId === null) {
+          disconnectErrorTimerId = window.setTimeout(() => {
+            disconnectErrorTimerId = null
+            handleDisconnect()
+          }, DISCONNECT_ERROR_DELAY_MS)
+        }
+        reconnectTimerId = window.setTimeout(() => {
+          reconnectTimerId = null
+          connectSocket()
+        }, RECONNECT_DELAY_MS)
       }
     }
 
@@ -95,6 +107,9 @@ export const useRuntimeSocket = ({
       isDisposed = true
       if (reconnectTimerId !== null) {
         window.clearTimeout(reconnectTimerId)
+      }
+      if (disconnectErrorTimerId !== null) {
+        window.clearTimeout(disconnectErrorTimerId)
       }
       socket?.close()
     }
