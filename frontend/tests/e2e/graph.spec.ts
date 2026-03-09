@@ -34,12 +34,16 @@ test.describe('Graph Editor Core Interaction', () => {
     await expect(addBtn).toBeVisible()
     await addBtn.click()
 
-    // Verify we can interact with its text input
-    // The CommandNode component uses an input with placeholder "e.g. apt install {package}"
-    const commandInput = page.locator('input[placeholder="e.g. apt install {package}"]')
-    await commandInput.waitFor({ state: 'visible' })
-    await commandInput.fill('echo "hello world"')
-    await expect(commandInput).toHaveValue('echo "hello world"')
+    // Open inline command editor and persist on Enter
+    const commandPreview = page.getByRole('button', { name: 'Click to enter command' })
+    await commandPreview.waitFor({ state: 'visible' })
+    await commandPreview.click()
+
+    const commandEditor = page.getByRole('textbox', { name: 'Command editor' })
+    await commandEditor.fill('echo "hello world"')
+    await commandEditor.press('Enter')
+
+    await expect(page.getByRole('button', { name: 'echo "hello world"' })).toBeVisible()
   })
 
   test('should interact with Global Variables widget', async ({ page }) => {

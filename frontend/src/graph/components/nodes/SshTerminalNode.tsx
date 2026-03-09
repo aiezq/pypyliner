@@ -80,6 +80,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
         icon="⇄"
         iconVariant="sshTerminal"
         label={data.label}
+        onLabelSave={(label) => updateNodeData<SshTerminalNodeData>(id, { label })}
         selected={selected}
         footer={
           <div className={styles.nodeStatus}>
@@ -88,16 +89,6 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
           </div>
         }
       >
-        <div className={styles.nodeField}>
-          <span className={styles.nodeFieldLabel}>Label</span>
-          <input
-            className={styles.nodeInput}
-            value={data.label}
-            onChange={(e) => updateNodeData<SshTerminalNodeData>(id, { label: e.target.value })}
-            onPointerDown={(e) => e.stopPropagation()}
-          />
-        </div>
-
         <div className={styles.nodeField}>
           <span className={styles.nodeFieldLabel}>SSH Variable</span>
           <select

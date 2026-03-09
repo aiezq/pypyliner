@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import BaseNode from './BaseNode'
 import { HANDLE_IDS, type CommandNodeData } from '../../types'
@@ -6,8 +7,52 @@ import styles from './BaseNode.module.scss'
 
 type Props = NodeProps & { data: CommandNodeData }
 
+const DEFAULT_COMMAND_LABEL = 'New Command'
+
+function buildCommandLabel(command: string): string {
+    const trimmed = command.trim()
+    if (!trimmed) {
+        return DEFAULT_COMMAND_LABEL
+    }
+
+    const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? trimmed
+    return firstLine.length > 32 ? `${firstLine.slice(0, 29)}...` : firstLine
+}
+
+function shouldSyncLabel(label: string, previousCommand: string): boolean {
+    const trimmedLabel = label.trim()
+    if (!trimmedLabel || trimmedLabel === DEFAULT_COMMAND_LABEL) {
+        return true
+    }
+
+    const trimmedCommand = previousCommand.trim()
+    return trimmedLabel === trimmedCommand || trimmedLabel === buildCommandLabel(previousCommand)
+}
+
 export default function CommandNode({ id, data, selected }: Props) {
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
+    const [isEditing, setIsEditing] = useState(false)
+    const [draftCommand, setDraftCommand] = useState(data.command)
+    const editorRef = useRef<HTMLTextAreaElement | null>(null)
+
+    useEffect(() => {
+        if (!isEditing || !editorRef.current) {
+            return
+        }
+
+        editorRef.current.focus()
+        editorRef.current.select()
+    }, [isEditing])
+
+    const saveCommand = (nextCommand: string) => {
+        const nextData: Partial<CommandNodeData> = { command: nextCommand }
+        if (shouldSyncLabel(data.label, data.command)) {
+            nextData.label = buildCommandLabel(nextCommand)
+        }
+
+        updateNodeData<CommandNodeData>(id, nextData)
+        setIsEditing(false)
+    }
 
     return (
         <>
@@ -23,6 +68,7 @@ export default function CommandNode({ id, data, selected }: Props) {
                 icon="⌘"
                 iconVariant="command"
                 label={data.label}
+                onLabelSave={(label) => updateNodeData<CommandNodeData>(id, { label })}
                 selected={selected}
                 footer={
                     data.variableNames.length > 0 ? (
@@ -51,37 +97,39 @@ export default function CommandNode({ id, data, selected }: Props) {
                     ) : undefined
                 }
             >
-                {/* Name field */}
-                <div className={styles.nodeField}>
-                    <span className={styles.nodeFieldLabel}>Name</span>
-                    <input
-                        className={styles.nodeInput}
-                        value={data.label}
-                        onChange={(e) =>
-                            updateNodeData<CommandNodeData>(id, { label: e.target.value })
-                        }
-                        onPointerDown={(e) => e.stopPropagation()}
-                    />
-                </div>
-
-                {/* Command field */}
                 <div className={styles.nodeField}>
                     <span className={styles.nodeFieldLabel}>Command</span>
-                    <input
-                        className={styles.nodeInput}
-                        value={data.command}
-                        onChange={(e) =>
-                            updateNodeData<CommandNodeData>(id, { command: e.target.value })
-                        }
-                        placeholder="e.g. apt install {package}"
-                        onPointerDown={(e) => e.stopPropagation()}
-                    />
+                    {isEditing ? (
+                        <textarea
+                            ref={editorRef}
+                            className={styles.nodeCodeEditor}
+                            value={draftCommand}
+                            onChange={(e) => setDraftCommand(e.target.value)}
+                            onBlur={() => saveCommand(draftCommand)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    saveCommand(draftCommand)
+                                }
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            aria-label="Command editor"
+                            rows={Math.max(3, draftCommand.split(/\r?\n/).length || 1)}
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            className={`${styles.nodeCodeBlock} ${styles.nodeCodeBlockButton} ${!data.command ? styles['nodeCodeBlock--placeholder'] : ''}`}
+                            onClick={() => {
+                                setDraftCommand(data.command)
+                                setIsEditing(true)
+                            }}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {data.command || 'Click to enter command'}
+                        </button>
+                    )}
                 </div>
-
-                {/* Command preview */}
-                {data.command && (
-                    <div className={styles.nodeCodeBlock}>{data.command}</div>
-                )}
             </BaseNode>
 
             {/* Chain output handle (right) */}

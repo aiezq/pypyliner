@@ -11,20 +11,13 @@ export default function VariableNode({ id, data, selected }: Props) {
 
     return (
         <>
-            <BaseNode icon="x" iconVariant="variable" label={data.label} selected={selected}>
-                {/* Variable name */}
-                <div className={styles.nodeField}>
-                    <span className={styles.nodeFieldLabel}>Name</span>
-                    <input
-                        className={styles.nodeInput}
-                        value={data.label}
-                        onChange={(e) =>
-                            updateNodeData<VariableNodeData>(id, { label: e.target.value })
-                        }
-                        onPointerDown={(e) => e.stopPropagation()}
-                    />
-                </div>
-
+            <BaseNode
+                icon="x"
+                iconVariant="variable"
+                label={data.label}
+                onLabelSave={(label) => updateNodeData<VariableNodeData>(id, { label })}
+                selected={selected}
+            >
                 {/* Variable value */}
                 <div className={styles.nodeField}>
                     <span className={styles.nodeFieldLabel}>Value</span>

@@ -62,6 +62,9 @@ export default function TerminalNode({ id, data, selected }: Props) {
                 icon="▶"
                 iconVariant="terminal"
                 label={data.label}
+                onLabelSave={(label) =>
+                    updateNodeData<TerminalNodeData>(id, { label })
+                }
                 selected={selected}
                 footer={
                     <div className={styles.nodeStatus}>
@@ -70,19 +73,6 @@ export default function TerminalNode({ id, data, selected }: Props) {
                     </div>
                 }
             >
-                {/* Terminal name */}
-                <div className={styles.nodeField}>
-                    <span className={styles.nodeFieldLabel}>Label</span>
-                    <input
-                        className={styles.nodeInput}
-                        value={data.label}
-                        onChange={(e) =>
-                            updateNodeData<TerminalNodeData>(id, { label: e.target.value })
-                        }
-                        onPointerDown={(e) => e.stopPropagation()}
-                    />
-                </div>
-
                 {/* Run button */}
                 <button
                     type="button"

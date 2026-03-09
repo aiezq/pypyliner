@@ -52,6 +52,9 @@ export default function SequenceNode({ id, data, selected }: Props) {
             icon="⇶"
             iconVariant="sequence"
             label={data.label}
+            onLabelSave={(label) =>
+                updateNodeData<SequenceNodeData>(id, { label })
+            }
             selected={selected}
             footer={
                 error && (
@@ -62,18 +65,6 @@ export default function SequenceNode({ id, data, selected }: Props) {
                 )
             }
         >
-            <div className={styles.nodeField}>
-                <span className={styles.nodeFieldLabel}>Label</span>
-                <input
-                    className={styles.nodeInput}
-                    value={data.label}
-                    onChange={(e) =>
-                        updateNodeData<SequenceNodeData>(id, { label: e.target.value })
-                    }
-                    onPointerDown={(e) => e.stopPropagation()}
-                />
-            </div>
-
             <div className={styles.varHandles} style={{ borderColor: 'rgba(243, 179, 94, 0.2)' }}>
                 <span className={styles.varHandlesTitle} style={{ color: 'rgba(243, 179, 94, 0.7)' }}>Execution Order</span>
 
