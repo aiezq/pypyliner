@@ -117,6 +117,7 @@ def _terminal() -> ManualTerminalData:
     return {
         "id": "terminal_1",
         "title": "Terminal #1",
+        "terminal_type": "local",
         "prompt_user": "operator",
         "prompt_cwd": "~",
         "status": "running",
@@ -124,6 +125,9 @@ def _terminal() -> ManualTerminalData:
         "created_at": "2026-03-05T00:00:00Z",
         "draft_command": "",
         "log_file_path": "/tmp/terminal_1.log",
+        "ssh_connection_name": None,
+        "ssh_host": None,
+        "ssh_username": None,
         "lines": [_line()],
     }
 

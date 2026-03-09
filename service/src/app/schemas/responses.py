@@ -37,6 +37,7 @@ class RunsListResponse(BaseModel):
 class ManualTerminalResponse(BaseModel):
     id: str
     title: str
+    terminal_type: str = "local"
     is_sequence: bool = False
     prompt_user: str
     prompt_cwd: str
@@ -45,6 +46,9 @@ class ManualTerminalResponse(BaseModel):
     created_at: str
     draft_command: str = ""
     log_file_path: str
+    ssh_connection_name: str | None = None
+    ssh_host: str | None = None
+    ssh_username: str | None = None
     lines: list[TerminalLineResponse] = Field(default_factory=list)
 
 

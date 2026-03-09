@@ -6,13 +6,21 @@ import {
   type CommandNodeData,
   type VariableNodeData,
   type TerminalNodeData,
+  type SshTerminalNodeData,
 } from '../types'
+import type { SshConnectionVariable } from '../../types'
 import { substituteVariables } from './variableParser'
 
 export interface ResolvedChain {
   terminalNodeId: string
   terminalId: string | null
   terminalLabel: string
+  terminalType: 'local' | 'ssh'
+  sshConnectionId: string | null
+  sshConnectionName: string | null
+  sshHost: string | null
+  sshUsername: string | null
+  sshPassword: string | null
   commands: ResolvedCommand[]
 }
 
@@ -32,15 +40,23 @@ export function resolveChain(
   nodes: GraphNode[],
   edges: GraphEdge[],
   globalVariables: Record<string, string> = {},
+  sshConnections: SshConnectionVariable[] = [],
 ): ResolvedChain {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
   const terminalNode = nodeMap.get(terminalNodeId)
 
-  if (!terminalNode || terminalNode.type !== NODE_TYPES.TERMINAL) {
+  if (
+    !terminalNode ||
+    (terminalNode.type !== NODE_TYPES.TERMINAL && terminalNode.type !== NODE_TYPES.SSH_TERMINAL)
+  ) {
     throw new Error(`Node ${terminalNodeId} is not a terminal node`)
   }
 
-  const termData = terminalNode.data as TerminalNodeData
+  const isSshTerminal = terminalNode.type === NODE_TYPES.SSH_TERMINAL
+  const termData = terminalNode.data as TerminalNodeData | SshTerminalNodeData
+  const selectedSshConnection = isSshTerminal
+    ? sshConnections.find((connection) => connection.id === termData.connectionId)
+    : undefined
 
   // Build adjacency: which node chains INTO which node
   // chain edge: source chain-out → target chain-in
@@ -101,6 +117,20 @@ export function resolveChain(
     terminalNodeId,
     terminalId: termData.terminalId,
     terminalLabel: termData.label,
+    terminalType: isSshTerminal ? 'ssh' : 'local',
+    sshConnectionId: isSshTerminal ? (termData as SshTerminalNodeData).connectionId : null,
+    sshConnectionName: selectedSshConnection
+      ? `${selectedSshConnection.username}@${selectedSshConnection.host}`
+      : null,
+    sshHost: isSshTerminal
+      ? (selectedSshConnection?.host ?? (termData as SshTerminalNodeData).sshHost)
+      : null,
+    sshUsername: isSshTerminal
+      ? (selectedSshConnection?.username ?? (termData as SshTerminalNodeData).sshUsername)
+      : null,
+    sshPassword: isSshTerminal
+      ? (selectedSshConnection?.password ?? (termData as SshTerminalNodeData).sshPassword)
+      : null,
     commands,
   }
 }
@@ -112,8 +142,9 @@ export function resolveAllChains(
   nodes: GraphNode[],
   edges: GraphEdge[],
   globalVariables: Record<string, string> = {},
+  sshConnections: SshConnectionVariable[] = [],
 ): ResolvedChain[] {
   return nodes
-    .filter((n) => n.type === NODE_TYPES.TERMINAL)
-    .map((n) => resolveChain(n.id, nodes, edges, globalVariables))
+    .filter((n) => n.type === NODE_TYPES.TERMINAL || n.type === NODE_TYPES.SSH_TERMINAL)
+    .map((n) => resolveChain(n.id, nodes, edges, globalVariables, sshConnections))
 }

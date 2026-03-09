@@ -101,6 +101,12 @@
   color: #86f1c5;
 }
 
+.menuItemIcon--ssh-terminal {
+  background: linear-gradient(135deg, rgba(112, 187, 255, 0.3), rgba(80, 145, 230, 0.2));
+  border: 1px solid rgba(112, 187, 255, 0.42);
+  color: #8bc7ff;
+}
+
 .menuItemIcon--sequence {
   background: linear-gradient(135deg, rgba(243, 179, 94, 0.3), rgba(220, 160, 80, 0.2));
   border: 1px solid rgba(243, 179, 94, 0.4);

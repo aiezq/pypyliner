@@ -1,4 +1,5 @@
 export type StreamType = 'out' | 'err' | 'meta'
+export type TerminalType = 'local' | 'ssh'
 export type SessionStatus =
   | 'idle'
   | 'pending'
@@ -18,12 +19,16 @@ export interface ManualTerminal {
   id: string
   title: string
   titleDraft: string
+  terminalType: TerminalType
   promptUser: string
   promptCwd: string
   isSequence: boolean
   status: SessionStatus
   exitCode: number | null
   draftCommand: string
+  sshConnectionName: string | null
+  sshHost: string | null
+  sshUsername: string | null
   lines: TerminalLine[]
 }
 
@@ -37,13 +42,24 @@ export interface BackendLine {
 export interface BackendManualTerminal {
   id: string
   title: string
+  terminal_type: TerminalType
   is_sequence: boolean
   prompt_user: string
   prompt_cwd: string
   status: SessionStatus
   exit_code: number | null
   draft_command: string
+  ssh_connection_name: string | null
+  ssh_host: string | null
+  ssh_username: string | null
   lines: BackendLine[]
+}
+
+export interface SshConnectionVariable {
+  id: string
+  username: string
+  host: string
+  password: string
 }
 
 export interface BackendTerminalCompletion {

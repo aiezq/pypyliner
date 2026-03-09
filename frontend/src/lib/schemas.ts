@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const StreamTypeSchema = z.enum(['out', 'err', 'meta'])
+export const TerminalTypeSchema = z.enum(['local', 'ssh'])
 export const SessionStatusSchema = z.enum([
   'idle',
   'pending',
@@ -20,12 +21,16 @@ export const BackendLineSchema = z.object({
 export const BackendManualTerminalSchema = z.object({
   id: z.string(),
   title: z.string(),
+  terminal_type: TerminalTypeSchema.default('local'),
   is_sequence: z.boolean(),
   prompt_user: z.string(),
   prompt_cwd: z.string(),
   status: SessionStatusSchema,
   exit_code: z.number().int().nullable(),
   draft_command: z.string(),
+  ssh_connection_name: z.string().nullable().default(null),
+  ssh_host: z.string().nullable().default(null),
+  ssh_username: z.string().nullable().default(null),
   lines: z.array(BackendLineSchema),
 })
 

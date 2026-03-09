@@ -3,7 +3,7 @@ import styles from './BaseNode.module.scss'
 
 interface BaseNodeProps {
     icon: ReactNode
-    iconVariant: 'command' | 'variable' | 'terminal' | 'sequence'
+    iconVariant: 'command' | 'variable' | 'terminal' | 'sshTerminal' | 'sequence'
     label: string
     selected?: boolean
     children: ReactNode

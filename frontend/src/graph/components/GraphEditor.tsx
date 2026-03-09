@@ -16,6 +16,7 @@ import { useContextMenu } from '../hooks/useContextMenu'
 import CommandNode from './nodes/CommandNode'
 import VariableNode from './nodes/VariableNode'
 import TerminalNode from './nodes/TerminalNode'
+import SshTerminalNode from './nodes/SshTerminalNode'
 import SequenceNode from './nodes/SequenceNode'
 import ContextMenu from './ContextMenu'
 import GlobalVariablesWidget from './GlobalVariablesWidget'
@@ -25,6 +26,7 @@ const nodeTypes: NodeTypes = {
     [NODE_TYPES.COMMAND]: CommandNode,
     [NODE_TYPES.VARIABLE]: VariableNode,
     [NODE_TYPES.TERMINAL]: TerminalNode,
+    [NODE_TYPES.SSH_TERMINAL]: SshTerminalNode,
     [NODE_TYPES.SEQUENCE]: SequenceNode,
 }
 
@@ -172,6 +174,8 @@ export default function GraphEditor() {
                                 return 'rgba(200, 140, 255, 0.5)'
                             case NODE_TYPES.TERMINAL:
                                 return 'rgba(96, 224, 175, 0.5)'
+                            case NODE_TYPES.SSH_TERMINAL:
+                                return 'rgba(112, 187, 255, 0.55)'
                             case NODE_TYPES.SEQUENCE:
                                 return 'rgba(243, 179, 94, 0.5)'
                             default:
@@ -192,7 +196,7 @@ export default function GraphEditor() {
                 <div className={styles.emptyHint}>
                     Right-click to add nodes
                     <br />
-                    <span className={styles.emptyHintKey}>Right Click</span> → Add Command / Variable / Terminal
+                    <span className={styles.emptyHintKey}>Right Click</span> → Add Command / Variable / Terminal / SSH Terminal
                 </div>
             )}
         </div>
