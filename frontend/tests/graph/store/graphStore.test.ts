@@ -161,6 +161,325 @@ describe('useGraphStore serialization', () => {
     expect(state.edges.filter((edge) => edge.type === 'variable')).toHaveLength(2)
   })
 
+  it('auto-inserts a new command node into an intersected chain edge', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-start',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Start',
+            command: 'echo start',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'terminal-end',
+          type: 'terminal',
+          position: { x: 560, y: 0 },
+          data: {
+            label: 'End',
+            terminalId: null,
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'edge-original',
+          source: 'command-start',
+          target: 'terminal-end',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    const insertedId = useGraphStore.getState().addCommandNode({ x: 280, y: 0 }, {
+      label: 'Middle',
+      command: 'echo middle',
+    })
+
+    const state = useGraphStore.getState()
+
+    expect(state.edges).toHaveLength(2)
+    expect(state.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'command-start',
+          target: insertedId,
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        }),
+        expect.objectContaining({
+          source: insertedId,
+          target: 'terminal-end',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        }),
+      ]),
+    )
+  })
+
+  it('inserts an existing orphan command node into a chain edge on demand', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-start',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Start',
+            command: 'echo start',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'command-middle',
+          type: 'command',
+          position: { x: 280, y: 0 },
+          data: {
+            label: 'Middle',
+            command: 'echo middle',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'terminal-end',
+          type: 'terminal',
+          position: { x: 560, y: 0 },
+          data: {
+            label: 'End',
+            terminalId: null,
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'edge-original',
+          source: 'command-start',
+          target: 'terminal-end',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    const wasInserted = useGraphStore.getState().insertNodeIntoIntersectedChain('command-middle')
+    const state = useGraphStore.getState()
+
+    expect(wasInserted).toBe(true)
+    expect(state.edges).toHaveLength(2)
+    expect(state.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'command-start',
+          target: 'command-middle',
+          type: 'chain',
+        }),
+        expect.objectContaining({
+          source: 'command-middle',
+          target: 'terminal-end',
+          type: 'chain',
+        }),
+      ]),
+    )
+  })
+
+  it('reconnects adjacent chain nodes when deleting a middle node', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-start',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Start',
+            command: 'echo start',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'command-middle',
+          type: 'command',
+          position: { x: 260, y: 0 },
+          data: {
+            label: 'Middle',
+            command: 'echo middle',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'terminal-end',
+          type: 'terminal',
+          position: { x: 560, y: 0 },
+          data: {
+            label: 'End',
+            terminalId: null,
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'edge-1',
+          source: 'command-start',
+          target: 'command-middle',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+        {
+          id: 'edge-2',
+          source: 'command-middle',
+          target: 'terminal-end',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    useGraphStore.getState().deleteNode('command-middle')
+
+    const state = useGraphStore.getState()
+    expect(state.nodes.map((node) => node.id)).toEqual(['command-start', 'terminal-end'])
+    expect(state.edges).toEqual([
+      expect.objectContaining({
+        source: 'command-start',
+        target: 'terminal-end',
+        sourceHandle: 'chain-out',
+        targetHandle: 'chain-in',
+        type: 'chain',
+      }),
+    ])
+  })
+
+  it('reconnects across consecutive deleted chain nodes', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-start',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Start',
+            command: 'echo start',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'command-middle-1',
+          type: 'command',
+          position: { x: 220, y: 0 },
+          data: {
+            label: 'Middle 1',
+            command: 'echo middle 1',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'command-middle-2',
+          type: 'command',
+          position: { x: 440, y: 0 },
+          data: {
+            label: 'Middle 2',
+            command: 'echo middle 2',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'terminal-end',
+          type: 'terminal',
+          position: { x: 700, y: 0 },
+          data: {
+            label: 'End',
+            terminalId: null,
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'edge-1',
+          source: 'command-start',
+          target: 'command-middle-1',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+        {
+          id: 'edge-2',
+          source: 'command-middle-1',
+          target: 'command-middle-2',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+        {
+          id: 'edge-3',
+          source: 'command-middle-2',
+          target: 'terminal-end',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    useGraphStore.getState().deleteNodes(['command-middle-1', 'command-middle-2'])
+
+    const state = useGraphStore.getState()
+    expect(state.nodes.map((node) => node.id)).toEqual(['command-start', 'terminal-end'])
+    expect(state.edges).toEqual([
+      expect.objectContaining({
+        source: 'command-start',
+        target: 'terminal-end',
+        sourceHandle: 'chain-out',
+        targetHandle: 'chain-in',
+        type: 'chain',
+      }),
+    ])
+  })
+
   it('imports multi-terminal pipeline draft with a sequence node', () => {
     resetGraphStore()
 

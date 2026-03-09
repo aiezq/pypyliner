@@ -31,6 +31,10 @@ import { parseVariables } from '../utils/variableParser'
 let nodeIdCounter = 0
 const nextNodeId = () => `node-${++nodeIdCounter}`
 const nextEdgeId = () => `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+const DEFAULT_NODE_WIDTH = 220
+const DEFAULT_NODE_HEIGHT = 140
+const CHAIN_HANDLE_OFFSET_Y = 20
+const CHAIN_INSERTION_PADDING = 12
 
 // ── Store interface ────────────────────────────────────────────────
 
@@ -67,6 +71,7 @@ interface GraphState {
   deleteNodes: (nodeIds: string[]) => void
   deleteEdge: (edgeId: string) => void
   addNodesAndEdges: (nodes: GraphNode[], edges: GraphEdge[]) => void
+  insertNodeIntoIntersectedChain: (nodeId: string) => boolean
   importPipelineDraft: (draft: PipelineDraft) => void
 
   // Serialization
@@ -139,6 +144,279 @@ function parseSshConnectionHint(connectionHint: string | null): {
     sshUsername: '',
     sshHost: trimmed,
   }
+}
+
+function getNodeDimensions(node: GraphNode): { width: number; height: number } {
+  const width = node.measured?.width ?? node.width ?? DEFAULT_NODE_WIDTH
+  const height = node.measured?.height ?? node.height ?? DEFAULT_NODE_HEIGHT
+  return { width, height }
+}
+
+function getNodeRect(node: GraphNode, padding = 0): {
+  left: number
+  top: number
+  right: number
+  bottom: number
+} {
+  const { width, height } = getNodeDimensions(node)
+  return {
+    left: node.position.x - padding,
+    top: node.position.y - padding,
+    right: node.position.x + width + padding,
+    bottom: node.position.y + height + padding,
+  }
+}
+
+function rectsIntersect(
+  a: ReturnType<typeof getNodeRect>,
+  b: ReturnType<typeof getNodeRect>,
+): boolean {
+  return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top
+}
+
+function getChainHandlePoint(node: GraphNode, side: 'source' | 'target'): { x: number; y: number } {
+  const { width, height } = getNodeDimensions(node)
+  const y = node.position.y + Math.min(CHAIN_HANDLE_OFFSET_Y, height / 2)
+  return {
+    x: side === 'source' ? node.position.x + width : node.position.x,
+    y,
+  }
+}
+
+function computeOutCode(
+  point: { x: number; y: number },
+  rect: ReturnType<typeof getNodeRect>,
+): number {
+  let code = 0
+
+  if (point.x < rect.left) code |= 1
+  else if (point.x > rect.right) code |= 2
+
+  if (point.y < rect.top) code |= 4
+  else if (point.y > rect.bottom) code |= 8
+
+  return code
+}
+
+function segmentIntersectsRect(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  rect: ReturnType<typeof getNodeRect>,
+): boolean {
+  let x0 = start.x
+  let y0 = start.y
+  let x1 = end.x
+  let y1 = end.y
+  let outCode0 = computeOutCode(start, rect)
+  let outCode1 = computeOutCode(end, rect)
+
+  while (true) {
+    if ((outCode0 | outCode1) === 0) {
+      return true
+    }
+
+    if ((outCode0 & outCode1) !== 0) {
+      return false
+    }
+
+    const outCodeOut = outCode0 !== 0 ? outCode0 : outCode1
+    let x = 0
+    let y = 0
+
+    if (outCodeOut & 8) {
+      x = x0 + ((x1 - x0) * (rect.bottom - y0)) / (y1 - y0)
+      y = rect.bottom
+    } else if (outCodeOut & 4) {
+      x = x0 + ((x1 - x0) * (rect.top - y0)) / (y1 - y0)
+      y = rect.top
+    } else if (outCodeOut & 2) {
+      y = y0 + ((y1 - y0) * (rect.right - x0)) / (x1 - x0)
+      x = rect.right
+    } else {
+      y = y0 + ((y1 - y0) * (rect.left - x0)) / (x1 - x0)
+      x = rect.left
+    }
+
+    if (outCodeOut === outCode0) {
+      x0 = x
+      y0 = y
+      outCode0 = computeOutCode({ x, y }, rect)
+    } else {
+      x1 = x
+      y1 = y
+      outCode1 = computeOutCode({ x, y }, rect)
+    }
+  }
+}
+
+function projectPointToSegment(
+  point: { x: number; y: number },
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): { distance: number; progress: number } {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+
+  if (lengthSquared === 0) {
+    return {
+      distance: Math.hypot(point.x - start.x, point.y - start.y),
+      progress: 0,
+    }
+  }
+
+  const rawProgress = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+  const progress = Math.max(0, Math.min(1, rawProgress))
+  const closestX = start.x + dx * progress
+  const closestY = start.y + dy * progress
+
+  return {
+    distance: Math.hypot(point.x - closestX, point.y - closestY),
+    progress,
+  }
+}
+
+function canInsertNodeIntoChain(node: GraphNode, edges: GraphEdge[]): boolean {
+  if (node.type !== NODE_TYPES.COMMAND) {
+    return false
+  }
+
+  return !edges.some(
+    (edge) =>
+      edge.type === EDGE_TYPES.CHAIN &&
+      (edge.source === node.id || edge.target === node.id),
+  )
+}
+
+function findChainEdgeToSplit(
+  node: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+): GraphEdge | null {
+  if (!canInsertNodeIntoChain(node, edges)) {
+    return null
+  }
+
+  const nodeRect = getNodeRect(node, CHAIN_INSERTION_PADDING)
+  const nodeCenter = {
+    x: (nodeRect.left + nodeRect.right) / 2,
+    y: (nodeRect.top + nodeRect.bottom) / 2,
+  }
+  let bestMatch: { edge: GraphEdge; distance: number } | null = null
+
+  for (const edge of edges) {
+    if (
+      edge.type !== EDGE_TYPES.CHAIN ||
+      edge.source === node.id ||
+      edge.target === node.id
+    ) {
+      continue
+    }
+
+    const sourceNode = nodes.find((item) => item.id === edge.source)
+    const targetNode = nodes.find((item) => item.id === edge.target)
+    if (!sourceNode || !targetNode) {
+      continue
+    }
+
+    if (
+      rectsIntersect(nodeRect, getNodeRect(sourceNode)) ||
+      rectsIntersect(nodeRect, getNodeRect(targetNode))
+    ) {
+      continue
+    }
+
+    const start = getChainHandlePoint(sourceNode, 'source')
+    const end = getChainHandlePoint(targetNode, 'target')
+    if (!segmentIntersectsRect(start, end, nodeRect)) {
+      continue
+    }
+
+    const { distance, progress } = projectPointToSegment(nodeCenter, start, end)
+    if (progress <= 0.08 || progress >= 0.92) {
+      continue
+    }
+
+    if (!bestMatch || distance < bestMatch.distance) {
+      bestMatch = { edge, distance }
+    }
+  }
+
+  return bestMatch?.edge ?? null
+}
+
+function getChainReconnectEdges(
+  removedNodeIds: Set<string>,
+  edges: GraphEdge[],
+): GraphEdge[] {
+  const chainEdges = edges.filter((edge) => edge.type === EDGE_TYPES.CHAIN)
+  const outgoingBySource = new Map<string, GraphEdge[]>()
+
+  for (const edge of chainEdges) {
+    const existing = outgoingBySource.get(edge.source)
+    if (existing) {
+      existing.push(edge)
+    } else {
+      outgoingBySource.set(edge.source, [edge])
+    }
+  }
+
+  const createdKeys = new Set(
+    chainEdges.map((edge) => `${edge.source}:${edge.target}:${edge.targetHandle ?? ''}`),
+  )
+  const reconnectEdges: GraphEdge[] = []
+
+  const collectReachableTargets = (startNodeId: string): Set<string> => {
+    const targets = new Set<string>()
+    const visited = new Set<string>()
+    const queue = [startNodeId]
+
+    while (queue.length > 0) {
+      const currentNodeId = queue.shift()
+      if (!currentNodeId || visited.has(currentNodeId)) {
+        continue
+      }
+
+      visited.add(currentNodeId)
+      const outgoingEdges = outgoingBySource.get(currentNodeId) ?? []
+      for (const edge of outgoingEdges) {
+        if (removedNodeIds.has(edge.target)) {
+          queue.push(edge.target)
+          continue
+        }
+
+        targets.add(edge.target)
+      }
+    }
+
+    return targets
+  }
+
+  for (const edge of chainEdges) {
+    if (!removedNodeIds.has(edge.target) || removedNodeIds.has(edge.source)) {
+      continue
+    }
+
+    const reachableTargets = collectReachableTargets(edge.target)
+    for (const target of reachableTargets) {
+      const key = `${edge.source}:${target}:${HANDLE_IDS.CHAIN_IN}`
+      if (createdKeys.has(key)) {
+        continue
+      }
+
+      createdKeys.add(key)
+      reconnectEdges.push({
+        id: nextEdgeId(),
+        source: edge.source,
+        target,
+        sourceHandle: HANDLE_IDS.CHAIN_OUT,
+        targetHandle: HANDLE_IDS.CHAIN_IN,
+        type: EDGE_TYPES.CHAIN,
+      })
+    }
+  }
+
+  return reconnectEdges
 }
 
 function normalizeTerminalGroupName(groupName: string | null | undefined): string {
@@ -310,6 +588,7 @@ export const useGraphStore = create<GraphState>()(
         }
 
         set((state) => ({ nodes: [...state.nodes, node] }))
+        get().insertNodeIntoIntersectedChain(id)
         return id
       },
 
@@ -446,22 +725,31 @@ export const useGraphStore = create<GraphState>()(
       },
 
       deleteNode: (nodeId) => {
-        set((state) => ({
-          nodes: state.nodes.filter((n) => n.id !== nodeId),
-          edges: state.edges.filter(
-            (e) => e.source !== nodeId && e.target !== nodeId,
-          ),
-        }))
+        const removedNodeIds = new Set([nodeId])
+        set((state) => {
+          const remainingEdges = state.edges.filter(
+            (edge) => edge.source !== nodeId && edge.target !== nodeId,
+          )
+
+          return {
+            nodes: state.nodes.filter((node) => node.id !== nodeId),
+            edges: [...remainingEdges, ...getChainReconnectEdges(removedNodeIds, state.edges)],
+          }
+        })
       },
 
       deleteNodes: (nodeIds) => {
         const idSet = new Set(nodeIds)
-        set((state) => ({
-          nodes: state.nodes.filter((n) => !idSet.has(n.id)),
-          edges: state.edges.filter(
-            (e) => !idSet.has(e.source) && !idSet.has(e.target),
-          ),
-        }))
+        set((state) => {
+          const remainingEdges = state.edges.filter(
+            (edge) => !idSet.has(edge.source) && !idSet.has(edge.target),
+          )
+
+          return {
+            nodes: state.nodes.filter((node) => !idSet.has(node.id)),
+            edges: [...remainingEdges, ...getChainReconnectEdges(idSet, state.edges)],
+          }
+        })
       },
 
       deleteEdge: (edgeId) => {
@@ -475,6 +763,47 @@ export const useGraphStore = create<GraphState>()(
           nodes: [...state.nodes, ...newNodes],
           edges: [...state.edges, ...newEdges],
         }))
+      },
+
+      insertNodeIntoIntersectedChain: (nodeId) => {
+        const state = get()
+        const node = state.nodes.find((item) => item.id === nodeId)
+        if (!node) {
+          return false
+        }
+
+        const edgeToSplit = findChainEdgeToSplit(node, state.nodes, state.edges)
+        if (!edgeToSplit) {
+          return false
+        }
+
+        const replacementEdges: GraphEdge[] = [
+          {
+            id: nextEdgeId(),
+            source: edgeToSplit.source,
+            target: node.id,
+            sourceHandle: HANDLE_IDS.CHAIN_OUT,
+            targetHandle: HANDLE_IDS.CHAIN_IN,
+            type: EDGE_TYPES.CHAIN,
+          },
+          {
+            id: nextEdgeId(),
+            source: node.id,
+            target: edgeToSplit.target,
+            sourceHandle: HANDLE_IDS.CHAIN_OUT,
+            targetHandle: HANDLE_IDS.CHAIN_IN,
+            type: EDGE_TYPES.CHAIN,
+          },
+        ]
+
+        set((current) => ({
+          edges: [
+            ...current.edges.filter((edge) => edge.id !== edgeToSplit.id),
+            ...replacementEdges,
+          ],
+        }))
+
+        return true
       },
 
       importPipelineDraft: (draft) => {

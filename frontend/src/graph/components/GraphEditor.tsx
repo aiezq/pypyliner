@@ -42,6 +42,9 @@ export default function GraphEditor() {
     const onEdgesChange = useGraphStore((s) => s.onEdgesChange)
     const onConnect = useGraphStore((s) => s.onConnect)
     const setViewport = useGraphStore((s) => s.setViewport)
+    const deleteNodes = useGraphStore((s) => s.deleteNodes)
+    const deleteEdge = useGraphStore((s) => s.deleteEdge)
+    const insertNodeIntoIntersectedChain = useGraphStore((s) => s.insertNodeIntoIntersectedChain)
 
     // Get the initial viewport from the store (which includes persisted localStorage state)
     // We use useMemo to ensure it's only evaluated once on mount.
@@ -130,6 +133,40 @@ export default function GraphEditor() {
         [setViewport],
     )
 
+    const handleNodeDragStop = useCallback(
+        (_event: React.MouseEvent | MouseEvent, node: import('@xyflow/react').Node) => {
+            insertNodeIntoIntersectedChain(node.id)
+        },
+        [insertNodeIntoIntersectedChain],
+    )
+
+    const handleBeforeDelete = useCallback(
+        async ({
+            nodes: nodesToDelete,
+            edges: edgesToDelete,
+        }: {
+            nodes: import('@xyflow/react').Node[]
+            edges: import('@xyflow/react').Edge[]
+        }) => {
+            const nodeIds = new Set(nodesToDelete.map((node) => node.id))
+
+            if (nodeIds.size > 0) {
+                deleteNodes(Array.from(nodeIds))
+            }
+
+            for (const edge of edgesToDelete) {
+                if (nodeIds.has(edge.source) || nodeIds.has(edge.target)) {
+                    continue
+                }
+
+                deleteEdge(edge.id)
+            }
+
+            return false
+        },
+        [deleteEdge, deleteNodes],
+    )
+
     const isEmpty = nodes.length === 0
 
     return (
@@ -146,6 +183,8 @@ export default function GraphEditor() {
                 onEdgeContextMenu={handleEdgeContextMenu}
                 onPaneClick={handlePaneClick}
                 onMoveEnd={handleMoveEnd}
+                onNodeDragStop={handleNodeDragStop}
+                onBeforeDelete={handleBeforeDelete}
                 nodeTypes={nodeTypes}
                 defaultEdgeOptions={defaultEdgeOptions}
                 fitView={false}
