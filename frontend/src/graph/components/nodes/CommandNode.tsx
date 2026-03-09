@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import BaseNode from './BaseNode'
 import { HANDLE_IDS, type CommandNodeData } from '../../types'
 import { useGraphStore } from '../../store/graphStore'
+import { tokenizeCommandTemplate } from '../../utils/variableParser'
 import styles from './BaseNode.module.scss'
 
 type Props = NodeProps & { data: CommandNodeData }
@@ -29,11 +30,26 @@ function shouldSyncLabel(label: string, previousCommand: string): boolean {
     return trimmedLabel === trimmedCommand || trimmedLabel === buildCommandLabel(previousCommand)
 }
 
+function renderCommandPreview(command: string) {
+    return tokenizeCommandTemplate(command).map((token, index) => (
+        <Fragment key={`${token.value}-${index}`}>
+            {token.isVariable ? (
+                <span className={styles.nodeCodeVariable}>{token.value}</span>
+            ) : (
+                token.value
+            )}
+        </Fragment>
+    ))
+}
+
 export default function CommandNode({ id, data, selected }: Props) {
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
     const [isEditing, setIsEditing] = useState(false)
     const [draftCommand, setDraftCommand] = useState(data.command)
     const editorRef = useRef<HTMLTextAreaElement | null>(null)
+    const previewRef = useRef<HTMLButtonElement | null>(null)
+    const [editorHeight, setEditorHeight] = useState<number | null>(null)
+    const [editorWidth, setEditorWidth] = useState<number | null>(null)
 
     useEffect(() => {
         if (!isEditing || !editorRef.current) {
@@ -43,6 +59,16 @@ export default function CommandNode({ id, data, selected }: Props) {
         editorRef.current.focus()
         editorRef.current.select()
     }, [isEditing])
+
+    useLayoutEffect(() => {
+        if (!isEditing || !editorRef.current) {
+            return
+        }
+
+        const nextHeight = editorHeight ?? previewRef.current?.offsetHeight ?? 0
+        editorRef.current.style.height = `${nextHeight}px`
+        editorRef.current.style.height = `${Math.max(nextHeight, editorRef.current.scrollHeight)}px`
+    }, [draftCommand, editorHeight, isEditing])
 
     const saveCommand = (nextCommand: string) => {
         const nextData: Partial<CommandNodeData> = { command: nextCommand }
@@ -103,6 +129,10 @@ export default function CommandNode({ id, data, selected }: Props) {
                         <textarea
                             ref={editorRef}
                             className={styles.nodeCodeEditor}
+                            style={{
+                                ...(editorHeight ? { minHeight: `${editorHeight}px` } : {}),
+                                ...(editorWidth ? { width: `${editorWidth}px` } : {}),
+                            }}
                             value={draftCommand}
                             onChange={(e) => setDraftCommand(e.target.value)}
                             onBlur={() => saveCommand(draftCommand)}
@@ -114,19 +144,22 @@ export default function CommandNode({ id, data, selected }: Props) {
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                             aria-label="Command editor"
-                            rows={Math.max(3, draftCommand.split(/\r?\n/).length || 1)}
+                            rows={Math.max(1, draftCommand.split(/\r?\n/).length || 1)}
                         />
                     ) : (
                         <button
+                            ref={previewRef}
                             type="button"
                             className={`${styles.nodeCodeBlock} ${styles.nodeCodeBlockButton} ${!data.command ? styles['nodeCodeBlock--placeholder'] : ''}`}
                             onClick={() => {
                                 setDraftCommand(data.command)
+                                setEditorHeight(previewRef.current?.offsetHeight ?? null)
+                                setEditorWidth(previewRef.current?.offsetWidth ?? null)
                                 setIsEditing(true)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                            {data.command || 'Click to enter command'}
+                            {data.command ? renderCommandPreview(data.command) : 'Click to enter command'}
                         </button>
                     )}
                 </div>

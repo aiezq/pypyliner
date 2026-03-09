@@ -9,6 +9,11 @@
  */
 const VARIABLE_REGEX = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g
 
+export interface CommandTemplateToken {
+  value: string
+  isVariable: boolean
+}
+
 export function parseVariables(command: string): string[] {
   const names = new Set<string>()
   let match: RegExpExecArray | null
@@ -18,6 +23,36 @@ export function parseVariables(command: string): string[] {
   }
 
   return Array.from(names)
+}
+
+export function tokenizeCommandTemplate(command: string): CommandTemplateToken[] {
+  const tokens: CommandTemplateToken[] = []
+  let lastIndex = 0
+
+  for (const match of command.matchAll(VARIABLE_REGEX)) {
+    const matchIndex = match.index ?? 0
+    if (matchIndex > lastIndex) {
+      tokens.push({
+        value: command.slice(lastIndex, matchIndex),
+        isVariable: false,
+      })
+    }
+
+    tokens.push({
+      value: match[0],
+      isVariable: true,
+    })
+    lastIndex = matchIndex + match[0].length
+  }
+
+  if (lastIndex < command.length) {
+    tokens.push({
+      value: command.slice(lastIndex),
+      isVariable: false,
+    })
+  }
+
+  return tokens
 }
 
 /**

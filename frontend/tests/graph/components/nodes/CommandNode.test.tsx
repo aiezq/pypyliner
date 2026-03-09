@@ -125,4 +125,36 @@ describe('CommandNode inline command editing', () => {
     expect(screen.queryByRole('textbox', { name: 'Command editor' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'echo from inline editor' })).toBeVisible()
   })
+
+  it('renders template variables with highlighted styling in the preview', () => {
+    resetGraphStore()
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-1',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Deploy',
+            command: 'deploy --host {host} --user {user}',
+            description: '',
+            variableNames: ['host', 'user'],
+          },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    render(<CommandNodeHost />)
+
+    const variableTokens = screen.getAllByText(/\{(host|user)\}/)
+      .filter((element) => element.className.includes('nodeCodeVariable'))
+
+    expect(variableTokens).toHaveLength(2)
+  })
 })
