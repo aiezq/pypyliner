@@ -3,19 +3,13 @@ import {
   createId,
   formatTime,
   getErrorMessage,
-  isPipelineOpenTerminalCommand,
-  pickLatestRun,
   toManualTerminal,
-  toRunState,
   toTerminalLine,
-  toTerminalSession,
   upsertManualTerminal,
 } from '../../src/lib/mappers'
 import type {
   BackendLine,
   BackendManualTerminal,
-  BackendRun,
-  BackendSession,
   ManualTerminal,
 } from '../../src/types'
 
@@ -27,40 +21,21 @@ const createBackendLine = (overrides: Partial<BackendLine> = {}): BackendLine =>
   ...overrides,
 })
 
-const createBackendSession = (
-  overrides: Partial<BackendSession> = {},
-): BackendSession => ({
-  id: 'session_1',
-  step_id: 'step_1',
-  title: 'Step title',
-  command: 'echo hello',
-  status: 'success',
-  exit_code: 0,
-  lines: [createBackendLine()],
-  ...overrides,
-})
-
-const createBackendRun = (overrides: Partial<BackendRun> = {}): BackendRun => ({
-  id: 'run_1',
-  pipeline_name: 'Main flow',
-  status: 'success',
-  started_at: '2026-03-01T10:00:00Z',
-  finished_at: '2026-03-01T10:02:00Z',
-  log_file_path: '/tmp/run_1.log',
-  sessions: [createBackendSession()],
-  ...overrides,
-})
-
 const createBackendManualTerminal = (
   overrides: Partial<BackendManualTerminal> = {},
 ): BackendManualTerminal => ({
   id: 'terminal_1',
   title: 'Terminal #1',
+  terminal_type: 'local',
   prompt_user: 'operator',
   prompt_cwd: '~',
+  is_sequence: false,
   status: 'running',
   exit_code: null,
   draft_command: 'ls',
+  ssh_connection_name: null,
+  ssh_host: null,
+  ssh_username: null,
   lines: [createBackendLine()],
   ...overrides,
 })
@@ -71,11 +46,16 @@ const createManualTerminal = (
   id: 'terminal_1',
   title: 'Terminal #1',
   titleDraft: 'Terminal #1',
+  terminalType: 'local',
   promptUser: 'operator',
   promptCwd: '~',
+  isSequence: false,
   status: 'running',
   exitCode: null,
   draftCommand: '',
+  sshConnectionName: null,
+  sshHost: null,
+  sshUsername: null,
   lines: [],
   ...overrides,
 })
@@ -89,7 +69,7 @@ describe('mappers', () => {
   it('createId uses crypto.randomUUID when available', () => {
     const randomUuidSpy = vi
       .spyOn(globalThis.crypto, 'randomUUID')
-      .mockReturnValue('uuid-fixed')
+      .mockReturnValue('uuid-fixed' as never)
 
     const result = createId('step')
 
@@ -127,10 +107,8 @@ describe('mappers', () => {
     expect(getErrorMessage('oops')).toBe('Unknown backend error')
   })
 
-  it('maps backend line/session/run/manual terminal into ui models', () => {
+  it('maps backend line and manual terminal into ui models', () => {
     const line = createBackendLine()
-    const session = createBackendSession()
-    const run = createBackendRun()
     const terminal = createBackendManualTerminal()
 
     expect(toTerminalLine(line)).toEqual({
@@ -140,59 +118,20 @@ describe('mappers', () => {
       createdAt: line.created_at,
     })
 
-    expect(toTerminalSession(session)).toEqual({
-      id: session.id,
-      stepId: session.step_id,
-      title: session.title,
-      command: session.command,
-      status: session.status,
-      exitCode: session.exit_code,
-      lines: [
-        {
-          id: line.id,
-          stream: line.stream,
-          text: line.text,
-          createdAt: line.created_at,
-        },
-      ],
-    })
-
-    expect(toRunState(run)).toEqual({
-      id: run.id,
-      pipelineName: run.pipeline_name,
-      status: run.status,
-      startedAt: run.started_at,
-      finishedAt: run.finished_at,
-      logFilePath: run.log_file_path,
-      sessions: [
-        {
-          id: session.id,
-          stepId: session.step_id,
-          title: session.title,
-          command: session.command,
-          status: session.status,
-          exitCode: session.exit_code,
-          lines: [
-            {
-              id: line.id,
-              stream: line.stream,
-              text: line.text,
-              createdAt: line.created_at,
-            },
-          ],
-        },
-      ],
-    })
-
     expect(toManualTerminal(terminal)).toEqual({
       id: terminal.id,
       title: terminal.title,
       titleDraft: terminal.title,
+      terminalType: terminal.terminal_type,
       promptUser: terminal.prompt_user,
       promptCwd: terminal.prompt_cwd,
+      isSequence: terminal.is_sequence,
       status: terminal.status,
       exitCode: terminal.exit_code,
       draftCommand: terminal.draft_command,
+      sshConnectionName: terminal.ssh_connection_name,
+      sshHost: terminal.ssh_host,
+      sshUsername: terminal.ssh_username,
       lines: [
         {
           id: line.id,
@@ -202,33 +141,6 @@ describe('mappers', () => {
         },
       ],
     })
-  })
-
-  it('pickLatestRun returns null for empty list and latest run otherwise', () => {
-    expect(pickLatestRun([])).toBeNull()
-
-    const oldRun = createBackendRun({
-      id: 'run_old',
-      started_at: '2026-03-01T10:00:00Z',
-    })
-    const latestRun = createBackendRun({
-      id: 'run_latest',
-      started_at: '2026-03-01T11:00:00Z',
-    })
-
-    expect(pickLatestRun([latestRun, oldRun])?.id).toBe('run_latest')
-    expect(pickLatestRun([oldRun, latestRun])?.id).toBe('run_latest')
-  })
-
-  it('matches pipeline open-terminal command for supported command forms', () => {
-    expect(isPipelineOpenTerminalCommand('operator:create_terminal')).toBe(true)
-    expect(isPipelineOpenTerminalCommand(' operator.open_terminal ')).toBe(true)
-    expect(isPipelineOpenTerminalCommand('open_terminal')).toBe(true)
-    expect(
-      isPipelineOpenTerminalCommand('bash -lc "echo Terminal session started"'),
-    ).toBe(true)
-    expect(isPipelineOpenTerminalCommand('')).toBe(false)
-    expect(isPipelineOpenTerminalCommand('echo hello')).toBe(false)
   })
 
   it('upsertManualTerminal appends when terminal does not exist', () => {
@@ -275,6 +187,6 @@ describe('mappers', () => {
 
     const next = upsertManualTerminal([existing], incoming)
     expect(next[0]?.titleDraft).toBe('Terminal renamed')
-    expect(next[0]?.draftCommand).toBe('pwd')
+    expect(next[0]?.draftCommand).toBe('')
   })
 })

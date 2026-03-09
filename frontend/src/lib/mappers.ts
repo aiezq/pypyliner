@@ -1,16 +1,8 @@
-import {
-  LEGACY_OPEN_TERMINAL_COMMAND,
-  PIPELINE_OPEN_TERMINAL_COMMAND,
-} from '../data/templates'
 import type {
   BackendLine,
   BackendManualTerminal,
-  BackendRun,
-  BackendSession,
   ManualTerminal,
-  RunState,
   TerminalLine,
-  TerminalSession,
 } from '../types'
 
 let idSequence = 0
@@ -46,25 +38,7 @@ export const toTerminalLine = (line: BackendLine): TerminalLine => ({
   createdAt: line.created_at,
 })
 
-export const toTerminalSession = (session: BackendSession): TerminalSession => ({
-  id: session.id,
-  stepId: session.step_id,
-  title: session.title,
-  command: session.command,
-  status: session.status,
-  exitCode: session.exit_code,
-  lines: session.lines.map(toTerminalLine),
-})
 
-export const toRunState = (run: BackendRun): RunState => ({
-  id: run.id,
-  pipelineName: run.pipeline_name,
-  status: run.status,
-  startedAt: run.started_at,
-  finishedAt: run.finished_at,
-  logFilePath: run.log_file_path,
-  sessions: run.sessions.map(toTerminalSession),
-})
 
 export const toManualTerminal = (
   terminal: BackendManualTerminal,
@@ -72,36 +46,20 @@ export const toManualTerminal = (
   id: terminal.id,
   title: terminal.title,
   titleDraft: terminal.title,
+  terminalType: terminal.terminal_type,
   promptUser: terminal.prompt_user,
   promptCwd: terminal.prompt_cwd,
+  isSequence: terminal.is_sequence,
   status: terminal.status,
   exitCode: terminal.exit_code,
   draftCommand: terminal.draft_command,
+  sshConnectionName: terminal.ssh_connection_name,
+  sshHost: terminal.ssh_host,
+  sshUsername: terminal.ssh_username,
   lines: terminal.lines.map(toTerminalLine),
 })
 
-export const pickLatestRun = (runs: BackendRun[]): BackendRun | null => {
-  if (runs.length === 0) {
-    return null
-  }
-  return runs.reduce((latest, current) =>
-    Date.parse(current.started_at) > Date.parse(latest.started_at) ? current : latest,
-  )
-}
 
-export const isPipelineOpenTerminalCommand = (command: string): boolean => {
-  const normalized = command.trim().replace(/\s+/g, ' ')
-  if (!normalized) {
-    return false
-  }
-  const lowered = normalized.toLowerCase()
-  return (
-    lowered === PIPELINE_OPEN_TERMINAL_COMMAND ||
-    lowered === 'operator.open_terminal' ||
-    lowered === 'open_terminal' ||
-    normalized === LEGACY_OPEN_TERMINAL_COMMAND
-  )
-}
 
 export const upsertManualTerminal = (
   terminals: ManualTerminal[],
@@ -122,10 +80,7 @@ export const upsertManualTerminal = (
             incoming.title === terminal.title
               ? terminal.titleDraft
               : incoming.title,
-          draftCommand:
-            terminal.draftCommand && !incoming.draftCommand
-              ? terminal.draftCommand
-              : incoming.draftCommand,
+          draftCommand: terminal.draftCommand,
         }
       : terminal,
   )

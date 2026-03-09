@@ -22,24 +22,16 @@ describe('TerminalWindowsDock', () => {
           id: '1',
           title: 'Manual #1',
           titleDraft: 'Manual #1',
+          terminalType: 'local',
           promptUser: 'user',
           promptCwd: '~',
+          isSequence: false,
           status: 'idle',
           exitCode: null,
           draftCommand: '',
-          lines: [],
-        },
-      },
-      {
-        windowId: 'run:1',
-        kind: 'run',
-        session: {
-          id: 's1',
-          stepId: 'step1',
-          title: 'Pipeline #1',
-          command: 'echo ok',
-          status: 'success',
-          exitCode: 0,
+          sshConnectionName: null,
+          sshHost: null,
+          sshUsername: null,
           lines: [],
         },
       },
@@ -49,9 +41,7 @@ describe('TerminalWindowsDock', () => {
 
     expect(screen.getByLabelText('Minimized terminals dock')).toBeInTheDocument()
     expect(screen.getByText('Manual #1')).toBeInTheDocument()
-    expect(screen.getByText('Pipeline #1')).toBeInTheDocument()
     expect(screen.getByText('M')).toBeInTheDocument()
-    expect(screen.getByText('P')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Manual #1/i }))
     expect(onRestoreWindow).toHaveBeenCalledWith('manual:1')

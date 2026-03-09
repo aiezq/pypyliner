@@ -1,73 +1,49 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useState, useEffect } from 'react'
 import HeaderBar from './components/HeaderBar'
+import { GraphEditor, useGraphStore } from './graph'
 import { useHistoryFeature } from './features/history/useHistoryFeature'
 import { useWorkbenchFeature } from './features/workbench/useWorkbenchFeature'
-import { useUiStore } from './stores/uiStore'
+import type { SessionStatus } from './types'
 
-type AppView = 'workbench' | 'history'
+type AppView = 'graph' | 'history' | 'ai'
 
-const CommandPackImportModal = lazy(() => import('./components/CommandPackImportModal'))
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
-const PipelineFlowSettingsModal = lazy(
-  () => import('./components/PipelineFlowSettingsModal'),
-)
 const TerminalWindowsLayer = lazy(() => import('./components/TerminalWindowsLayer'))
-const WorkbenchLayoutView = lazy(() => import('./components/workbench/WorkbenchLayoutView'))
+const LocalAiPanel = lazy(() => import('./features/ai/LocalAiPanel'))
 
 function App() {
-  const pipelineName = useUiStore((state) => state.pipelineName)
-  const setPipelineName = useUiStore((state) => state.setPipelineName)
-  const isImportModalOpen = useUiStore((state) => state.isImportModalOpen)
-  const openImportModal = useUiStore((state) => state.openImportModal)
-  const closeImportModal = useUiStore((state) => state.closeImportModal)
-  const [isFlowSettingsModalOpen, setIsFlowSettingsModalOpen] = useState(false)
-  const [activeView, setActiveView] = useState<AppView>('workbench')
+  const [activeView, setActiveView] = useState<AppView>('graph')
 
-  const workbench = useWorkbenchFeature({
-    pipelineName,
-    setPipelineName,
-  })
+  const workbench = useWorkbenchFeature()
 
   const history = useHistoryFeature({
     isActive: activeView === 'history',
   })
+
+  const setActiveTerminalIds = useGraphStore((s) => s.setActiveTerminalIds)
+  const setTerminalStatuses = useGraphStore((s) => s.setTerminalStatuses)
+
+  useEffect(() => {
+    const terminals = workbench.terminalWindowsLayerProps.manualTerminals
+    setActiveTerminalIds(terminals.map(t => t.id))
+
+    const statuses: Record<string, SessionStatus> = {}
+    terminals.forEach(t => {
+      statuses[t.id] = t.status
+    })
+    setTerminalStatuses(statuses)
+  }, [workbench.terminalWindowsLayerProps.manualTerminals, setActiveTerminalIds, setTerminalStatuses])
 
   return (
     <div className="app">
       <HeaderBar
         isSocketConnected={workbench.isSocketConnected}
         terminalInstancesCount={workbench.terminalInstancesCount}
+        onOpenLocalAi={() => setActiveView('ai')}
         onCreateManualTerminal={() => {
           void workbench.createManualTerminal()
         }}
-        onOpenImportModal={openImportModal}
-        onOpenFlowSettingsModal={() => setIsFlowSettingsModalOpen(true)}
       />
-
-      {isImportModalOpen ? (
-        <Suspense fallback={null}>
-          <CommandPackImportModal
-            isOpen={isImportModalOpen}
-            onClose={closeImportModal}
-            onImport={workbench.importJsonPack}
-          />
-        </Suspense>
-      ) : null}
-
-      {isFlowSettingsModalOpen ? (
-        <Suspense fallback={null}>
-          <PipelineFlowSettingsModal
-            isOpen={isFlowSettingsModalOpen}
-            flows={workbench.flowSettings.flows}
-            selectedFlowId={workbench.flowSettings.selectedFlowId}
-            isMutating={workbench.flowSettings.isMutating}
-            onClose={() => setIsFlowSettingsModalOpen(false)}
-            onSwitchFlow={workbench.flowSettings.onSwitchFlow}
-            onRenameFlow={workbench.flowSettings.onRenameFlow}
-            onDeleteFlow={workbench.flowSettings.onDeleteFlow}
-          />
-        </Suspense>
-      ) : null}
 
       {workbench.errorBannerMessage ? (
         <p className="errorBanner">{workbench.errorBannerMessage}</p>
@@ -77,11 +53,11 @@ function App() {
         <button
           type="button"
           role="tab"
-          aria-selected={activeView === 'workbench'}
-          className={`appTabButton${activeView === 'workbench' ? ' appTabButton--active' : ''}`}
-          onClick={() => setActiveView('workbench')}
+          aria-selected={activeView === 'graph'}
+          className={`appTabButton${activeView === 'graph' ? ' appTabButton--active' : ''}`}
+          onClick={() => setActiveView('graph')}
         >
-          Workbench
+          Graph Editor
         </button>
         <button
           type="button"
@@ -92,20 +68,30 @@ function App() {
         >
           History
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'ai'}
+          className={`appTabButton${activeView === 'ai' ? ' appTabButton--active' : ''}`}
+          onClick={() => setActiveView('ai')}
+        >
+          Local AI
+        </button>
       </div>
 
-      {activeView === 'workbench' ? (
-        <Suspense fallback={<p className="empty">Loading workbench...</p>}>
-          <WorkbenchLayoutView {...workbench.workbenchLayoutProps} />
-        </Suspense>
-      ) : (
+      {activeView === 'graph' ? (
+        <GraphEditor />
+      ) : activeView === 'history' ? (
         <Suspense fallback={<p className="empty">Loading history...</p>}>
           <HistoryPanel
-            runs={history.runs}
             terminalHistory={history.terminalHistory}
             isLoading={history.isLoading}
             errorMessage={history.errorMessage}
           />
+        </Suspense>
+      ) : (
+        <Suspense fallback={<p className="empty">Loading Local AI...</p>}>
+          <LocalAiPanel onImportComplete={() => setActiveView('graph')} />
         </Suspense>
       )}
 

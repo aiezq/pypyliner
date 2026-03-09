@@ -18,8 +18,7 @@ interface FloatingTerminalWindowProps {
     direction: ResizeDirection,
     event: ReactMouseEvent<HTMLElement>,
   ) => void
-  onTogglePin: () => void
-  onDismissRunSession: () => void
+
   onMinimize: () => void
   getCopyTailLineCount: (terminalId: string) => number
   isCopyTailRecentlyCopied: (terminalId: string) => boolean
@@ -50,8 +49,7 @@ function FloatingTerminalWindow({
   onBringToFront,
   onBeginDrag,
   onBeginResize,
-  onTogglePin,
-  onDismissRunSession,
+
   onMinimize,
   getCopyTailLineCount,
   isCopyTailRecentlyCopied,
@@ -69,70 +67,7 @@ function FloatingTerminalWindow({
   onClearManualTerminal,
   onRemoveManualTerminal,
 }: FloatingTerminalWindowProps) {
-  if (windowItem.kind === 'run') {
-    const session = windowItem.session
-    return (
-      <article
-        className="terminalWindow terminalWindow--run"
-        style={{
-          left: `${frame.x}px`,
-          top: `${frame.y}px`,
-          width: `${frame.width}px`,
-          height: `${frame.height}px`,
-          zIndex,
-        }}
-        onMouseDown={onBringToFront}
-      >
-        <TerminalPanel
-          variant="floating"
-          kind="run"
-          session={session}
-          titleHint="Pipeline output"
-          onHeaderMouseDown={onBeginDrag}
-          controls={
-            <>
-              <button
-                type="button"
-                className="terminalWindowControl terminalWindowControl--pin"
-                onMouseDown={(event) => event.stopPropagation()}
-                onClick={onTogglePin}
-                title="Pin to workflow"
-              >
-                P
-              </button>
-              <button
-                type="button"
-                className="terminalWindowControl"
-                onMouseDown={(event) => event.stopPropagation()}
-                onClick={onMinimize}
-                title="Minimize"
-              >
-                -
-              </button>
-              <button
-                type="button"
-                className="terminalWindowControl terminalWindowControl--danger"
-                onMouseDown={(event) => event.stopPropagation()}
-                onClick={onDismissRunSession}
-                title="Close output window"
-              >
-                ×
-              </button>
-              <span className={`status status--${session.status}`}>{session.status}</span>
-            </>
-          }
-        />
 
-        {RESIZE_DIRECTIONS.map((direction) => (
-          <span
-            key={direction}
-            className={`resizeHandle resizeHandle--${direction}`}
-            onMouseDown={(event) => onBeginResize(direction, event)}
-          />
-        ))}
-      </article>
-    )
-  }
 
   const terminal = windowItem.terminal
   const isEditingTitle = editingManualTitleId === terminal.id
@@ -154,7 +89,7 @@ function FloatingTerminalWindow({
         kind="manual"
         terminal={terminal}
         isEditingTitle={isEditingTitle}
-        titleHint="Manual terminal"
+        titleHint={terminal.terminalType === 'ssh' ? 'SSH terminal' : 'Manual terminal'}
         onHeaderMouseDown={onBeginDrag}
         onUpdateTitleDraft={(title) => onUpdateManualTitle(terminal.id, title)}
         onStartTitleEdit={() =>
@@ -177,15 +112,6 @@ function FloatingTerminalWindow({
         isCopyTailRecentlyCopied={isCopyTailRecentlyCopied(terminal.id)}
         controls={
           <>
-            <button
-              type="button"
-              className="terminalWindowControl terminalWindowControl--pin"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={onTogglePin}
-              title="Pin to workflow"
-            >
-              P
-            </button>
             <button
               type="button"
               className="terminalWindowControl"

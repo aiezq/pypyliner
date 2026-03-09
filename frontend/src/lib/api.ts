@@ -4,6 +4,15 @@ export const API_BASE_URL =
 
 export const WS_EVENTS_URL = `${API_BASE_URL.replace(/^http/, 'ws')}/ws/events`
 
+interface ValidationErrorItem {
+  loc?: Array<string | number>
+  msg?: string
+}
+
+interface ApiErrorPayload {
+  detail?: string | ValidationErrorItem[] | Record<string, unknown>
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   const hasBody = init?.body !== undefined
@@ -19,9 +28,13 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
     try {
-      const errorPayload = (await response.json()) as { detail?: string }
+      const errorPayload = (await response.json()) as ApiErrorPayload
       if (typeof errorPayload.detail === 'string') {
         detail = errorPayload.detail
+      } else if (Array.isArray(errorPayload.detail)) {
+        detail = errorPayload.detail.map((e) => `${e.loc?.join('.')}: ${e.msg}`).join(', ')
+      } else if (errorPayload.detail) {
+        detail = JSON.stringify(errorPayload.detail)
       }
     } catch {
       const text = await response.text()

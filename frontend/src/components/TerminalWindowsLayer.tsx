@@ -1,4 +1,4 @@
-import type { ManualTerminal, TerminalSession } from '../types'
+import type { ManualTerminal } from '../types'
 import {
   useFloatingTerminalWindowsController,
 } from '../hooks/useFloatingTerminalWindowsController'
@@ -6,13 +6,11 @@ import FloatingTerminalWindow from './terminal-windows/FloatingTerminalWindow'
 import TerminalWindowsDock from './terminal-windows/TerminalWindowsDock'
 
 export interface TerminalWindowsLayerProps {
-  runSessions: TerminalSession[]
   manualTerminals: ManualTerminal[]
-  pinnedWindowIds: string[]
+
   requestedMinimizedWindowIds: string[]
   onConsumeRequestedMinimizeWindow: (windowId: string) => void
-  onTogglePinWindow: (windowId: string) => void
-  onDismissRunSessionWindow: (windowId: string) => void
+
   getCopyTailLineCount: (terminalId: string) => number
   isCopyTailRecentlyCopied: (terminalId: string) => boolean
   onUpdateCopyTailLineCount: (terminalId: string, value: string) => void
@@ -33,13 +31,11 @@ export interface TerminalWindowsLayerProps {
 }
 
 function TerminalWindowsLayer({
-  runSessions,
   manualTerminals,
-  pinnedWindowIds,
+
   requestedMinimizedWindowIds,
   onConsumeRequestedMinimizeWindow,
-  onTogglePinWindow,
-  onDismissRunSessionWindow,
+
   getCopyTailLineCount,
   isCopyTailRecentlyCopied,
   onUpdateCopyTailLineCount,
@@ -70,9 +66,8 @@ function TerminalWindowsLayer({
     getWindowFrame,
     getWindowZIndex,
   } = useFloatingTerminalWindowsController({
-    runSessions,
     manualTerminals,
-    pinnedWindowIds,
+
     requestedMinimizedWindowIds,
     onConsumeRequestedMinimizeWindow,
     onUpdateManualTitle,
@@ -98,8 +93,7 @@ function TerminalWindowsLayer({
             onBeginResize={(direction, event) =>
               beginWindowResize(windowItem.windowId, direction, event)
             }
-            onTogglePin={() => onTogglePinWindow(windowItem.windowId)}
-            onDismissRunSession={() => onDismissRunSessionWindow(windowItem.windowId)}
+
             onMinimize={() => minimizeWindow(windowItem.windowId)}
             getCopyTailLineCount={getCopyTailLineCount}
             isCopyTailRecentlyCopied={isCopyTailRecentlyCopied}

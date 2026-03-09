@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +31,13 @@ class AppSettings(BaseSettings):
 
     command_packs_dir: Path = _DEFAULT_SERVICE_DIR / "command_packs"
     pipeline_flows_dir: Path = _DEFAULT_SERVICE_DIR / "pipeline_flows"
+    ai_enabled: bool = True
+    ai_data_dir: Path = _DEFAULT_DATA_DIR / "ai"
+    ai_runtime: Literal["ollama"] = "ollama"
+    ai_default_model: str = "gemma3"
+    ai_max_doc_chars: int = 120_000
+    ai_request_timeout_sec: int = 180
+    ai_install_timeout_sec: int = 3600
 
     max_lines_in_memory: int = 600
     shell_executable: str = "/bin/bash"
@@ -61,6 +69,8 @@ class AppSettings(BaseSettings):
             self.command_packs_dir = self.service_dir / "command_packs"
         if "pipeline_flows_dir" not in fields_set:
             self.pipeline_flows_dir = self.service_dir / "pipeline_flows"
+        if "ai_data_dir" not in fields_set:
+            self.ai_data_dir = self.data_dir / "ai"
 
         if "default_manual_terminal_command" not in fields_set:
             self.default_manual_terminal_command = f"{self.shell_executable} --noprofile --norc"

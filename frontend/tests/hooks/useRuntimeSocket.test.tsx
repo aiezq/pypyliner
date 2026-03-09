@@ -20,7 +20,8 @@ class MockWebSocket {
   onclose: (() => void) | null = null
   close = vi.fn()
 
-  constructor(_url: string) {
+  constructor(url: string) {
+    void url
     MockWebSocket.instances.push(this)
   }
 }
@@ -38,7 +39,7 @@ describe('useRuntimeSocket', () => {
     vi.unstubAllGlobals()
   })
 
-  it('handles open, valid event, invalid payload, error and reconnect on close', async () => {
+  it('handles open, valid event, invalid payload, delayed disconnect error and reconnect on close', async () => {
     const onEvent = vi.fn<(event: RuntimeSocketEvent) => void>()
     const onOpen = vi.fn(async () => {})
     const onOpenError = vi.fn()
@@ -93,17 +94,23 @@ describe('useRuntimeSocket', () => {
     act(() => {
       socket?.onerror?.()
     })
-    expect(onErrorMessage).toHaveBeenCalledWith('WebSocket disconnected from backend')
+    expect(onErrorMessage).not.toHaveBeenCalledWith('WebSocket disconnected from backend')
 
     act(() => {
       socket?.onclose?.()
     })
     expect(result.current.isSocketConnected).toBe(false)
+    expect(onErrorMessage).not.toHaveBeenCalledWith('WebSocket disconnected from backend')
 
     act(() => {
       vi.advanceTimersByTime(1500)
     })
     expect(MockWebSocket.instances.length).toBeGreaterThanOrEqual(2)
+
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(onErrorMessage).toHaveBeenCalledWith('WebSocket disconnected from backend')
 
     unmount()
     expect(
@@ -147,6 +154,89 @@ describe('useRuntimeSocket', () => {
       await Promise.resolve()
     })
     expect(onOpenError).toHaveBeenCalled()
+  })
+
+  it('keeps the same socket across callback rerenders and uses latest handlers', () => {
+    const firstOnEvent = vi.fn<(event: RuntimeSocketEvent) => void>()
+    const secondOnEvent = vi.fn<(event: RuntimeSocketEvent) => void>()
+    const firstOnErrorMessage = vi.fn()
+    const secondOnErrorMessage = vi.fn()
+
+    const { rerender } = renderHook(
+      ({
+        onEvent,
+        onErrorMessage,
+      }: {
+        onEvent: (event: RuntimeSocketEvent) => void
+        onErrorMessage: (message: string) => void
+      }) =>
+        useRuntimeSocket({
+          onEvent,
+          onErrorMessage,
+        }),
+      {
+        initialProps: {
+          onEvent: firstOnEvent,
+          onErrorMessage: firstOnErrorMessage,
+        },
+      },
+    )
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    const socket = MockWebSocket.instances[0]
+
+    rerender({
+      onEvent: secondOnEvent,
+      onErrorMessage: secondOnErrorMessage,
+    })
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+
+    act(() => {
+      socket?.onmessage?.({
+        data: JSON.stringify({
+          type: 'terminal_closed',
+          data: { terminal_id: 'terminal_2' },
+        }),
+      })
+      socket?.onclose?.()
+      vi.advanceTimersByTime(3500)
+    })
+
+    expect(firstOnEvent).not.toHaveBeenCalled()
+    expect(secondOnEvent).toHaveBeenCalledWith({
+      type: 'terminal_closed',
+      data: { terminal_id: 'terminal_2' },
+    })
+    expect(firstOnErrorMessage).not.toHaveBeenCalled()
+    expect(secondOnErrorMessage).toHaveBeenCalledWith('WebSocket disconnected from backend')
+  })
+
+  it('suppresses disconnect banner when reconnect succeeds before the delay elapses', () => {
+    const onErrorMessage = vi.fn()
+
+    renderHook(() =>
+      useRuntimeSocket({
+        onEvent: vi.fn(),
+        onErrorMessage,
+      }),
+    )
+
+    const firstSocket = MockWebSocket.instances[0]
+    act(() => {
+      firstSocket?.onclose?.()
+      vi.advanceTimersByTime(1500)
+    })
+
+    const reconnectSocket = MockWebSocket.instances[1]
+    expect(reconnectSocket).toBeDefined()
+
+    act(() => {
+      reconnectSocket?.onopen?.()
+      vi.advanceTimersByTime(2000)
+    })
+
+    expect(onErrorMessage).not.toHaveBeenCalledWith('WebSocket disconnected from backend')
   })
 
   it('ignores socket events after unmount (disposed state)', () => {

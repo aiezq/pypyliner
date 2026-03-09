@@ -33,6 +33,8 @@ class PipelineRunData(TypedDict):
 class ManualTerminalData(TypedDict):
     id: str
     title: str
+    terminal_type: str
+    is_sequence: bool
     prompt_user: str
     prompt_cwd: str
     status: str
@@ -40,12 +42,16 @@ class ManualTerminalData(TypedDict):
     created_at: str
     draft_command: str
     log_file_path: str
+    ssh_connection_name: str | None
+    ssh_host: str | None
+    ssh_username: str | None
     lines: list[TerminalLineData]
 
 
 class ManualTerminalHistoryItemData(TypedDict):
     terminal_id: str
     title: str
+    is_sequence: bool
     created_at: str
     updated_at: str
     closed_at: str | None

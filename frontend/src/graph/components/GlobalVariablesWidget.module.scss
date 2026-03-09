@@ -1,0 +1,269 @@
+.widget {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  width: 220px;
+  border: 1px solid rgba(110, 146, 199, 0.25);
+  border-radius: 12px;
+  background: rgba(8, 18, 36, 0.85);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: width 0.3s cubic-bezier(0.2, 0, 0, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget--open {
+  width: 320px;
+}
+
+/* ── Header ── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.2s ease;
+}
+
+.header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.headerIcon {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(200, 120, 255, 0.3), rgba(180, 100, 240, 0.2));
+  border: 1px solid rgba(180, 120, 255, 0.4);
+  color: #d4a8ff;
+}
+
+.headerTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.headerBadge {
+  margin-left: auto;
+  background: rgba(180, 120, 255, 0.2);
+  color: #d4a8ff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 10px;
+}
+
+.headerChevron {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 0.2rem;
+  width: 1rem;
+  text-align: center;
+}
+
+/* ── Content ── */
+
+.content {
+  border-top: 1px solid rgba(110, 146, 199, 0.15);
+  display: flex;
+  flex-direction: column;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.section + .section {
+  border-top: 1px solid rgba(110, 146, 199, 0.15);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.7rem 0.2rem;
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sectionBadge {
+  margin-left: auto;
+  background: rgba(110, 146, 199, 0.15);
+  color: #a8d8ff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.12rem 0.38rem;
+  border-radius: 10px;
+}
+
+/* ── List ── */
+
+.list {
+  padding: 0.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 250px;
+}
+
+.empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.variableItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.6rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  gap: 0.5rem;
+}
+
+.variableItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.variableInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: hidden;
+}
+
+.variableKey {
+  font-size: 0.7rem;
+  color: #d4a8ff;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.variableValue {
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deleteButton {
+  background: transparent;
+  border: none;
+  color: #ff9e9e;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.deleteButton:hover {
+  opacity: 1;
+  background: rgba(255, 80, 80, 0.15);
+}
+
+/* ── Add Form ── */
+
+.addForm {
+  padding: 0.6rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(110, 146, 199, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.inputStack {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(110, 146, 199, 0.3);
+  background: rgba(4, 11, 23, 0.9);
+  color: var(--text);
+  font-size: 0.75rem;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #d4a8ff;
+}
+
+.passwordRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+}
+
+.passwordToggle {
+  border-radius: 6px;
+  border: 1px solid rgba(110, 146, 199, 0.3);
+  background: rgba(4, 11, 23, 0.9);
+  color: var(--text);
+  padding: 0 0.65rem;
+  cursor: pointer;
+}
+
+.addButton {
+  width: 100%;
+  padding: 0.4rem;
+  border-radius: 6px;
+  border: none;
+  background: rgba(180, 120, 255, 0.15);
+  color: #d4a8ff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.addButton:hover:not(:disabled) {
+  background: rgba(180, 120, 255, 0.25);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}

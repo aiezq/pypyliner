@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from starlette.responses import Response
 
 from src.app.api.routes.command_packs import (
     create_command_template,
@@ -28,6 +29,7 @@ from src.app.api.routes.terminals import (
     close_terminal,
     complete_terminal_command,
     create_terminal,
+    get_terminal,
     get_terminal_log,
     get_terminals,
     rename_terminal,
@@ -69,6 +71,17 @@ from src.app.services.pipeline_flows import PipelineFlowManager
 from src.app.services.runtime import RuntimeManager
 
 
+async def _read_response_text(response: Response) -> str:
+    body = getattr(response, "body", None)
+    if body is not None:
+        return body.decode("utf-8")
+
+    chunks: list[bytes] = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode("utf-8"))
+    return b"".join(chunks).decode("utf-8")
+
+
 def _line() -> TerminalLineData:
     return {
         "id": "line_1",
@@ -104,6 +117,7 @@ def _terminal() -> ManualTerminalData:
     return {
         "id": "terminal_1",
         "title": "Terminal #1",
+        "terminal_type": "local",
         "prompt_user": "operator",
         "prompt_cwd": "~",
         "status": "running",
@@ -111,6 +125,9 @@ def _terminal() -> ManualTerminalData:
         "created_at": "2026-03-05T00:00:00Z",
         "draft_command": "",
         "log_file_path": "/tmp/terminal_1.log",
+        "ssh_connection_name": None,
+        "ssh_host": None,
+        "ssh_username": None,
         "lines": [_line()],
     }
 
@@ -159,6 +176,10 @@ class RuntimeStub:
 
     def list_manual_terminals(self) -> list[ManualTerminalData]:
         return [_terminal()]
+
+    def get_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
+        assert terminal_id == "terminal_1"
+        return _terminal()
 
     async def create_manual_terminal(self, payload: ManualTerminalCreatePayload) -> ManualTerminalData:
         assert payload.title == "Terminal #1"
@@ -354,7 +375,8 @@ async def test_runs_routes(tmp_path: Path):
         runtime=cast(RuntimeManager, runtime),
     )
     stop_res = await stop_run("run_1", runtime=cast(RuntimeManager, runtime))
-    log_text = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    log_response = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    log_text = await _read_response_text(log_response)
 
     assert runs_res.runs[0].id == "run_1"
     assert run_res.pipeline_name == "Pipeline"
@@ -371,6 +393,7 @@ async def test_terminals_routes(tmp_path: Path):
     runtime.get_terminal_log_path = lambda _terminal_id: terminal_log  # type: ignore[method-assign]
 
     terminals_res = await get_terminals(runtime=cast(RuntimeManager, runtime))
+    terminal_res = await get_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     created_res = await create_terminal(
         payload=ManualTerminalCreatePayload(title="Terminal #1"),
         runtime=cast(RuntimeManager, runtime),
@@ -393,9 +416,11 @@ async def test_terminals_routes(tmp_path: Path):
     stop_res = await stop_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     clear_res = await clear_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     close_res = await close_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
-    log_text = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+    log_response = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+    log_text = await _read_response_text(log_response)
 
     assert terminals_res.manual_terminals[0].id == "terminal_1"
+    assert terminal_res.id == "terminal_1"
     assert created_res.id == "terminal_1"
     assert run_res.status == "running"
     assert complete_res.completed_command == "ls src"
@@ -404,6 +429,19 @@ async def test_terminals_routes(tmp_path: Path):
     assert clear_res.lines == []
     assert close_res.deleted is True
     assert log_text == "terminal-log"
+
+
+@pytest.mark.asyncio
+async def test_log_routes_return_empty_text_for_missing_files(tmp_path: Path):
+    runtime = RuntimeStub()
+    runtime.get_run_log_path = lambda _run_id: tmp_path / "missing-run.log"  # type: ignore[method-assign]
+    runtime.get_terminal_log_path = lambda _terminal_id: tmp_path / "missing-terminal.log"  # type: ignore[method-assign]
+
+    run_log_response = await get_run_log("run_1", runtime=cast(RuntimeManager, runtime))
+    terminal_log_response = await get_terminal_log("terminal_1", runtime=cast(RuntimeManager, runtime))
+
+    assert await _read_response_text(run_log_response) == ""
+    assert await _read_response_text(terminal_log_response) == ""
 
 
 @pytest.mark.asyncio

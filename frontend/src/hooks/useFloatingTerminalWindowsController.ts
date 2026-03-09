@@ -5,16 +5,12 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react'
-import type { ManualTerminal, TerminalSession } from '../types'
+import type { ManualTerminal } from '../types'
 
 type WindowKind = 'run' | 'manual'
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
-export interface RunTerminalWindowDescriptor {
-  windowId: string
-  kind: 'run'
-  session: TerminalSession
-}
+
 
 export interface ManualTerminalWindowDescriptor {
   windowId: string
@@ -22,9 +18,7 @@ export interface ManualTerminalWindowDescriptor {
   terminal: ManualTerminal
 }
 
-export type TerminalWindowDescriptor =
-  | RunTerminalWindowDescriptor
-  | ManualTerminalWindowDescriptor
+export type TerminalWindowDescriptor = ManualTerminalWindowDescriptor
 
 export interface TerminalWindowFrame {
   x: number
@@ -48,9 +42,8 @@ interface ResizeState {
 }
 
 interface UseFloatingTerminalWindowsControllerOptions {
-  runSessions: TerminalSession[]
   manualTerminals: ManualTerminal[]
-  pinnedWindowIds: string[]
+
   requestedMinimizedWindowIds: string[]
   onConsumeRequestedMinimizeWindow: (windowId: string) => void
   onUpdateManualTitle: (terminalId: string, title: string) => void
@@ -108,9 +101,8 @@ const constrainFrame = (frame: TerminalWindowFrame): TerminalWindowFrame => {
 }
 
 export const useFloatingTerminalWindowsController = ({
-  runSessions,
   manualTerminals,
-  pinnedWindowIds,
+
   requestedMinimizedWindowIds,
   onConsumeRequestedMinimizeWindow,
   onUpdateManualTitle,
@@ -118,18 +110,13 @@ export const useFloatingTerminalWindowsController = ({
 }: UseFloatingTerminalWindowsControllerOptions) => {
   const windows = useMemo<TerminalWindowDescriptor[]>(
     () => [
-      ...runSessions.map((session): TerminalWindowDescriptor => ({
-        windowId: `run:${session.id}`,
-        kind: 'run',
-        session,
-      })),
       ...manualTerminals.map((terminal): TerminalWindowDescriptor => ({
         windowId: `manual:${terminal.id}`,
         kind: 'manual',
         terminal,
       })),
     ],
-    [manualTerminals, runSessions],
+    [manualTerminals],
   )
 
   const [windowFrames, setWindowFrames] = useState<Record<string, TerminalWindowFrame>>({})
@@ -152,7 +139,7 @@ export const useFloatingTerminalWindowsController = ({
     return next
   }, [windows])
 
-  const pinnedWindowSet = useMemo(() => new Set(pinnedWindowIds), [pinnedWindowIds])
+
   const requestedMinimizedWindowSet = useMemo(
     () => new Set(requestedMinimizedWindowIds),
     [requestedMinimizedWindowIds],
@@ -349,26 +336,24 @@ export const useFloatingTerminalWindowsController = ({
     () =>
       windows.filter(
         (windowItem) =>
-          !pinnedWindowSet.has(windowItem.windowId) &&
           !(
             minimizedWindows[windowItem.windowId] === true ||
             requestedMinimizedWindowSet.has(windowItem.windowId)
           ),
       ),
-    [pinnedWindowSet, windows, minimizedWindows, requestedMinimizedWindowSet],
+    [windows, minimizedWindows, requestedMinimizedWindowSet],
   )
 
   const minimizedWindowsList = useMemo(
     () =>
       windows.filter(
         (windowItem) =>
-          !pinnedWindowSet.has(windowItem.windowId) &&
           (
             minimizedWindows[windowItem.windowId] === true ||
             requestedMinimizedWindowSet.has(windowItem.windowId)
           ),
       ),
-    [pinnedWindowSet, windows, minimizedWindows, requestedMinimizedWindowSet],
+    [windows, minimizedWindows, requestedMinimizedWindowSet],
   )
 
   const getWindowFrame = (windowItem: TerminalWindowDescriptor, index: number): TerminalWindowFrame =>

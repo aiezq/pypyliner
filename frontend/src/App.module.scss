@@ -1,9 +1,11 @@
   .app {
-    width: min(1500px, 96vw);
+    width: min(1600px, 98vw);
+    height: 100vh;
     margin: 0 auto;
-    padding: 1.6rem 0 2.6rem;
-    display: grid;
-    gap: 1.1rem;
+    padding: 0.8rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
     animation: fadeIn 400ms ease-out;
   }
 

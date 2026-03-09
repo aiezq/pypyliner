@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEventHandler, type ReactNode } from 'react'
-import type { ManualTerminal, TerminalLine, TerminalSession } from '../types'
+import type { ManualTerminal, TerminalLine } from '../types'
 
 type TerminalHistoryDirection = 'up' | 'down'
 type TerminalPanelVariant = 'pinned' | 'floating'
@@ -10,11 +10,6 @@ interface TerminalPanelBaseProps {
   controlsClassName?: string
   onHeaderMouseDown?: MouseEventHandler<HTMLElement>
   titleHint?: string
-}
-
-interface RunTerminalPanelProps extends TerminalPanelBaseProps {
-  kind: 'run'
-  session: TerminalSession
 }
 
 interface ManualTerminalPanelProps extends TerminalPanelBaseProps {
@@ -36,7 +31,7 @@ interface ManualTerminalPanelProps extends TerminalPanelBaseProps {
   isCopyTailRecentlyCopied: boolean
 }
 
-type TerminalPanelProps = RunTerminalPanelProps | ManualTerminalPanelProps
+type TerminalPanelProps = ManualTerminalPanelProps
 
 interface TerminalOutputProps {
   lines: TerminalLine[]
@@ -85,30 +80,7 @@ function TerminalPanel(props: TerminalPanelProps) {
   const headerClassName = variant === 'floating' ? 'terminalWindow__dragbar' : 'section__head'
   const bodyClassName = variant === 'floating' ? 'terminalWindow__content' : undefined
 
-  if (props.kind === 'run') {
-    const { session } = props
-    return (
-      <>
-        <div className={headerClassName} onMouseDown={onHeaderMouseDown}>
-          {variant === 'floating' ? (
-            <div className="terminalWindow__title">
-              <strong>{session.title}</strong>
-              {titleHint ? <span className="terminalWindow__hint">{titleHint}</span> : null}
-            </div>
-          ) : (
-            <h2>{session.title}</h2>
-          )}
-          <div className={getControlsClassName(variant, controlsClassName)}>{controls}</div>
-        </div>
 
-        <div className={bodyClassName}>
-          <p className="terminalWindow__meta">exit: {session.exitCode ?? '...'}</p>
-          <code>{session.command}</code>
-          <TerminalOutput lines={session.lines} />
-        </div>
-      </>
-    )
-  }
 
   const {
     terminal,

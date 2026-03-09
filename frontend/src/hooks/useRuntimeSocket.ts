@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { WS_EVENTS_URL } from '../lib/api'
 import {
   RuntimeSocketEventSchema,
@@ -12,6 +12,9 @@ interface UseRuntimeSocketOptions {
   onErrorMessage?: (message: string) => void
 }
 
+const RECONNECT_DELAY_MS = 1500
+const DISCONNECT_ERROR_DELAY_MS = 3500
+
 export const useRuntimeSocket = ({
   onEvent,
   onOpen,
@@ -20,9 +23,40 @@ export const useRuntimeSocket = ({
 }: UseRuntimeSocketOptions) => {
   const [isSocketConnected, setIsSocketConnected] = useState(false)
 
+  const handleOpen = useEffectEvent(async (): Promise<void> => {
+    if (!onOpen) {
+      return
+    }
+
+    try {
+      await onOpen()
+    } catch (error) {
+      onOpenError?.(error)
+    }
+  })
+
+  const handleMessage = useEffectEvent((rawMessage: string): void => {
+    try {
+      const rawPayload = JSON.parse(rawMessage) as unknown
+      const parsedEvent = RuntimeSocketEventSchema.safeParse(rawPayload)
+      if (!parsedEvent.success) {
+        onErrorMessage?.('Failed to parse WebSocket event payload')
+        return
+      }
+      onEvent(parsedEvent.data)
+    } catch {
+      onErrorMessage?.('Failed to parse WebSocket event payload')
+    }
+  })
+
+  const handleDisconnect = useEffectEvent((): void => {
+    onErrorMessage?.('WebSocket disconnected from backend')
+  })
+
   useEffect(() => {
     let isDisposed = false
     let reconnectTimerId: number | null = null
+    let disconnectErrorTimerId: number | null = null
     let socket: WebSocket | null = null
 
     const connectSocket = (): void => {
@@ -32,48 +66,38 @@ export const useRuntimeSocket = ({
         if (isDisposed) {
           return
         }
-        setIsSocketConnected(true)
-        if (!onOpen) {
-          return
+        if (disconnectErrorTimerId !== null) {
+          window.clearTimeout(disconnectErrorTimerId)
+          disconnectErrorTimerId = null
         }
-        void Promise.resolve(onOpen()).catch((error: unknown) => {
-          if (isDisposed) {
-            return
-          }
-          onOpenError?.(error)
-        })
+        setIsSocketConnected(true)
+        void handleOpen()
       }
 
       socket.onmessage = (message) => {
         if (isDisposed) {
           return
         }
-        try {
-          const rawPayload = JSON.parse(message.data) as unknown
-          const parsedEvent = RuntimeSocketEventSchema.safeParse(rawPayload)
-          if (!parsedEvent.success) {
-            onErrorMessage?.('Failed to parse WebSocket event payload')
-            return
-          }
-          onEvent(parsedEvent.data)
-        } catch {
-          onErrorMessage?.('Failed to parse WebSocket event payload')
-        }
+        handleMessage(message.data)
       }
 
-      socket.onerror = () => {
-        if (isDisposed) {
-          return
-        }
-        onErrorMessage?.('WebSocket disconnected from backend')
-      }
+      socket.onerror = () => undefined
 
       socket.onclose = () => {
         if (isDisposed) {
           return
         }
         setIsSocketConnected(false)
-        reconnectTimerId = window.setTimeout(connectSocket, 1500)
+        if (disconnectErrorTimerId === null) {
+          disconnectErrorTimerId = window.setTimeout(() => {
+            disconnectErrorTimerId = null
+            handleDisconnect()
+          }, DISCONNECT_ERROR_DELAY_MS)
+        }
+        reconnectTimerId = window.setTimeout(() => {
+          reconnectTimerId = null
+          connectSocket()
+        }, RECONNECT_DELAY_MS)
       }
     }
 
@@ -84,9 +108,12 @@ export const useRuntimeSocket = ({
       if (reconnectTimerId !== null) {
         window.clearTimeout(reconnectTimerId)
       }
+      if (disconnectErrorTimerId !== null) {
+        window.clearTimeout(disconnectErrorTimerId)
+      }
       socket?.close()
     }
-  }, [onErrorMessage, onEvent, onOpen, onOpenError])
+  }, [])
 
   return {
     isSocketConnected,

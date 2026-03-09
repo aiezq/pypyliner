@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import pty
 import re
 import shlex
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Final, Literal, TypeVar
+from typing import Any, Awaitable, Callable, Coroutine, Final, Literal, TypeVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -58,6 +60,7 @@ from src.app.services.history_db import HistoryDatabase
 StreamType = Literal["out", "err", "meta"]
 StatusType = Literal["idle", "pending", "running", "success", "failed", "stopped"]
 RunStatusType = Literal["running", "success", "failed", "stopped"]
+TerminalType = Literal["local", "ssh"]
 T = TypeVar("T")
 
 # Keep local non-optional aliases for settings-derived constants.
@@ -65,6 +68,7 @@ RUN_LOGS_DIR_PATH: Final[Path] = RUN_LOGS_DIR
 TERMINAL_LOGS_DIR_PATH: Final[Path] = TERMINAL_LOGS_DIR
 MANUAL_TERMINAL_CWD: Final[Path] = DEFAULT_MANUAL_TERMINAL_CWD
 MANUAL_TERMINAL_COMMAND: Final[str] = DEFAULT_MANUAL_TERMINAL_COMMAND
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -119,10 +123,20 @@ class ManualTerminalState:
     exit_code: int | None
     created_at: str
     log_file_path: Path
+    terminal_type: TerminalType = "local"
+    is_sequence: bool = False
     draft_command: str = ""
+    ssh_connection_name: str | None = None
+    ssh_host: str | None = None
+    ssh_username: str | None = None
+    ssh_password: str | None = None
     lines: list[TerminalLine] = field(default_factory=_new_line_buffer)
     stop_requested: bool = False
     current_process: asyncio.subprocess.Process | None = None
+    pty_master_fd: int | None = None
+    ssh_password_sent: bool = False
+    ssh_host_confirmation_sent: bool = False
+    ssh_prompt_ready: bool = False
 
 
 class EventHub:
@@ -184,6 +198,7 @@ class RuntimeManager:
         self.history_db = history_db
         self.events = EventHub()
         self._log_locks: dict[Path, asyncio.Lock] = {}
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
     async def ensure_dirs(self) -> None:
         await asyncio.gather(
@@ -225,6 +240,8 @@ class RuntimeManager:
         return {
             "id": terminal.id,
             "title": terminal.title,
+            "terminal_type": terminal.terminal_type,
+            "is_sequence": terminal.is_sequence,
             "prompt_user": terminal.prompt_user,
             "prompt_cwd": terminal.prompt_cwd,
             "status": terminal.status,
@@ -232,6 +249,9 @@ class RuntimeManager:
             "created_at": terminal.created_at,
             "draft_command": terminal.draft_command,
             "log_file_path": str(terminal.log_file_path),
+            "ssh_connection_name": terminal.ssh_connection_name,
+            "ssh_host": terminal.ssh_host,
+            "ssh_username": terminal.ssh_username,
             "lines": [self._serialize_line(line) for line in terminal.lines],
         }
 
@@ -260,6 +280,12 @@ class RuntimeManager:
             self._serialize_terminal(terminal)
             for terminal in self.manual_terminals.values()
         ]
+
+    def get_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
+        terminal = self.manual_terminals.get(terminal_id)
+        if terminal is None:
+            raise ServiceError(status_code=404, detail="Terminal not found")
+        return self._serialize_terminal(terminal)
 
     def history(self) -> HistoryData:
         if self.history_db is None:
@@ -296,6 +322,44 @@ class RuntimeManager:
         async with lock:
             await asyncio.to_thread(append_text_line, path, line)
 
+    def _track_background_task(
+        self,
+        task: object,
+        *,
+        label: str,
+        on_error: Callable[[Exception], Awaitable[None]] | None = None,
+    ) -> object:
+        if not isinstance(task, asyncio.Task):
+            return task
+
+        self._background_tasks.add(task)
+
+        def _handle_completion(done_task: asyncio.Task[Any]) -> None:
+            self._background_tasks.discard(done_task)
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                return
+            except Exception as error:  # pragma: no cover - exercised via async follow-up
+                LOGGER.exception("Runtime background task failed: %s", label)
+                if on_error is None:
+                    return
+                recovery_task = asyncio.create_task(on_error(error))
+                self._track_background_task(recovery_task, label=f"{label}.recovery")
+
+        task.add_done_callback(_handle_completion)
+        return task
+
+    def _create_background_task(
+        self,
+        coroutine: Coroutine[Any, Any, Any],
+        *,
+        label: str,
+        on_error: Callable[[Exception], Awaitable[None]] | None = None,
+    ) -> object:
+        task = asyncio.create_task(coroutine)
+        return self._track_background_task(task, label=label, on_error=on_error)
+
     async def _terminate_process(self, process: asyncio.subprocess.Process) -> None:
         if process.returncode is not None:
             return
@@ -305,6 +369,35 @@ class RuntimeManager:
         except asyncio.TimeoutError:
             process.kill()
             await process.wait()
+
+    @staticmethod
+    async def _close_terminal_pty(terminal: ManualTerminalState) -> None:
+        if terminal.pty_master_fd is None:
+            return
+        master_fd = terminal.pty_master_fd
+        terminal.pty_master_fd = None
+        try:
+            await asyncio.to_thread(os.close, master_fd)
+        except OSError:
+            return
+
+    async def _write_terminal_input(self, terminal: ManualTerminalState, command: str) -> None:
+        if terminal.pty_master_fd is not None:
+            try:
+                await asyncio.to_thread(os.write, terminal.pty_master_fd, command.encode())
+                return
+            except OSError as error:
+                raise ServiceError(status_code=409, detail="Terminal shell is not writable") from error
+
+        process = terminal.current_process
+        if process is None or process.stdin is None:
+            raise ServiceError(status_code=500, detail="Terminal shell is not available")
+
+        process.stdin.write(command.encode())
+        try:
+            await process.stdin.drain()
+        except (BrokenPipeError, ConnectionResetError) as error:
+            raise ServiceError(status_code=409, detail="Terminal shell is not writable") from error
 
     @staticmethod
     def _prompt_probe_command() -> str:
@@ -335,13 +428,11 @@ class RuntimeManager:
 
     async def _request_manual_prompt_probe(self, terminal: ManualTerminalState) -> None:
         process = terminal.current_process
-        if process is None or process.stdin is None or process.returncode is not None:
+        if process is None or process.returncode is not None:
             return
-
-        process.stdin.write((self._prompt_probe_command() + "\n").encode())
         try:
-            await process.stdin.drain()
-        except (BrokenPipeError, ConnectionResetError):
+            await self._write_terminal_input(terminal, self._prompt_probe_command() + "\n")
+        except ServiceError:
             return
 
     def _next_manual_terminal_title(self) -> str:
@@ -351,6 +442,15 @@ class RuntimeManager:
         while title in existing_titles:
             number += 1
             title = f"Manual terminal #{number}"
+        return title
+
+    def _next_ssh_terminal_title(self) -> str:
+        number = len(self.manual_terminals) + 1
+        title = f"SSH terminal #{number}"
+        existing_titles = {terminal.title for terminal in self.manual_terminals.values()}
+        while title in existing_titles:
+            number += 1
+            title = f"SSH terminal #{number}"
         return title
 
     @staticmethod
@@ -425,6 +525,11 @@ class RuntimeManager:
         terminal: ManualTerminalState,
         command: str,
     ) -> tuple[str, str, list[str]]:
+        if terminal.terminal_type == "ssh":
+            prefix, token = cls._split_completion_input(command)
+            quote = token[0] if token.startswith('"') or token.startswith("'") else ""
+            return prefix, quote, []
+
         prefix, token = cls._split_completion_input(command)
         quote = ""
         token_body = token
@@ -574,6 +679,7 @@ class RuntimeManager:
         self.history_db.upsert_manual_terminal(
             terminal_id=terminal.id,
             title=terminal.title,
+            is_sequence=terminal.is_sequence,
             created_at=terminal.created_at,
             updated_at=updated_at or now_iso(),
             closed_at=closed_at,
@@ -612,6 +718,68 @@ class RuntimeManager:
         }
         await self.events.broadcast("terminal_status", payload)
 
+    async def _handle_pipeline_run_task_error(
+        self,
+        run: PipelineRunState,
+        error: Exception,
+    ) -> None:
+        if run.finished_at is not None:
+            return
+
+        crashed_message = f"[error] pipeline run crashed: {error}"
+        current_session = next((session for session in run.sessions if session.status == "running"), None)
+
+        if current_session is not None:
+            current_session.status = "stopped" if run.stop_requested else "failed"
+            current_session.exit_code = -1
+            await self._append_pipeline_line(run, current_session, "meta", crashed_message)
+            await self._emit_run_session_status(run, current_session)
+        else:
+            await self._append_log(run.log_file_path, f"[{now_iso()}] [run] {crashed_message}")
+
+        if run.stop_requested:
+            run.status = "stopped"
+            for session in run.sessions:
+                if session.status == "pending":
+                    session.status = "stopped"
+                    session.exit_code = -1
+                    await self._append_pipeline_line(
+                        run,
+                        session,
+                        "meta",
+                        "[skipped] run was stopped before this step",
+                    )
+                    await self._emit_run_session_status(run, session)
+        else:
+            run.status = "failed"
+
+        run.finished_at = now_iso()
+        await self._append_log(
+            run.log_file_path,
+            f"[{run.finished_at}] [run] finished with status: {run.status}",
+        )
+        await self._emit_run_status(run)
+
+    async def _handle_manual_terminal_task_error(
+        self,
+        terminal_id: str,
+        error: Exception,
+    ) -> None:
+        terminal = self.manual_terminals.get(terminal_id)
+        if terminal is None:
+            return
+
+        terminal.current_process = None
+        await self._close_terminal_pty(terminal)
+        terminal.status = "stopped" if terminal.stop_requested else "failed"
+        terminal.exit_code = -1
+        await self._append_manual_line(
+            terminal,
+            "meta",
+            f"[error] terminal background task crashed: {error}",
+        )
+        await self._emit_terminal_status(terminal)
+
     @staticmethod
     def _is_process_running(process: asyncio.subprocess.Process | None) -> bool:
         return process is not None and process.returncode is None
@@ -628,8 +796,57 @@ class RuntimeManager:
             return True
         return normalized.startswith("bash -lc") and "echo Terminal session started" in normalized
 
+    @staticmethod
+    async def _create_pty_process(
+        argv: list[str],
+        *,
+        cwd: str | None = None,
+    ) -> tuple[asyncio.subprocess.Process, int]:
+        master_fd, slave_fd = pty.openpty()
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *argv,
+                cwd=cwd,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                start_new_session=True,
+            )
+        except Exception:
+            os.close(master_fd)
+            os.close(slave_fd)
+            raise
+
+        os.close(slave_fd)
+        return process, master_fd
+
+    @staticmethod
+    def _build_ssh_argv(terminal: ManualTerminalState) -> list[str]:
+        if not terminal.ssh_host or not terminal.ssh_username:
+            raise ServiceError(status_code=400, detail="SSH terminal requires host and username")
+
+        return [
+            "ssh",
+            "-tt",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "PreferredAuthentications=password,keyboard-interactive",
+            "-o",
+            "PubkeyAuthentication=no",
+            "-o",
+            "NumberOfPasswordPrompts=1",
+            f"{terminal.ssh_username}@{terminal.ssh_host}",
+        ]
+
     async def _start_manual_terminal_shell(self, terminal: ManualTerminalState) -> None:
         if self._is_process_running(terminal.current_process):
+            return
+
+        if terminal.terminal_type == "ssh":
+            await self._start_ssh_terminal_shell(terminal)
             return
 
         argv = shlex.split(MANUAL_TERMINAL_COMMAND)
@@ -656,10 +873,165 @@ class RuntimeManager:
         )
         await self._emit_terminal_status(terminal)
 
-        asyncio.create_task(self._stream_manual_terminal_output(terminal, process.stdout, "out"))
-        asyncio.create_task(self._stream_manual_terminal_output(terminal, process.stderr, "err"))
-        asyncio.create_task(self._watch_manual_terminal_process(terminal, process))
+        self._create_background_task(
+            self._stream_manual_terminal_output(terminal, process.stdout, "out"),
+            label=f"manual_terminal_stream_out:{terminal.id}",
+        )
+        self._create_background_task(
+            self._stream_manual_terminal_output(terminal, process.stderr, "err"),
+            label=f"manual_terminal_stream_err:{terminal.id}",
+        )
+        self._create_background_task(
+            self._watch_manual_terminal_process(terminal, process),
+            label=f"manual_terminal_watch:{terminal.id}",
+            on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+        )
         await self._request_manual_prompt_probe(terminal)
+
+    async def _start_ssh_terminal_shell(self, terminal: ManualTerminalState) -> None:
+        if self._is_process_running(terminal.current_process):
+            return
+
+        argv = self._build_ssh_argv(terminal)
+        process, master_fd = await self._create_pty_process(argv)
+
+        terminal.current_process = process
+        terminal.pty_master_fd = master_fd
+        terminal.stop_requested = False
+        terminal.status = "running"
+        terminal.exit_code = None
+        terminal.ssh_password_sent = False
+        terminal.ssh_host_confirmation_sent = False
+        terminal.ssh_prompt_ready = False
+        terminal.prompt_user = f"{terminal.ssh_username}@{terminal.ssh_host}"
+        terminal.prompt_cwd = "~"
+
+        connection_target = f"{terminal.ssh_username}@{terminal.ssh_host}"
+        await self._append_manual_line(
+            terminal,
+            "meta",
+            f"[start] ssh session connecting: {connection_target}",
+        )
+        await self._emit_terminal_status(terminal)
+
+        self._create_background_task(
+            self._stream_manual_terminal_pty_output(terminal, master_fd),
+            label=f"manual_terminal_stream_pty:{terminal.id}",
+            on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+        )
+        self._create_background_task(
+            self._watch_manual_terminal_process(terminal, process),
+            label=f"manual_terminal_watch:{terminal.id}",
+            on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+        )
+
+    async def _maybe_handle_ssh_auth_prompts(
+        self,
+        terminal: ManualTerminalState,
+        text: str,
+    ) -> None:
+        if terminal.terminal_type != "ssh":
+            return
+
+        lowered = text.lower()
+        if (
+            not terminal.ssh_host_confirmation_sent
+            and "are you sure you want to continue connecting" in lowered
+        ):
+            terminal.ssh_host_confirmation_sent = True
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[auth] accepting SSH host fingerprint",
+            )
+            await self._write_terminal_input(terminal, "yes\n")
+
+        if (
+            not terminal.ssh_password_sent
+            and terminal.ssh_password is not None
+            and "password:" in lowered
+        ):
+            terminal.ssh_password_sent = True
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[auth] sending SSH password",
+            )
+            await self._write_terminal_input(terminal, terminal.ssh_password + "\n")
+            self._create_background_task(
+                self._probe_ssh_terminal_until_ready(terminal.id),
+                label=f"manual_terminal_probe_ssh:{terminal.id}",
+                on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+            )
+
+    async def _probe_ssh_terminal_until_ready(self, terminal_id: str) -> None:
+        await asyncio.sleep(0.25)
+
+        for _ in range(12):
+            terminal = self.manual_terminals.get(terminal_id)
+            if terminal is None or terminal.terminal_type != "ssh":
+                return
+            if terminal.ssh_prompt_ready or not self._is_process_running(terminal.current_process):
+                return
+
+            await self._request_manual_prompt_probe(terminal)
+            await asyncio.sleep(0.5)
+
+    async def _stream_manual_terminal_pty_output(
+        self,
+        terminal: ManualTerminalState,
+        master_fd: int,
+    ) -> None:
+        pending = ""
+        try:
+            while True:
+                chunk = await asyncio.to_thread(os.read, master_fd, 4096)
+                if not chunk:
+                    break
+
+                text = chunk.decode(errors="replace")
+                pending += text
+                await self._maybe_handle_ssh_auth_prompts(terminal, pending[-512:])
+
+                normalized = pending.replace("\r\n", "\n").replace("\r", "\n")
+                parts = normalized.split("\n")
+                if pending.endswith(("\n", "\r")):
+                    pending = ""
+                else:
+                    pending = parts.pop()
+
+                for line in parts:
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    parsed_prompt_state = self._parse_prompt_probe_line(stripped)
+                    if parsed_prompt_state is not None:
+                        user, cwd = parsed_prompt_state
+                        if terminal.ssh_host:
+                            user = f"{user}@{terminal.ssh_host}"
+                        changed = False
+                        if user != terminal.prompt_user or cwd != terminal.prompt_cwd:
+                            terminal.prompt_user = user
+                            terminal.prompt_cwd = cwd
+                            changed = True
+                        if terminal.status == "running":
+                            terminal.status = "idle"
+                            changed = True
+                        terminal.ssh_prompt_ready = True
+                        if changed:
+                            payload: TerminalUpdatedEventData = {
+                                "terminal": self._serialize_terminal(terminal)
+                            }
+                            await self.events.broadcast("terminal_updated", payload)
+                        continue
+                    await self._append_manual_line(terminal, "out", stripped)
+        except Exception:
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[warn] terminal output stream was interrupted",
+            )
+            raise
 
     async def _stream_manual_terminal_output(
         self,
@@ -679,9 +1051,17 @@ class RuntimeManager:
                     parsed_prompt_state = self._parse_prompt_probe_line(text)
                     if parsed_prompt_state is not None:
                         user, cwd = parsed_prompt_state
+                        changed = False
                         if user != terminal.prompt_user or cwd != terminal.prompt_cwd:
                             terminal.prompt_user = user
                             terminal.prompt_cwd = cwd
+                            changed = True
+                            
+                        if terminal.status == "running":
+                            terminal.status = "idle"
+                            changed = True
+                            
+                        if changed:
                             payload: TerminalUpdatedEventData = {
                                 "terminal": self._serialize_terminal(terminal)
                             }
@@ -701,6 +1081,7 @@ class RuntimeManager:
         process: asyncio.subprocess.Process,
     ) -> None:
         return_code = await process.wait()
+        await self._close_terminal_pty(terminal)
         if terminal.current_process is process:
             terminal.current_process = None
 
@@ -758,7 +1139,11 @@ class RuntimeManager:
         await self._append_log(log_file_path, f"[{started_at}] [run] started: {run.pipeline_name}")
         event_payload: RunCreatedEventData = {"run": self._serialize_run(run)}
         await self.events.broadcast("run_created", event_payload)
-        asyncio.create_task(self._execute_pipeline_run(run))
+        self._create_background_task(
+            self._execute_pipeline_run(run),
+            label=f"pipeline_run:{run.id}",
+            on_error=lambda error: self._handle_pipeline_run_task_error(run, error),
+        )
         return self._serialize_run(run)
 
     async def _execute_pipeline_run(self, run: PipelineRunState) -> None:
@@ -872,7 +1257,10 @@ class RuntimeManager:
         run.stop_requested = True
         await self._append_log(run.log_file_path, f"[{now_iso()}] [run] stop requested")
         if run.current_process and run.current_process.returncode is None:
-            asyncio.create_task(self._terminate_process(run.current_process))
+            self._create_background_task(
+                self._terminate_process(run.current_process),
+                label=f"terminate_process:{run.id}",
+            )
         return self._serialize_run(run)
 
     async def create_manual_terminal(
@@ -880,16 +1268,33 @@ class RuntimeManager:
         payload: ManualTerminalCreatePayload,
     ) -> ManualTerminalData:
         terminal_id = make_id("terminal")
-        title = payload.title or self._next_manual_terminal_title()
+        terminal_type = payload.terminal_type
+        title = payload.title or (
+            self._next_ssh_terminal_title() if terminal_type == "ssh" else self._next_manual_terminal_title()
+        )
+        ssh_connection_name = payload.ssh_connection_name.strip() if payload.ssh_connection_name else None
+        ssh_host = payload.ssh_host.strip() if payload.ssh_host else None
+        ssh_username = payload.ssh_username.strip() if payload.ssh_username else None
+        ssh_password = payload.ssh_password if payload.ssh_password else None
         terminal = ManualTerminalState(
             id=terminal_id,
             title=title,
-            prompt_user=os.environ.get("USER", "operator"),
+            terminal_type=terminal_type,
+            is_sequence=payload.is_sequence,
+            prompt_user=(
+                f"{ssh_username}@{ssh_host}"
+                if terminal_type == "ssh" and ssh_username and ssh_host
+                else os.environ.get("USER", "operator")
+            ),
             prompt_cwd="~",
             status="idle",
             exit_code=None,
             created_at=now_iso(),
             log_file_path=TERMINAL_LOGS_DIR_PATH / f"{terminal_id}.log",
+            ssh_connection_name=ssh_connection_name,
+            ssh_host=ssh_host,
+            ssh_username=ssh_username,
+            ssh_password=ssh_password,
         )
         self.manual_terminals[terminal.id] = terminal
         self._persist_manual_terminal(
@@ -899,9 +1304,15 @@ class RuntimeManager:
         )
         await self._append_log(
             terminal.log_file_path,
-            f"[{terminal.created_at}] [terminal] created",
+            f"[{terminal.created_at}] [terminal] created ({terminal.terminal_type})",
         )
-        await self._append_manual_line(terminal, "meta", "[ready] terminal created")
+        await self._append_manual_line(
+            terminal,
+            "meta",
+            "[ready] terminal created"
+            if terminal.terminal_type == "local"
+            else f"[ready] ssh terminal created for {terminal.ssh_username}@{terminal.ssh_host}",
+        )
         await self._start_manual_terminal_shell(terminal)
         event_payload: TerminalCreatedEventData = {"terminal": self._serialize_terminal(terminal)}
         await self.events.broadcast("terminal_created", event_payload)
@@ -924,8 +1335,10 @@ class RuntimeManager:
             await self._start_manual_terminal_shell(terminal)
 
         process = terminal.current_process
-        if process is None or process.stdin is None:
+        if process is None:
             raise ServiceError(status_code=500, detail="Terminal shell is not available")
+        if terminal.terminal_type == "ssh" and not terminal.ssh_prompt_ready:
+            raise ServiceError(status_code=409, detail="SSH terminal is still connecting")
 
         terminal.draft_command = ""
         terminal.status = "running"
@@ -938,12 +1351,11 @@ class RuntimeManager:
                 created_at=now_iso(),
             )
         await self._append_manual_line(terminal, "meta", f"[input] {command}")
-        process.stdin.write((command + "\n").encode())
-        process.stdin.write((self._prompt_probe_command() + "\n").encode())
         try:
-            await process.stdin.drain()
-        except (BrokenPipeError, ConnectionResetError) as error:
-            raise ServiceError(status_code=409, detail="Terminal shell is not writable") from error
+            await self._write_terminal_input(terminal, command + "\n")
+            await self._write_terminal_input(terminal, self._prompt_probe_command() + "\n")
+        except ServiceError:
+            raise
         await self._emit_terminal_status(terminal)
         return self._serialize_terminal(terminal)
 

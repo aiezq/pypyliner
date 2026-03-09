@@ -35,6 +35,7 @@ class ManualTerminalHistoryRecord(SQLModel, table=True):
 
     terminal_id: str = Field(primary_key=True)
     title: str
+    is_sequence: bool = Field(default=False)
     created_at: str
     updated_at: str = Field(index=True)
     closed_at: str | None = None

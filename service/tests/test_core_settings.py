@@ -16,6 +16,13 @@ def test_app_settings_finalize_defaults(tmp_path: Path):
     assert settings.database_url == f"sqlite:///{tmp_path / 'data' / 'history.sqlite3'}"
     assert settings.command_packs_dir == tmp_path / "command_packs"
     assert settings.pipeline_flows_dir == tmp_path / "pipeline_flows"
+    assert settings.ai_data_dir == tmp_path / "data" / "ai"
+    assert settings.ai_enabled is True
+    assert settings.ai_runtime == "ollama"
+    assert settings.ai_default_model == "gemma3"
+    assert settings.ai_max_doc_chars == 120_000
+    assert settings.ai_request_timeout_sec == 180
+    assert settings.ai_install_timeout_sec == 3600
     assert settings.default_manual_terminal_command == "/bin/zsh --noprofile --norc"
 
 

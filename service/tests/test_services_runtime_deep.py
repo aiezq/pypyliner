@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Awaitable, Callable, cast
+from typing import Any, Awaitable, Callable, Coroutine, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -365,6 +365,68 @@ async def test_runtime_pipeline_run_paths(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_runtime_marks_run_failed_when_background_pipeline_task_crashes() -> None:
+    runtime = RuntimeManager()
+    runtime.events.broadcast = AsyncMock()
+    setattr(runtime, "_persist_run", MagicMock())
+    setattr(runtime, "_append_log", AsyncMock())
+
+    async def broken_execute(_run: PipelineRunState) -> None:
+        raise RuntimeError("boom")
+
+    setattr(runtime, "_execute_pipeline_run", broken_execute)
+
+    created = await runtime.create_pipeline_run(
+        PipelineRunCreatePayload(
+            pipeline_name="Crash test",
+            steps=[PipelineStepPayload(label="step 1", command="echo ok")],
+        )
+    )
+
+    for _ in range(4):
+        await asyncio.sleep(0)
+
+    run = runtime.runs[created["id"]]
+    assert run.status == "failed"
+    assert run.finished_at is not None
+    assert run.sessions[0].status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_runtime_marks_terminal_failed_when_background_task_crashes() -> None:
+    runtime = RuntimeManager()
+    terminal = _make_terminal("terminal_background_crash")
+    terminal.status = "running"
+    terminal.current_process = cast(Any, FakeProcess(returncode=None, wait_results=[0], stdin=FakeStdin()))
+    runtime.manual_terminals[terminal.id] = terminal
+    setattr(runtime, "_append_manual_line", AsyncMock())
+    setattr(runtime, "_emit_terminal_status", AsyncMock())
+
+    create_background_task = cast(
+        Callable[[Coroutine[Any, Any, Any]], object],
+        getattr(runtime, "_create_background_task"),
+    )
+
+    async def broken_task() -> None:
+        raise RuntimeError("terminal boom")
+
+    create_background_task(
+        broken_task(),
+        label=f"manual_terminal_watch:{terminal.id}",
+        on_error=lambda error: runtime._handle_manual_terminal_task_error(terminal.id, error),
+    )
+
+    for _ in range(4):
+        await asyncio.sleep(0)
+
+    assert terminal.status == "failed"
+    assert terminal.exit_code == -1
+    assert terminal.current_process is None
+    cast(AsyncMock, getattr(runtime, "_append_manual_line")).assert_awaited()
+    cast(AsyncMock, getattr(runtime, "_emit_terminal_status")).assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_runtime_stop_run_and_terminal_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
     runtime = RuntimeManager()
 
@@ -505,6 +567,20 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     created = await runtime.create_manual_terminal(ManualTerminalCreatePayload(title=None))
     assert created["title"] == "Manual terminal #2"
 
+    created_ssh = await runtime.create_manual_terminal(
+        ManualTerminalCreatePayload(
+            title=None,
+            terminal_type="ssh",
+            ssh_username="deploy",
+            ssh_host="10.0.0.15",
+            ssh_password="secret",
+            ssh_connection_name="deploy@10.0.0.15",
+        )
+    )
+    assert created_ssh["title"] == "SSH terminal #3"
+    assert created_ssh["terminal_type"] == "ssh"
+    assert created_ssh["ssh_host"] == "10.0.0.15"
+
     is_open_terminal_command = cast(
         Callable[[str], bool],
         getattr(RuntimeManager, "_is_pipeline_open_terminal_command"),
@@ -520,6 +596,10 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     collect_path_matches = cast(
         Callable[[Path, str], list[str]],
         getattr(RuntimeManager, "_collect_path_matches"),
+    )
+    build_ssh_argv = cast(
+        Callable[[ManualTerminalState], list[str]],
+        getattr(RuntimeManager, "_build_ssh_argv"),
     )
 
     assert is_open_terminal_command(PIPELINE_OPEN_TERMINAL_COMMAND)
@@ -552,6 +632,18 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     assert prefix == "ls "
     assert quote == '"'
     assert isinstance(completions, list)
+
+    ssh_terminal = _make_terminal("terminal_ssh")
+    ssh_terminal.terminal_type = "ssh"
+    ssh_terminal.ssh_username = "deploy"
+    ssh_terminal.ssh_host = "10.0.0.15"
+    ssh_terminal.ssh_password = "secret"
+    assert "deploy@10.0.0.15" in build_ssh_argv(ssh_terminal)
+
+    ssh_prefix, ssh_quote, ssh_completions = await token(ssh_terminal, "ls /op")
+    assert ssh_prefix == "ls "
+    assert ssh_quote == ""
+    assert ssh_completions == []
 
 
 @pytest.mark.asyncio

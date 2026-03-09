@@ -14,6 +14,7 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     runtime = SimpleNamespace(ensure_dirs=AsyncMock())
     command_packs = SimpleNamespace(ensure_ready=AsyncMock())
     pipeline_flows = SimpleNamespace(ensure_ready=AsyncMock())
+    ai_models = SimpleNamespace(ensure_ready=AsyncMock())
     history_db = SimpleNamespace(ensure_ready=MagicMock())
 
     configure_logging = MagicMock()
@@ -24,6 +25,7 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(app_main, "get_runtime", lambda: runtime)
     monkeypatch.setattr(app_main, "get_command_pack_manager", lambda: command_packs)
     monkeypatch.setattr(app_main, "get_pipeline_flow_manager", lambda: pipeline_flows)
+    monkeypatch.setattr(app_main, "get_ai_model_manager", lambda: ai_models)
     monkeypatch.setattr(app_main, "get_history_database", lambda: history_db)
 
     async with app_main.lifespan(FastAPI()):
@@ -35,3 +37,4 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     runtime.ensure_dirs.assert_awaited_once()
     command_packs.ensure_ready.assert_awaited_once()
     pipeline_flows.ensure_ready.assert_awaited_once()
+    ai_models.ensure_ready.assert_awaited_once()

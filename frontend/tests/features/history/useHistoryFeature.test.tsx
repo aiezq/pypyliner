@@ -49,8 +49,6 @@ describe('useHistoryFeature', () => {
 
     const { result } = renderHook(() => useHistoryFeature({ isActive: true }))
 
-    expect(result.current.runs).toHaveLength(1)
-    expect(result.current.runs[0]?.pipelineName).toBe('Main flow')
     expect(result.current.terminalHistory).toHaveLength(1)
     expect(result.current.isLoading).toBe(false)
     expect(result.current.errorMessage).toBeNull()
@@ -84,7 +82,6 @@ describe('useHistoryFeature', () => {
 
     expect(apiRequestMock).toHaveBeenCalledWith('/api/history')
     expect(payload).toEqual({
-      runs: [],
       manual_terminal_history: [],
     })
   })
@@ -100,7 +97,6 @@ describe('useHistoryFeature', () => {
 
     const { result } = renderHook(() => useHistoryFeature({ isActive: false }))
 
-    expect(result.current.runs).toEqual([])
     expect(result.current.terminalHistory).toEqual([])
     expect(result.current.isLoading).toBe(true)
     expect(result.current.errorMessage).toBe('history request failed')
