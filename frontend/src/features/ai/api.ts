@@ -2,11 +2,13 @@ import { apiRequest } from '../../lib/api'
 import {
   AIModelStatusResponseSchema,
   AIModelsResponseSchema,
+  AnalyzeDocumentationResponseSchema,
   GeneratePipelineDraftResponseSchema,
 } from '../../lib/schemas'
 import type {
   AIModelStatusResponse,
   AIModelsResponse,
+  AnalyzeDocumentationResponse,
   GeneratePipelineDraftResponse,
 } from '../../lib/schemas'
 
@@ -55,9 +57,27 @@ export async function removeAiModel(modelId: string): Promise<AIModelStatusRespo
   return AIModelStatusResponseSchema.parse(payload)
 }
 
+export async function analyzeDocumentation(
+  modelId: string,
+  documentationText: string,
+): Promise<AnalyzeDocumentationResponse> {
+  const payload = await apiRequest<unknown>('/api/ai/pipeline-drafts/clarify', {
+    method: 'POST',
+    body: JSON.stringify({
+      model_id: modelId,
+      documentation_text: documentationText,
+      context: {
+        command_packs: true,
+      },
+    }),
+  })
+  return AnalyzeDocumentationResponseSchema.parse(payload)
+}
+
 export async function generatePipelineDraft(
   modelId: string,
   documentationText: string,
+  clarificationAnswers: Array<{ question_id: string; answer: string }>,
 ): Promise<GeneratePipelineDraftResponse> {
   const payload = await apiRequest<unknown>('/api/ai/pipeline-drafts/generate', {
     method: 'POST',
@@ -68,6 +88,7 @@ export async function generatePipelineDraft(
       context: {
         command_packs: true,
       },
+      clarification_answers: clarificationAnswers,
     }),
   })
   return GeneratePipelineDraftResponseSchema.parse(payload)

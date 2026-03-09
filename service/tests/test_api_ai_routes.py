@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 
 from src.app.api.routes.ai import (
+    analyze_pipeline_documentation,
     cancel_ai_model_install,
     generate_pipeline_draft,
     get_ai_model_status,
@@ -17,6 +18,8 @@ from src.app.api.routes.ai import (
 from src.app.schemas.ai import (
     AIModelStatusResponse,
     AIModelsResponse,
+    AnalyzeDocumentationRequest,
+    AnalyzeDocumentationResponse,
     GeneratePipelineDraftRequest,
     GeneratePipelineDraftResponse,
 )
@@ -115,6 +118,24 @@ class AIModelManagerStub:
 
 
 class PipelineDraftGeneratorStub:
+    async def analyze_documentation(self, payload: AnalyzeDocumentationRequest):
+        assert payload.model_id == "gemma3"
+        return AnalyzeDocumentationResponse.model_validate({
+            "questions": [
+                {
+                    "id": "region",
+                    "question": "Which region is used?",
+                    "description": "Choose Moscow or Belgrade.",
+                    "answer_type": "choice",
+                    "choices": ["Moscow", "Belgrade"],
+                    "required": True,
+                }
+            ],
+            "warnings": ["Documentation contains multiple environment branches."],
+            "install_state": "installed",
+            "model_state": "ready",
+        })
+
     async def generate(self, payload: GeneratePipelineDraftRequest):
         assert payload.model_id == "gemma3"
         return GeneratePipelineDraftResponse.model_validate({
@@ -156,6 +177,22 @@ async def test_ai_model_lifecycle_routes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_analyze_pipeline_documentation_route() -> None:
+    generator = PipelineDraftGeneratorStub()
+
+    response = await analyze_pipeline_documentation(
+        payload=AnalyzeDocumentationRequest(
+            model_id="gemma3",
+            documentation_text="Use Moscow or Belgrade branch depending on the region.",
+        ),
+        generator=cast(PipelineDraftGenerator, generator),
+    )
+
+    assert response.questions[0].id == "region"
+    assert response.warnings[0] == "Documentation contains multiple environment branches."
+
+
+@pytest.mark.asyncio
 async def test_generate_pipeline_draft_route() -> None:
     generator = PipelineDraftGeneratorStub()
 
@@ -163,6 +200,12 @@ async def test_generate_pipeline_draft_route() -> None:
         payload=GeneratePipelineDraftRequest(
             model_id="gemma3",
             documentation_text="Generate a simple local workflow.",
+            clarification_answers=[
+                {
+                    "question_id": "region",
+                    "answer": "Belgrade",
+                }
+            ],
         ),
         generator=cast(PipelineDraftGenerator, generator),
     )

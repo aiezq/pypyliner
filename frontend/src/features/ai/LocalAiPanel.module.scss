@@ -318,6 +318,38 @@
   color: var(--muted);
 }
 
+.questionsList {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.questionCard {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: rgba(7, 18, 33, 0.72);
+  border: 1px solid rgba(110, 146, 199, 0.18);
+}
+
+.questionTitle {
+  font-weight: 600;
+}
+
+.questionDescription {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.questionInput {
+  border-radius: 10px;
+  border: 1px solid rgba(110, 146, 199, 0.28);
+  background: rgba(8, 18, 33, 0.95);
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+}
+
 @media (max-width: 900px) {
   .header,
   .previewHeader {

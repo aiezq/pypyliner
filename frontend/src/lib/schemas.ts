@@ -117,11 +117,21 @@ export const PipelineDraftStepSchema = z.object({
   uses_variables: z.array(z.string()),
   template_id: z.string().nullable(),
   terminal_type: TerminalTypeSchema,
+  terminal_group: z.string().nullable().optional(),
 })
 
 export const PipelineDraftTargetTerminalSchema = z.object({
   type: TerminalTypeSchema,
   connection_hint: z.string().nullable(),
+})
+
+export const DocumentationClarificationQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  description: z.string(),
+  answer_type: z.enum(['text', 'choice']),
+  choices: z.array(z.string()),
+  required: z.boolean(),
 })
 
 export const PipelineDraftSchema = z.object({
@@ -133,6 +143,13 @@ export const PipelineDraftSchema = z.object({
   steps: z.array(PipelineDraftStepSchema),
   target_terminal: PipelineDraftTargetTerminalSchema,
   confidence: z.number().min(0).max(1),
+})
+
+export const AnalyzeDocumentationResponseSchema = z.object({
+  questions: z.array(DocumentationClarificationQuestionSchema),
+  warnings: z.array(z.string()),
+  install_state: AIInstallStateSchema,
+  model_state: AIModelStateSchema,
 })
 
 export const GeneratePipelineDraftResponseSchema = z.object({
@@ -189,5 +206,7 @@ export type RuntimeSocketEvent = SocketEvent
 export type AIModel = z.infer<typeof AIModelSchema>
 export type AIModelsResponse = z.infer<typeof AIModelsResponseSchema>
 export type AIModelStatusResponse = z.infer<typeof AIModelStatusResponseSchema>
+export type DocumentationClarificationQuestion = z.infer<typeof DocumentationClarificationQuestionSchema>
 export type PipelineDraft = z.infer<typeof PipelineDraftSchema>
+export type AnalyzeDocumentationResponse = z.infer<typeof AnalyzeDocumentationResponseSchema>
 export type GeneratePipelineDraftResponse = z.infer<typeof GeneratePipelineDraftResponseSchema>

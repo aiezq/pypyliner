@@ -69,6 +69,7 @@ class PipelineDraftStep(BaseModel):
     uses_variables: list[str] = Field(default_factory=list)
     template_id: str | None = None
     terminal_type: TerminalKind = "local"
+    terminal_group: str | None = None
 
 
 class PipelineDraftTargetTerminal(BaseModel):
@@ -93,10 +94,31 @@ class GeneratePipelineDraftContext(BaseModel):
     command_packs: bool = True
 
 
-class GeneratePipelineDraftRequest(BaseModel):
+class DocumentationClarificationQuestion(BaseModel):
+    id: str
+    question: str
+    description: str
+    answer_type: Literal["text", "choice"] = "text"
+    choices: list[str] = Field(default_factory=list)
+    required: bool = True
+
+
+class DocumentationClarificationAnswer(BaseModel):
+    question_id: str
+    answer: str
+
+    @field_validator("answer")
+    @classmethod
+    def validate_answer(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Clarification answer cannot be empty.")
+        return stripped
+
+
+class AnalyzeDocumentationRequest(BaseModel):
     model_id: str
     documentation_text: str = Field(min_length=1)
-    mode: Literal["graph"] = "graph"
     context: GeneratePipelineDraftContext = Field(default_factory=GeneratePipelineDraftContext)
 
     @field_validator("documentation_text")
@@ -106,6 +128,18 @@ class GeneratePipelineDraftRequest(BaseModel):
         if not stripped:
             raise ValueError("Documentation text cannot be empty.")
         return stripped
+
+
+class GeneratePipelineDraftRequest(AnalyzeDocumentationRequest):
+    mode: Literal["graph"] = "graph"
+    clarification_answers: list[DocumentationClarificationAnswer] = Field(default_factory=list)
+
+
+class AnalyzeDocumentationResponse(BaseModel):
+    questions: list[DocumentationClarificationQuestion] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    install_state: AIInstallState
+    model_state: AIModelState
 
 
 class GeneratePipelineDraftResponse(BaseModel):

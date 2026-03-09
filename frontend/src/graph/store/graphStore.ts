@@ -140,6 +140,34 @@ function parseSshConnectionHint(connectionHint: string | null): {
   }
 }
 
+function normalizeTerminalGroupName(groupName: string | null | undefined): string {
+  const trimmed = groupName?.trim()
+  return trimmed || 'main_terminal'
+}
+
+function formatTerminalGroupLabel(groupName: string, flowName: string, stepLabels: string[]): string {
+  if (groupName === 'teleop_terminal') {
+    return 'Teleop Terminal'
+  }
+  if (groupName === 'collect_terminal') {
+    return 'Collect Terminal'
+  }
+  if (groupName === 'main_terminal') {
+    return flowName || 'Generated Terminal'
+  }
+
+  const labelFromSteps = stepLabels[0]?.trim()
+  if (labelFromSteps) {
+    return `${labelFromSteps} Terminal`
+  }
+
+  return groupName
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 // ── Store ──────────────────────────────────────────────────────────
 
 export const useGraphStore = create<GraphState>()(
@@ -413,7 +441,7 @@ export const useGraphStore = create<GraphState>()(
         const anchor = getImportAnchor(currentNodes)
         const newNodes: GraphNode[] = []
         const newEdges: GraphEdge[] = []
-        const commandNodeIds: string[] = []
+        const commandNodeIdsByStepId = new Map<string, string>()
 
         const referencedVariables = new Set<string>()
         for (const step of draft.steps) {
@@ -454,73 +482,135 @@ export const useGraphStore = create<GraphState>()(
           })
         })
 
-        draft.steps.forEach((step, index) => {
-          const nodeId = nextNodeId()
-          commandNodeIds.push(nodeId)
-          newNodes.push({
-            id: nodeId,
-            type: NODE_TYPES.COMMAND,
-            position: {
-              x: anchor.x + index * 300,
-              y: anchor.y,
-            },
-            data: {
-              label: step.label,
-              command: step.command,
-              description: step.description,
-              variableNames: parseVariables(step.command),
-            },
-          })
+        const groupedSteps = new Map<string, typeof draft.steps>()
+        draft.steps.forEach((step) => {
+          const groupName = normalizeTerminalGroupName(step.terminal_group)
+          const existing = groupedSteps.get(groupName)
+          if (existing) {
+            existing.push(step)
+            return
+          }
+          groupedSteps.set(groupName, [step])
         })
 
-        const terminalNodeId = nextNodeId()
-        if (draft.target_terminal.type === 'ssh') {
-          const connectionDetails = parseSshConnectionHint(draft.target_terminal.connection_hint)
-          newNodes.push({
-            id: terminalNodeId,
-            type: NODE_TYPES.SSH_TERMINAL,
-            position: {
-              x: anchor.x + Math.max(draft.steps.length - 1, 0) * 300 + 320,
-              y: anchor.y,
-            },
-            data: {
-              label: connectionDetails.label,
-              terminalId: null,
-              connectionId: null,
-              sshUsername: connectionDetails.sshUsername,
-              sshHost: connectionDetails.sshHost,
-              sshPassword: '',
-            },
-          })
-        } else {
-          newNodes.push({
-            id: terminalNodeId,
-            type: NODE_TYPES.TERMINAL,
-            position: {
-              x: anchor.x + Math.max(draft.steps.length - 1, 0) * 300 + 320,
-              y: anchor.y,
-            },
-            data: {
-              label: draft.flow_name || 'Generated Terminal',
-              terminalId: null,
-            },
-          })
-        }
+        const groupEntries = Array.from(groupedSteps.entries())
+        const hasSequence = groupEntries.length > 1
+        const maxLaneLength = groupEntries.reduce((value, [, steps]) => Math.max(value, steps.length), 0)
+        const laneSpacingY = 260
+        const sequenceNodeX = anchor.x + Math.max(maxLaneLength - 1, 0) * 300 + 640
+        const sequenceNodeY = anchor.y + ((Math.max(groupEntries.length - 1, 0) * laneSpacingY) / 2)
+        let sequenceNodeId: string | null = null
 
-        commandNodeIds.forEach((nodeId, index) => {
-          const nextTargetId = commandNodeIds[index + 1] ?? terminalNodeId
-          newEdges.push({
-            id: nextEdgeId(),
-            source: nodeId,
-            target: nextTargetId,
-            sourceHandle: HANDLE_IDS.CHAIN_OUT,
-            targetHandle: HANDLE_IDS.CHAIN_IN,
-            type: EDGE_TYPES.CHAIN,
-          } as GraphEdge)
+        groupEntries.forEach(([groupName, steps], groupIndex) => {
+          const laneY = anchor.y + groupIndex * laneSpacingY
+          const laneCommandIds: string[] = []
+
+          steps.forEach((step, stepIndex) => {
+            const nodeId = nextNodeId()
+            laneCommandIds.push(nodeId)
+            commandNodeIdsByStepId.set(step.id, nodeId)
+            newNodes.push({
+              id: nodeId,
+              type: NODE_TYPES.COMMAND,
+              position: {
+                x: anchor.x + stepIndex * 300,
+                y: laneY,
+              },
+              data: {
+                label: step.label,
+                command: step.command,
+                description: step.description,
+                variableNames: parseVariables(step.command),
+              },
+            })
+          })
+
+          const terminalNodeId = nextNodeId()
+          const terminalType = steps[0]?.terminal_type ?? draft.target_terminal.type
+          const terminalX = anchor.x + Math.max(steps.length - 1, 0) * 300 + 320
+          const terminalLabel = formatTerminalGroupLabel(
+            groupName,
+            draft.flow_name,
+            steps.map((step) => step.label),
+          )
+
+          if (terminalType === 'ssh') {
+            const connectionDetails = parseSshConnectionHint(draft.target_terminal.connection_hint)
+            newNodes.push({
+              id: terminalNodeId,
+              type: NODE_TYPES.SSH_TERMINAL,
+              position: {
+                x: terminalX,
+                y: laneY,
+              },
+              data: {
+                label: terminalLabel || connectionDetails.label,
+                terminalId: null,
+                connectionId: null,
+                sshUsername: connectionDetails.sshUsername,
+                sshHost: connectionDetails.sshHost,
+                sshPassword: '',
+              },
+            })
+          } else {
+            newNodes.push({
+              id: terminalNodeId,
+              type: NODE_TYPES.TERMINAL,
+              position: {
+                x: terminalX,
+                y: laneY,
+              },
+              data: {
+                label: terminalLabel,
+                terminalId: null,
+              },
+            })
+          }
+
+          laneCommandIds.forEach((nodeId, index) => {
+            const nextTargetId = laneCommandIds[index + 1] ?? terminalNodeId
+            newEdges.push({
+              id: nextEdgeId(),
+              source: nodeId,
+              target: nextTargetId,
+              sourceHandle: HANDLE_IDS.CHAIN_OUT,
+              targetHandle: HANDLE_IDS.CHAIN_IN,
+              type: EDGE_TYPES.CHAIN,
+            } as GraphEdge)
+          })
+
+          if (hasSequence) {
+            if (!sequenceNodeId) {
+              sequenceNodeId = nextNodeId()
+              newNodes.push({
+                id: sequenceNodeId,
+                type: NODE_TYPES.SEQUENCE,
+                position: {
+                  x: sequenceNodeX,
+                  y: sequenceNodeY,
+                },
+                data: {
+                  label: draft.flow_name || 'Generated Sequence',
+                },
+              })
+            }
+
+            newEdges.push({
+              id: nextEdgeId(),
+              source: terminalNodeId,
+              target: sequenceNodeId,
+              sourceHandle: HANDLE_IDS.SEQUENCE_OUT,
+              targetHandle: HANDLE_IDS.sequenceIn(groupIndex),
+              type: EDGE_TYPES.SEQUENCE,
+            } as GraphEdge)
+          }
         })
 
-        draft.steps.forEach((step, index) => {
-          const commandNodeId = commandNodeIds[index]
+        draft.steps.forEach((step) => {
+          const commandNodeId = commandNodeIdsByStepId.get(step.id)
+          if (!commandNodeId) {
+            return
+          }
           const variableNames = Array.from(
             new Set([...step.uses_variables, ...parseVariables(step.command)]),
           )

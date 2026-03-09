@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends
 
 from src.app.deps import get_ai_model_manager, get_pipeline_draft_generator
-from src.app.schemas.ai import AIModelStatusResponse, AIModelsResponse, GeneratePipelineDraftRequest, GeneratePipelineDraftResponse
+from src.app.schemas.ai import (
+    AIModelStatusResponse,
+    AIModelsResponse,
+    AnalyzeDocumentationRequest,
+    AnalyzeDocumentationResponse,
+    GeneratePipelineDraftRequest,
+    GeneratePipelineDraftResponse,
+)
 from src.app.services.ai_models import AIModelManager
 from src.app.services.pipeline_drafts import PipelineDraftGenerator
 
@@ -61,6 +68,14 @@ async def remove_ai_model(
     manager: AIModelManager = Depends(get_ai_model_manager),
 ) -> AIModelStatusResponse:
     return await manager.remove_model(model_id)
+
+
+@router.post("/pipeline-drafts/clarify", response_model=AnalyzeDocumentationResponse)
+async def analyze_pipeline_documentation(
+    payload: AnalyzeDocumentationRequest,
+    generator: PipelineDraftGenerator = Depends(get_pipeline_draft_generator),
+) -> AnalyzeDocumentationResponse:
+    return await generator.analyze_documentation(payload)
 
 
 @router.post("/pipeline-drafts/generate", response_model=GeneratePipelineDraftResponse)
