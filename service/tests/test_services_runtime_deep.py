@@ -365,6 +365,34 @@ async def test_runtime_pipeline_run_paths(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_runtime_marks_run_failed_when_background_pipeline_task_crashes() -> None:
+    runtime = RuntimeManager()
+    runtime.events.broadcast = AsyncMock()
+    setattr(runtime, "_persist_run", MagicMock())
+    setattr(runtime, "_append_log", AsyncMock())
+
+    async def broken_execute(_run: PipelineRunState) -> None:
+        raise RuntimeError("boom")
+
+    setattr(runtime, "_execute_pipeline_run", broken_execute)
+
+    created = await runtime.create_pipeline_run(
+        PipelineRunCreatePayload(
+            pipeline_name="Crash test",
+            steps=[PipelineStepPayload(label="step 1", command="echo ok")],
+        )
+    )
+
+    for _ in range(4):
+        await asyncio.sleep(0)
+
+    run = runtime.runs[created["id"]]
+    assert run.status == "failed"
+    assert run.finished_at is not None
+    assert run.sessions[0].status == "pending"
+
+
+@pytest.mark.asyncio
 async def test_runtime_stop_run_and_terminal_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
     runtime = RuntimeManager()
 
