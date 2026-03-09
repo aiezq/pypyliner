@@ -14,9 +14,6 @@ export default defineConfig({
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
             return 'vendor-react'
           }
-          if (id.includes('@tanstack/react-query') || id.includes('zustand')) {
-            return 'vendor-state'
-          }
           if (
             id.includes('react-hook-form') ||
             id.includes('@hookform/resolvers') ||
