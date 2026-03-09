@@ -3,9 +3,53 @@ import { apiRequest } from '../../lib/api'
 import { resolveChain } from '../utils/graphResolver'
 import { useGraphStore } from '../store/graphStore'
 import type { GraphNode, GraphEdge } from '../types'
+import type { SessionStatus } from '../../types'
 
 interface UseGraphExecutionReturn {
   executeTerminalNode: (terminalNodeId: string, isSequence?: boolean) => Promise<void>
+}
+
+interface BackendTerminalSummary {
+  id: string
+  status: SessionStatus
+}
+
+const TERMINAL_POLL_INTERVAL_MS = 250
+const TERMINAL_COMMAND_TIMEOUT_MS = 5 * 60 * 1000
+
+const TERMINAL_COMPLETED_STATUSES: ReadonlySet<SessionStatus> = new Set(['idle', 'success'])
+const TERMINAL_FAILED_STATUSES: ReadonlySet<SessionStatus> = new Set(['failed', 'stopped'])
+
+const waitFor = async (delayMs: number): Promise<void> =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs)
+  })
+
+const waitForTerminalCommandCompletion = async (terminalId: string): Promise<void> => {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < TERMINAL_COMMAND_TIMEOUT_MS) {
+    const { manual_terminals } = await apiRequest<{ manual_terminals: BackendTerminalSummary[] }>(
+      '/api/terminals',
+    )
+    const terminal = manual_terminals.find((item) => item.id === terminalId)
+
+    if (!terminal) {
+      throw new Error(`Terminal ${terminalId} is no longer available`)
+    }
+
+    if (TERMINAL_COMPLETED_STATUSES.has(terminal.status)) {
+      return
+    }
+
+    if (TERMINAL_FAILED_STATUSES.has(terminal.status)) {
+      throw new Error(`Terminal ${terminalId} stopped before command completed`)
+    }
+
+    await waitFor(TERMINAL_POLL_INTERVAL_MS)
+  }
+
+  throw new Error(`Timed out waiting for terminal ${terminalId} to finish command`)
 }
 
 /**
@@ -55,15 +99,7 @@ export function useGraphExecution(): UseGraphExecutionReturn {
         method: 'POST',
         body: JSON.stringify({ command: trimmedCommand }),
       })
-
-      // Wait for the command to finish executing before moving to the next one
-      while (true) {
-        await new Promise((r) => setTimeout(r, 100))
-        const statuses = useGraphStore.getState().terminalStatuses
-        if (statuses[terminalId] === 'idle') {
-          break
-        }
-      }
+      await waitForTerminalCommandCompletion(terminalId)
     }
   }, [])
 
