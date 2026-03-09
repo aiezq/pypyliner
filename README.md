@@ -1,11 +1,11 @@
 # Pypyliner Operator Helper
 
 Pypyliner Operator Helper — локальное desktop-приложение для Linux-операторов.
-Оно объединяет визуальный запуск пайплайнов, интерактивные терминальные окна и постоянную историю запусков.
+Оно объединяет визуальный запуск пайплайнов, интерактивные терминальные окна, локальную AI-генерацию черновиков и постоянную историю запусков.
 
 - Фронтенд: React 19 + TypeScript + Vite
 - Бэкенд: FastAPI + runtime на asyncio subprocess
-- Хранение данных: JSON-файлы (паки/флоу) + SQLite (история)
+- Хранение данных: SQLite + локальные runtime/data-каталоги
 
 Важно:
 - модель single-host (все работает на одной машине);
@@ -29,6 +29,14 @@ Pypyliner Operator Helper — локальное desktop-приложение д
   - копирование последних `N` строк вывода.
 - Вкладка истории (данные приходят из базы бэкенда).
 - Синхронизация runtime в реальном времени по WebSocket.
+- Вкладка `Local AI`:
+  - список локальных моделей;
+  - установка и удаление моделей;
+  - загрузка/выгрузка модели в runtime;
+  - прогресс загрузки модели в байтах и процентах;
+  - отмена установки с очисткой уже скачанных файлов;
+  - генерация `PipelineDraft` по документации;
+  - preview и импорт draft прямо в Graph Editor.
 
 ### Бэкенд
 
@@ -39,6 +47,12 @@ Pypyliner Operator Helper — локальное desktop-приложение д
 - SQLite-персистентность запусков и истории терминалов (`service/data/history.sqlite3`).
 - Модели SQLModel + автозапуск Alembic-миграций при старте.
 - Инициализация структурированного логирования и централизованных настроек (`pydantic-settings`).
+- Local AI backend:
+  - manifest локальных моделей;
+  - abstraction layer для runtime (`Ollama`);
+  - lifecycle моделей: install/status/cancel/load/unload/remove;
+  - генерация `PipelineDraft` с repair attempts;
+  - risk classification для опасных команд.
 
 ## Структура проекта
 
@@ -143,6 +157,13 @@ pnpm dev
 - `OPERATOR_DATA_DIR`
 - `OPERATOR_COMMAND_PACKS_DIR`
 - `OPERATOR_PIPELINE_FLOWS_DIR`
+- `OPERATOR_AI_ENABLED`
+- `OPERATOR_AI_DATA_DIR`
+- `OPERATOR_AI_RUNTIME`
+- `OPERATOR_AI_DEFAULT_MODEL`
+- `OPERATOR_AI_MAX_DOC_CHARS`
+- `OPERATOR_AI_REQUEST_TIMEOUT_SEC`
+- `OPERATOR_AI_INSTALL_TIMEOUT_SEC`
 
 Полный список и значения по умолчанию смотрите в `service/src/app/core/settings.py`.
 
@@ -153,6 +174,8 @@ pnpm dev
 - БД истории: `service/data/history.sqlite3`
 - Наборы команд: `service/command_packs/*.json`
 - Pipeline flow: `service/pipeline_flows/*.json`
+- AI state и runtime-данные: `service/data/ai/`
+- AI manifest: `service/src/app/assets/ai/models.manifest.json`
 
 ## Обзор API
 
@@ -190,6 +213,15 @@ pnpm dev
   - `POST /api/pipeline-flows`
   - `PUT /api/pipeline-flows/{flow_id}`
   - `DELETE /api/pipeline-flows/{flow_id}`
+- Local AI:
+  - `GET /api/ai/models`
+  - `POST /api/ai/models/{model_id}/install`
+  - `GET /api/ai/models/{model_id}/status`
+  - `POST /api/ai/models/{model_id}/cancel-install`
+  - `POST /api/ai/models/{model_id}/load`
+  - `POST /api/ai/models/{model_id}/unload`
+  - `DELETE /api/ai/models/{model_id}`
+  - `POST /api/ai/pipeline-drafts/generate`
 - WebSocket:
   - `WS /ws/events`
 
@@ -235,6 +267,9 @@ pytest --cov=src/app --cov-report=term-missing
 - По дизайну отсутствуют auth и sandbox для команд.
 - Не открывайте сервис в недоверенные сети.
 - Используйте только в доверенной локальной/внутренней среде.
+- Генерация AI-черновика не запускает команды автоматически.
+- Для AI-черновиков действует preview перед импортом в граф.
+- Опасные команды помечаются risk flags и блокируют импорт до пересмотра draft.
 
 ## Решение проблем
 
@@ -256,3 +291,10 @@ uvicorn src.main:app --reload
 - выполните хотя бы один pipeline или команду в ручном терминале;
 - проверьте, что существует `service/data/history.sqlite3`;
 - проверьте права на запись в `service/data` и `service/logs`.
+
+### Local AI не устанавливает или не загружает модель
+
+- проверьте, что `Ollama` установлен и запущен локально;
+- откройте `Local AI`, нажмите `Refresh` и проверьте `runtime status`;
+- на macOS при первом запуске может понадобиться вручную открыть `/Applications/Ollama.app`;
+- если загрузка модели зависла, используйте `Cancel` в карточке модели: это остановит установку и очистит partial download.
