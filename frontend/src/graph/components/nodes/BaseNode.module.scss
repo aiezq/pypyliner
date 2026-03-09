@@ -62,6 +62,12 @@
   color: #86f1c5;
 }
 
+.nodeIcon--sshTerminal {
+  background: linear-gradient(135deg, rgba(112, 187, 255, 0.28), rgba(80, 145, 230, 0.22));
+  border: 1px solid rgba(112, 187, 255, 0.45);
+  color: #8bc7ff;
+}
+
 .nodeIcon--sequence {
   background: linear-gradient(135deg, rgba(243, 179, 94, 0.3), rgba(220, 160, 80, 0.2));
   border: 1px solid rgba(243, 179, 94, 0.45);
@@ -111,6 +117,27 @@
 .nodeInput:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.nodeInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+}
+
+.nodeInputToggle {
+  border: 1px solid rgba(110, 146, 199, 0.28);
+  background: rgba(4, 11, 23, 0.9);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0 0.55rem;
+  cursor: pointer;
+}
+
+.nodeHint {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.4;
 }
 
 .nodeCodeBlock {

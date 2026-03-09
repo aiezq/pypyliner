@@ -25,7 +25,10 @@ export function useSequenceExecution() {
     // Execute each source terminal in order, waiting for the previous to finish
     for (const edge of sortedEdges) {
       const targetNode = nodes.find(n => n.id === edge.source)
-      if (targetNode?.type === NODE_TYPES.TERMINAL) {
+      if (
+        targetNode?.type === NODE_TYPES.TERMINAL ||
+        targetNode?.type === NODE_TYPES.SSH_TERMINAL
+      ) {
         // executeTerminalNode handles creating the terminal if it doesn't exist
         // and iterating through its own command chain sequentially.
         // Awaiting this means the next terminal in the sequence only starts

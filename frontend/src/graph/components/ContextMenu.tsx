@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGraphStore } from '../store/graphStore'
 import { usePresetsStore, deriveCollections } from '../store/presetsStore'
 import type { ContextMenuState } from '../hooks/useContextMenu'
-import type { NodePreset, CommandNodeData, VariableNodeData, TerminalNodeData, GroupPresetData } from '../types'
+import type {
+    NodePreset,
+    CommandNodeData,
+    VariableNodeData,
+    TerminalNodeData,
+    SshTerminalNodeData,
+    GroupPresetData,
+} from '../types'
 import { NODE_TYPES } from '../types'
 import styles from './ContextMenu.module.scss'
 
@@ -15,6 +22,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     const addCommandNode = useGraphStore((s) => s.addCommandNode)
     const addVariableNode = useGraphStore((s) => s.addVariableNode)
     const addTerminalNode = useGraphStore((s) => s.addTerminalNode)
+    const addSshTerminalNode = useGraphStore((s) => s.addSshTerminalNode)
     const addSequenceNode = useGraphStore((s) => s.addSequenceNode)
     const deleteNode = useGraphStore((s) => s.deleteNode)
     const deleteNodes = useGraphStore((s) => s.deleteNodes)
@@ -92,6 +100,9 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             case NODE_TYPES.TERMINAL:
                 addTerminalNode(pos, preset.data as TerminalNodeData)
                 break
+            case NODE_TYPES.SSH_TERMINAL:
+                addSshTerminalNode(pos, preset.data as SshTerminalNodeData)
+                break
             case NODE_TYPES.GROUP: {
                 const groupData = preset.data as GroupPresetData
                 if (!groupData.nodes || !groupData.edges) break
@@ -164,7 +175,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             addPreset({
                 nodeType,
                 label: (targetNode.data as { label: string }).label,
-                data: { ...targetNode.data } as CommandNodeData | VariableNodeData | TerminalNodeData,
+                data: { ...targetNode.data } as CommandNodeData | VariableNodeData | TerminalNodeData | SshTerminalNodeData,
                 collection: saveCollection.trim(),
             })
         }
@@ -184,7 +195,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 addPreset({
                     nodeType,
                     label: (node.data as { label: string }).label,
-                    data: { ...node.data } as CommandNodeData | VariableNodeData | TerminalNodeData,
+                    data: { ...node.data } as CommandNodeData | VariableNodeData | TerminalNodeData | SshTerminalNodeData,
                     collection: saveCollection.trim(),
                 })
             }
@@ -407,6 +418,15 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <button
                 type="button"
                 className={styles.menuItem}
+                onClick={() => { addSshTerminalNode(pos); closeMenu() }}
+            >
+                <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--ssh-terminal']}`}>⇄</span>
+                SSH Terminal
+            </button>
+
+            <button
+                type="button"
+                className={styles.menuItem}
                 onClick={() => { addSequenceNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--sequence']}`}>⇶</span>
@@ -465,8 +485,19 @@ function PresetItem({
     onSpawn: (p: NodePreset) => void
 }) {
     const removePreset = usePresetsStore((s) => s.removePreset)
-    const typeIcon = preset.nodeType === 'command' ? '⌘' : preset.nodeType === 'variable' ? 'x' : preset.nodeType === 'group' ? '⚄' : '▶'
-    const variant = preset.nodeType
+    const typeIcon =
+        preset.nodeType === 'command'
+            ? '⌘'
+            : preset.nodeType === 'variable'
+                ? 'x'
+                : preset.nodeType === 'group'
+                    ? '⚄'
+                    : preset.nodeType === 'ssh-terminal'
+                        ? '⇄'
+                        : preset.nodeType === 'sequence'
+                            ? '⇶'
+                            : '▶'
+    const variant = preset.nodeType === 'ssh-terminal' ? 'ssh-terminal' : preset.nodeType
 
     return (
         <div className={styles.presetItem}>

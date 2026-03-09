@@ -18,10 +18,11 @@ import {
   type CommandNodeData,
   type VariableNodeData,
   type TerminalNodeData,
+  type SshTerminalNodeData,
   type SequenceNodeData,
   type SerializedGraph,
 } from '../types'
-import type { SessionStatus } from '../../types'
+import type { SessionStatus, SshConnectionVariable } from '../../types'
 import { parseVariables } from '../utils/variableParser'
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ interface GraphState {
   activeTerminalIds: string[]
   terminalStatuses: Record<string, SessionStatus>
   globalVariables: Record<string, string>
+  sshConnections: SshConnectionVariable[]
 
   // React Flow callbacks
   onNodesChange: (changes: NodeChange<GraphNode>[]) => void
@@ -49,11 +51,14 @@ interface GraphState {
   setTerminalStatuses: (statuses: Record<string, SessionStatus>) => void
   setGlobalVariable: (key: string, value: string) => void
   deleteGlobalVariable: (key: string) => void
+  saveSshConnection: (connection: Omit<SshConnectionVariable, 'id'> & { id?: string }) => string
+  deleteSshConnection: (connectionId: string) => void
 
   // Node CRUD
   addCommandNode: (position: { x: number; y: number }, data?: Partial<CommandNodeData>) => string
   addVariableNode: (position: { x: number; y: number }, data?: Partial<VariableNodeData>) => string
   addTerminalNode: (position: { x: number; y: number }, data?: Partial<TerminalNodeData>) => string
+  addSshTerminalNode: (position: { x: number; y: number }, data?: Partial<SshTerminalNodeData>) => string
   addSequenceNode: (position: { x: number; y: number }, data?: Partial<SequenceNodeData>) => string
   updateNodeData: <T extends Record<string, unknown>>(nodeId: string, data: Partial<T>) => void
   deleteNode: (nodeId: string) => void
@@ -104,6 +109,7 @@ export const useGraphStore = create<GraphState>()(
       activeTerminalIds: [],
       terminalStatuses: {},
       globalVariables: {},
+      sshConnections: [],
 
       onNodesChange: (changes) => {
         set((state) => ({
@@ -171,6 +177,50 @@ export const useGraphStore = create<GraphState>()(
         })
       },
 
+      saveSshConnection: (connection) => {
+        const connectionId = connection.id ?? `ssh_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+        set((state) => {
+          const existingIndex = state.sshConnections.findIndex((item) => item.id === connectionId)
+          const nextConnection: SshConnectionVariable = {
+            id: connectionId,
+            username: connection.username,
+            host: connection.host,
+            password: connection.password,
+          }
+
+          if (existingIndex === -1) {
+            return { sshConnections: [...state.sshConnections, nextConnection] }
+          }
+
+          const nextConnections = [...state.sshConnections]
+          nextConnections[existingIndex] = nextConnection
+          return { sshConnections: nextConnections }
+        })
+        return connectionId
+      },
+
+      deleteSshConnection: (connectionId) => {
+        set((state) => ({
+          sshConnections: state.sshConnections.filter((connection) => connection.id !== connectionId),
+          nodes: state.nodes.map((node) => {
+            if (
+              node.type === NODE_TYPES.SSH_TERMINAL &&
+              node.data.connectionId === connectionId
+            ) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  connectionId: null,
+                  terminalId: null,
+                },
+              }
+            }
+            return node
+          }) as GraphNode[],
+        }))
+      },
+
       addCommandNode: (position, data) => {
         const id = nextNodeId()
         const command = data?.command ?? ''
@@ -219,6 +269,27 @@ export const useGraphStore = create<GraphState>()(
           data: {
             label: data?.label ?? 'Terminal',
             terminalId: data?.terminalId ?? null,
+          },
+        }
+
+        set((state) => ({ nodes: [...state.nodes, node] }))
+        return id
+      },
+
+      addSshTerminalNode: (position, data) => {
+        const id = nextNodeId()
+
+        const node: GraphNode = {
+          id,
+          type: NODE_TYPES.SSH_TERMINAL,
+          position,
+          data: {
+            label: data?.label ?? 'SSH Terminal',
+            terminalId: data?.terminalId ?? null,
+            connectionId: data?.connectionId ?? null,
+            sshUsername: data?.sshUsername ?? '',
+            sshHost: data?.sshHost ?? '',
+            sshPassword: data?.sshPassword ?? '',
           },
         }
 
@@ -296,8 +367,8 @@ export const useGraphStore = create<GraphState>()(
       },
 
       serialize: () => {
-        const { nodes, edges, viewport, globalVariables } = get()
-        return { nodes, edges, viewport, globalVariables }
+        const { nodes, edges, viewport, globalVariables, sshConnections } = get()
+        return { nodes, edges, viewport, globalVariables, sshConnections }
       },
 
       deserialize: (graph) => {
@@ -313,6 +384,7 @@ export const useGraphStore = create<GraphState>()(
           edges: graph.edges,
           viewport: graph.viewport,
           globalVariables: graph.globalVariables,
+          sshConnections: graph.sshConnections ?? [],
         })
       },
 
@@ -323,6 +395,7 @@ export const useGraphStore = create<GraphState>()(
           edges: [],
           viewport: { x: 0, y: 0, zoom: 1 },
           globalVariables: {},
+          sshConnections: [],
         })
       },
     }),
@@ -333,6 +406,7 @@ export const useGraphStore = create<GraphState>()(
         edges: state.edges,
         viewport: state.viewport,
         globalVariables: state.globalVariables,
+        sshConnections: state.sshConnections,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

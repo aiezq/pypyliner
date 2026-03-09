@@ -60,14 +60,22 @@ const waitForTerminalCommandCompletion = async (terminalId: string): Promise<voi
  */
 export function useGraphExecution(): UseGraphExecutionReturn {
   const executeTerminalNode = useCallback(async (terminalNodeId: string, isSequence: boolean = false) => {
-    const { nodes, edges, updateNodeData, globalVariables } = useGraphStore.getState()
+    const { nodes, edges, updateNodeData, globalVariables, sshConnections } = useGraphStore.getState()
 
     const chain = resolveChain(
       terminalNodeId,
       nodes as GraphNode[],
       edges as GraphEdge[],
       globalVariables,
+      sshConnections,
     )
+
+    if (
+      chain.terminalType === 'ssh' &&
+      (!chain.sshUsername?.trim() || !chain.sshHost?.trim() || !chain.sshPassword?.trim())
+    ) {
+      throw new Error('SSH terminal requires username, host, and password')
+    }
 
     // Validate or create terminal
     let terminalId = chain.terminalId
@@ -89,10 +97,16 @@ export function useGraphExecution(): UseGraphExecutionReturn {
         body: JSON.stringify({
           title: chain.terminalLabel,
           is_sequence: isSequence,
+          terminal_type: chain.terminalType,
+          ssh_connection_name: chain.sshConnectionName,
+          ssh_host: chain.sshHost,
+          ssh_username: chain.sshUsername,
+          ssh_password: chain.sshPassword,
         }),
       })
       terminalId = result.id
       updateNodeData(terminalNodeId, { terminalId })
+      await waitForTerminalCommandCompletion(terminalId)
     }
 
     // Execute each command in order

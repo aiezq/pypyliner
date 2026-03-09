@@ -86,7 +86,10 @@ export default function SequenceNode({ id, data, selected }: Props) {
                     if (connectedEdge) {
                         const nodes = useGraphStore.getState().nodes
                         const sourceNode = nodes.find(n => n.id === connectedEdge.source)
-                        if (sourceNode?.type === NODE_TYPES.TERMINAL) {
+                        if (
+                            sourceNode?.type === NODE_TYPES.TERMINAL ||
+                            sourceNode?.type === NODE_TYPES.SSH_TERMINAL
+                        ) {
                             terminalName = sourceNode.data.label as string
                         }
                     }

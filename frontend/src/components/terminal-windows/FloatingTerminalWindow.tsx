@@ -89,7 +89,7 @@ function FloatingTerminalWindow({
         kind="manual"
         terminal={terminal}
         isEditingTitle={isEditingTitle}
-        titleHint="Manual terminal"
+        titleHint={terminal.terminalType === 'ssh' ? 'SSH terminal' : 'Manual terminal'}
         onHeaderMouseDown={onBeginDrag}
         onUpdateTitleDraft={(title) => onUpdateManualTitle(terminal.id, title)}
         onStartTitleEdit={() =>

@@ -46,12 +46,16 @@ export const toManualTerminal = (
   id: terminal.id,
   title: terminal.title,
   titleDraft: terminal.title,
+  terminalType: terminal.terminal_type,
   promptUser: terminal.prompt_user,
   promptCwd: terminal.prompt_cwd,
   isSequence: terminal.is_sequence,
   status: terminal.status,
   exitCode: terminal.exit_code,
   draftCommand: terminal.draft_command,
+  sshConnectionName: terminal.ssh_connection_name,
+  sshHost: terminal.ssh_host,
+  sshUsername: terminal.ssh_username,
   lines: terminal.lines.map(toTerminalLine),
 })
 

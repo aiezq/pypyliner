@@ -567,6 +567,20 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     created = await runtime.create_manual_terminal(ManualTerminalCreatePayload(title=None))
     assert created["title"] == "Manual terminal #2"
 
+    created_ssh = await runtime.create_manual_terminal(
+        ManualTerminalCreatePayload(
+            title=None,
+            terminal_type="ssh",
+            ssh_username="deploy",
+            ssh_host="10.0.0.15",
+            ssh_password="secret",
+            ssh_connection_name="deploy@10.0.0.15",
+        )
+    )
+    assert created_ssh["title"] == "SSH terminal #3"
+    assert created_ssh["terminal_type"] == "ssh"
+    assert created_ssh["ssh_host"] == "10.0.0.15"
+
     is_open_terminal_command = cast(
         Callable[[str], bool],
         getattr(RuntimeManager, "_is_pipeline_open_terminal_command"),
@@ -582,6 +596,10 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     collect_path_matches = cast(
         Callable[[Path, str], list[str]],
         getattr(RuntimeManager, "_collect_path_matches"),
+    )
+    build_ssh_argv = cast(
+        Callable[[ManualTerminalState], list[str]],
+        getattr(RuntimeManager, "_build_ssh_argv"),
     )
 
     assert is_open_terminal_command(PIPELINE_OPEN_TERMINAL_COMMAND)
@@ -614,6 +632,18 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     assert prefix == "ls "
     assert quote == '"'
     assert isinstance(completions, list)
+
+    ssh_terminal = _make_terminal("terminal_ssh")
+    ssh_terminal.terminal_type = "ssh"
+    ssh_terminal.ssh_username = "deploy"
+    ssh_terminal.ssh_host = "10.0.0.15"
+    ssh_terminal.ssh_password = "secret"
+    assert "deploy@10.0.0.15" in build_ssh_argv(ssh_terminal)
+
+    ssh_prefix, ssh_quote, ssh_completions = await token(ssh_terminal, "ls /op")
+    assert ssh_prefix == "ls "
+    assert ssh_quote == ""
+    assert ssh_completions == []
 
 
 @pytest.mark.asyncio

@@ -35,11 +35,26 @@ const createTerminalNode = (terminalId: string | null): GraphNode =>
     },
   }) as GraphNode
 
-const createChainEdge = (): GraphEdge =>
+const createSshTerminalNode = (terminalId: string | null, connectionId: string | null = 'ssh_1'): GraphNode =>
+  ({
+    id: 'terminal_ssh_1',
+    type: NODE_TYPES.SSH_TERMINAL,
+    position: { x: 200, y: 0 },
+    data: {
+      label: 'SSH Terminal',
+      terminalId,
+      connectionId,
+      sshUsername: '',
+      sshHost: '',
+      sshPassword: '',
+    },
+  }) as GraphNode
+
+const createChainEdge = (target: string = 'terminal_1'): GraphEdge =>
   ({
     id: 'edge_1',
     source: 'command_1',
-    target: 'terminal_1',
+    target,
     sourceHandle: 'chain-out',
     targetHandle: 'chain-in',
     type: EDGE_TYPES.CHAIN,
@@ -54,6 +69,7 @@ const resetGraphStore = (): void => {
     activeTerminalIds: [],
     terminalStatuses: {},
     globalVariables: {},
+    sshConnections: [],
   })
 }
 
@@ -204,5 +220,60 @@ describe('useGraphExecution', () => {
       '/api/terminals',
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+
+  it('creates an SSH terminal from a saved SSH variable before running the chain', async () => {
+    useGraphStore.setState({
+      nodes: [createCommandNode('uname -a'), createSshTerminalNode(null)],
+      edges: [createChainEdge('terminal_ssh_1')],
+      sshConnections: [
+        {
+          id: 'ssh_1',
+          username: 'deploy',
+          host: '10.0.0.5',
+          password: 'secret',
+        },
+      ],
+    })
+
+    const requestBodies: Array<Record<string, unknown>> = []
+    let terminalCalls = 0
+    apiRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+
+      if (path === '/api/terminals/terminal_ssh_created' && method === 'GET') {
+        terminalCalls += 1
+        if (terminalCalls === 1) {
+          return { id: 'terminal_ssh_created', status: 'running' }
+        }
+        return { id: 'terminal_ssh_created', status: 'idle' }
+      }
+
+      if (path === '/api/terminals' && method === 'POST') {
+        requestBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+        return { id: 'terminal_ssh_created' }
+      }
+
+      if (path === '/api/terminals/terminal_ssh_created/run' && method === 'POST') {
+        return { id: 'terminal_ssh_created' }
+      }
+
+      throw new Error(`Unexpected request: ${method} ${path}`)
+    })
+
+    const { result } = renderHook(() => useGraphExecution())
+
+    const executionPromise = result.current.executeTerminalNode('terminal_ssh_1')
+    await vi.advanceTimersByTimeAsync(500)
+
+    await expect(executionPromise).resolves.toBeUndefined()
+    expect(requestBodies[0]).toMatchObject({
+      title: 'SSH Terminal',
+      terminal_type: 'ssh',
+      ssh_connection_name: 'deploy@10.0.0.5',
+      ssh_host: '10.0.0.5',
+      ssh_username: 'deploy',
+      ssh_password: 'secret',
+    })
   })
 })
