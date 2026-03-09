@@ -24,6 +24,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     const addTerminalNode = useGraphStore((s) => s.addTerminalNode)
     const addSshTerminalNode = useGraphStore((s) => s.addSshTerminalNode)
     const addSequenceNode = useGraphStore((s) => s.addSequenceNode)
+    const switchTerminalNodeType = useGraphStore((s) => s.switchTerminalNodeType)
     const deleteNode = useGraphStore((s) => s.deleteNode)
     const deleteNodes = useGraphStore((s) => s.deleteNodes)
     const deleteEdge = useGraphStore((s) => s.deleteEdge)
@@ -87,6 +88,8 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
 
     const pos = { x: menu.canvasX, y: menu.canvasY }
     const targetNode = menu.nodeId ? nodes.find((n) => n.id === menu.nodeId) : null
+    const canSwitchTerminalType =
+        targetNode?.type === NODE_TYPES.TERMINAL || targetNode?.type === NODE_TYPES.SSH_TERMINAL
 
     // ── Spawn a preset as a new node ──
     const spawnPreset = (preset: NodePreset) => {
@@ -298,6 +301,22 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                             <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--save']}`}>💾</span>
                             Save as Preset
                         </button>
+
+                        {canSwitchTerminalType && (
+                            <button
+                                type="button"
+                                className={styles.menuItem}
+                                onClick={() => {
+                                    switchTerminalNodeType(targetNode.id)
+                                    closeMenu()
+                                }}
+                            >
+                                <span className={`${styles.menuItemIcon} ${styles[targetNode.type === NODE_TYPES.TERMINAL ? 'menuItemIcon--ssh-terminal' : 'menuItemIcon--terminal']}`}>
+                                    {targetNode.type === NODE_TYPES.TERMINAL ? '⇄' : '▶'}
+                                </span>
+                                {targetNode.type === NODE_TYPES.TERMINAL ? 'Switch to SSH Terminal' : 'Switch to Default Terminal'}
+                            </button>
+                        )}
 
                         <div className={styles.menuDivider} />
 

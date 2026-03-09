@@ -232,4 +232,81 @@ describe('useGraphStore serialization', () => {
       .map((node) => String(node.data.label))
     expect(terminalLabels).toEqual(expect.arrayContaining(['Teleop Terminal', 'Collect Terminal']))
   })
+
+  it('switches a terminal node to ssh-terminal without changing node id or edges', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'command-1',
+          type: 'command',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Run deploy',
+            command: 'deploy-tool',
+            description: '',
+            variableNames: [],
+          },
+        },
+        {
+          id: 'terminal-1',
+          type: 'terminal',
+          position: { x: 320, y: 0 },
+          data: {
+            label: 'Main Terminal',
+            terminalId: 'term_backend_1',
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'edge-1',
+          source: 'command-1',
+          target: 'terminal-1',
+          sourceHandle: 'chain-out',
+          targetHandle: 'chain-in',
+          type: 'chain',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      activeTerminalIds: [],
+      terminalStatuses: {},
+      globalVariables: {},
+      sshConnections: [],
+    })
+
+    useGraphStore.getState().switchTerminalNodeType('terminal-1')
+
+    const state = useGraphStore.getState()
+    const switchedNode = state.nodes.find((node) => node.id === 'terminal-1')
+    expect(switchedNode?.type).toBe('ssh-terminal')
+    expect(switchedNode?.data).toMatchObject({
+      label: 'Main Terminal',
+      terminalId: null,
+      connectionId: null,
+      sshUsername: '',
+      sshHost: '',
+      sshPassword: '',
+    })
+    expect(state.edges).toEqual([
+      {
+        id: 'edge-1',
+        source: 'command-1',
+        target: 'terminal-1',
+        sourceHandle: 'chain-out',
+        targetHandle: 'chain-in',
+        type: 'chain',
+      },
+    ])
+
+    useGraphStore.getState().switchTerminalNodeType('terminal-1')
+
+    const revertedNode = useGraphStore.getState().nodes.find((node) => node.id === 'terminal-1')
+    expect(revertedNode?.type).toBe('terminal')
+    expect(revertedNode?.data).toMatchObject({
+      label: 'Main Terminal',
+      terminalId: null,
+    })
+  })
 })
