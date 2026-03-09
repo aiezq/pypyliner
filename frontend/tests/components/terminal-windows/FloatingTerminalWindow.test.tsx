@@ -31,7 +31,6 @@ const baseProps = () => ({
   onBringToFront: vi.fn(),
   onBeginDrag: vi.fn(),
   onBeginResize: vi.fn<(direction: ResizeDirection) => void>(),
-  onTogglePin: vi.fn(),
   onMinimize: vi.fn(),
   getCopyTailLineCount: vi.fn(() => 20),
   isCopyTailRecentlyCopied: vi.fn(() => false),
@@ -55,48 +54,7 @@ describe('FloatingTerminalWindow', () => {
     terminalPanelMock.mockClear()
   })
 
-  it('renders run session window and forwards controls callbacks', () => {
-    const props = baseProps()
-    const windowItem: TerminalWindowDescriptor = {
-      windowId: 'run:1',
-      kind: 'run',
-      session: {
-        id: 'session_1',
-        stepId: 'step_1',
-        title: 'Run title',
-        command: 'echo ok',
-        status: 'running',
-        exitCode: null,
-        lines: [],
-      },
-    }
 
-    render(<FloatingTerminalWindow {...props} windowItem={windowItem} />)
-
-    const article = document.querySelector('article')
-    expect(article).not.toBeNull()
-    fireEvent.mouseDown(article as HTMLElement)
-    expect(props.onBringToFront).toHaveBeenCalledTimes(1)
-
-    fireEvent.click(screen.getByTitle('Pin to workflow'))
-    fireEvent.click(screen.getByTitle('Minimize'))
-    fireEvent.mouseDown(screen.getByTitle('Pin to workflow'))
-    fireEvent.mouseDown(screen.getByTitle('Minimize'))
-    expect(props.onTogglePin).toHaveBeenCalledTimes(1)
-    expect(props.onMinimize).toHaveBeenCalledTimes(1)
-
-    const resizeHandles = document.querySelectorAll('.resizeHandle')
-    expect(resizeHandles.length).toBe(8)
-    fireEvent.mouseDown(resizeHandles[0] as Element)
-    expect(props.onBeginResize).toHaveBeenCalled()
-
-    const panelProps = terminalPanelMock.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(panelProps.kind).toBe('run')
-    expect(panelProps.variant).toBe('floating')
-    expect(panelProps.session).toMatchObject({ id: 'session_1' })
-    ;(panelProps.onHeaderMouseDown as (event: unknown) => void)({} as unknown)
-    expect(props.onBeginDrag).toHaveBeenCalledTimes(1)
-  })
 
   it('renders manual window and forwards terminal-specific actions', () => {
     const props = baseProps()
@@ -109,6 +67,7 @@ describe('FloatingTerminalWindow', () => {
         titleDraft: 'Manual #1',
         promptUser: 'operator',
         promptCwd: '~',
+        isSequence: false,
         status: 'running',
         exitCode: null,
         draftCommand: 'pwd',
@@ -126,7 +85,6 @@ describe('FloatingTerminalWindow', () => {
 
     fireEvent.click(screen.getByTitle('Stop terminal'))
     fireEvent.click(screen.getByTitle('Close terminal'))
-    fireEvent.mouseDown(screen.getByTitle('Pin to workflow'))
     fireEvent.mouseDown(screen.getByTitle('Minimize'))
     fireEvent.mouseDown(screen.getByTitle('Stop terminal'))
     fireEvent.mouseDown(screen.getByTitle('Close terminal'))
@@ -141,20 +99,20 @@ describe('FloatingTerminalWindow', () => {
     expect(panelProps.copyTailLineCount).toBe(20)
     expect(panelProps.isCopyTailRecentlyCopied).toBe(false)
 
-    ;(panelProps.onUpdateTitleDraft as (value: string) => void)('New title')
-    ;(panelProps.onStartTitleEdit as () => void)()
-    ;(panelProps.onCancelTitleEdit as () => void)()
-    ;(panelProps.onSaveTitleEdit as () => void)()
-    ;(panelProps.onUpdateCommand as (value: string) => void)('ls')
-    ;(panelProps.onAutocompleteCommand as () => void)()
-    ;(panelProps.onNavigateHistory as (dir: 'up' | 'down', draft: string) => void)(
-      'up',
-      '',
-    )
-    ;(panelProps.onRunCommand as () => void)()
-    ;(panelProps.onClearTerminal as () => void)()
-    ;(panelProps.onUpdateCopyTailLineCount as (value: string) => void)('25')
-    ;(panelProps.onCopyTail as () => void)()
+      ; (panelProps.onUpdateTitleDraft as (value: string) => void)('New title')
+      ; (panelProps.onStartTitleEdit as () => void)()
+      ; (panelProps.onCancelTitleEdit as () => void)()
+      ; (panelProps.onSaveTitleEdit as () => void)()
+      ; (panelProps.onUpdateCommand as (value: string) => void)('ls')
+      ; (panelProps.onAutocompleteCommand as () => void)()
+      ; (panelProps.onNavigateHistory as (dir: 'up' | 'down', draft: string) => void)(
+        'up',
+        '',
+      )
+      ; (panelProps.onRunCommand as () => void)()
+      ; (panelProps.onClearTerminal as () => void)()
+      ; (panelProps.onUpdateCopyTailLineCount as (value: string) => void)('25')
+      ; (panelProps.onCopyTail as () => void)()
 
     expect(props.onUpdateManualTitle).toHaveBeenCalledWith('terminal_1', 'New title')
     expect(props.onStartManualTitleEdit).toHaveBeenCalledWith('terminal_1', 'Manual #1')
@@ -184,6 +142,7 @@ describe('FloatingTerminalWindow', () => {
         titleDraft: 'Manual #2',
         promptUser: 'operator',
         promptCwd: '~',
+        isSequence: false,
         status: 'success',
         exitCode: 0,
         draftCommand: '',

@@ -48,6 +48,7 @@ export const toManualTerminal = (
   titleDraft: terminal.title,
   promptUser: terminal.prompt_user,
   promptCwd: terminal.prompt_cwd,
+  isSequence: terminal.is_sequence,
   status: terminal.status,
   exitCode: terminal.exit_code,
   draftCommand: terminal.draft_command,

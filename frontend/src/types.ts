@@ -20,6 +20,7 @@ export interface ManualTerminal {
   titleDraft: string
   promptUser: string
   promptCwd: string
+  isSequence: boolean
   status: SessionStatus
   exitCode: number | null
   draftCommand: string
