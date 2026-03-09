@@ -3,15 +3,10 @@ import { apiRequest } from '../../lib/api'
 import { resolveChain } from '../utils/graphResolver'
 import { useGraphStore } from '../store/graphStore'
 import type { GraphNode, GraphEdge } from '../types'
-import type { SessionStatus } from '../../types'
+import type { BackendManualTerminal, SessionStatus } from '../../types'
 
 interface UseGraphExecutionReturn {
   executeTerminalNode: (terminalNodeId: string, isSequence?: boolean) => Promise<void>
-}
-
-interface BackendTerminalSummary {
-  id: string
-  status: SessionStatus
 }
 
 const TERMINAL_POLL_INTERVAL_MS = 250
@@ -29,10 +24,17 @@ const waitForTerminalCommandCompletion = async (terminalId: string): Promise<voi
   const startedAt = Date.now()
 
   while (Date.now() - startedAt < TERMINAL_COMMAND_TIMEOUT_MS) {
-    const { manual_terminals } = await apiRequest<{ manual_terminals: BackendTerminalSummary[] }>(
-      '/api/terminals',
-    )
-    const terminal = manual_terminals.find((item) => item.id === terminalId)
+    let terminal: Pick<BackendManualTerminal, 'id' | 'status'>
+    try {
+      terminal = await apiRequest<Pick<BackendManualTerminal, 'id' | 'status'>>(
+        `/api/terminals/${terminalId}`,
+      )
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Terminal not found') {
+        throw new Error(`Terminal ${terminalId} is no longer available`)
+      }
+      throw error
+    }
 
     if (!terminal) {
       throw new Error(`Terminal ${terminalId} is no longer available`)
@@ -70,19 +72,23 @@ export function useGraphExecution(): UseGraphExecutionReturn {
     // Validate or create terminal
     let terminalId = chain.terminalId
     if (terminalId) {
-      // Check if terminal still exists on backend (e.g. wasn't closed by user)
-      const { manual_terminals } = await apiRequest<{ manual_terminals: { id: string }[] }>('/api/terminals')
-      if (!manual_terminals.some((t) => t.id === terminalId)) {
-        terminalId = null
+      try {
+        await apiRequest<Pick<BackendManualTerminal, 'id'>>(`/api/terminals/${terminalId}`)
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Terminal not found') {
+          terminalId = null
+        } else {
+          throw error
+        }
       }
     }
 
     if (!terminalId) {
       const result = await apiRequest<{ id: string }>('/api/terminals', {
         method: 'POST',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           title: chain.terminalLabel,
-          is_sequence: isSequence
+          is_sequence: isSequence,
         }),
       })
       terminalId = result.id

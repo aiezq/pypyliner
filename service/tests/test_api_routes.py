@@ -29,6 +29,7 @@ from src.app.api.routes.terminals import (
     close_terminal,
     complete_terminal_command,
     create_terminal,
+    get_terminal,
     get_terminal_log,
     get_terminals,
     rename_terminal,
@@ -171,6 +172,10 @@ class RuntimeStub:
 
     def list_manual_terminals(self) -> list[ManualTerminalData]:
         return [_terminal()]
+
+    def get_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
+        assert terminal_id == "terminal_1"
+        return _terminal()
 
     async def create_manual_terminal(self, payload: ManualTerminalCreatePayload) -> ManualTerminalData:
         assert payload.title == "Terminal #1"
@@ -384,6 +389,7 @@ async def test_terminals_routes(tmp_path: Path):
     runtime.get_terminal_log_path = lambda _terminal_id: terminal_log  # type: ignore[method-assign]
 
     terminals_res = await get_terminals(runtime=cast(RuntimeManager, runtime))
+    terminal_res = await get_terminal("terminal_1", runtime=cast(RuntimeManager, runtime))
     created_res = await create_terminal(
         payload=ManualTerminalCreatePayload(title="Terminal #1"),
         runtime=cast(RuntimeManager, runtime),
@@ -410,6 +416,7 @@ async def test_terminals_routes(tmp_path: Path):
     log_text = await _read_response_text(log_response)
 
     assert terminals_res.manual_terminals[0].id == "terminal_1"
+    assert terminal_res.id == "terminal_1"
     assert created_res.id == "terminal_1"
     assert run_res.status == "running"
     assert complete_res.completed_command == "ls src"

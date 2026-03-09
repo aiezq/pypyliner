@@ -75,20 +75,16 @@ describe('useGraphExecution', () => {
       edges: [createChainEdge()],
     })
 
-    let listCalls = 0
+    let terminalCalls = 0
     apiRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
 
-      if (path === '/api/terminals' && method === 'GET') {
-        listCalls += 1
-        if (listCalls === 1) {
-          return {
-            manual_terminals: [{ id: 'terminal_created', status: 'running' }],
-          }
+      if (path === '/api/terminals/terminal_created' && method === 'GET') {
+        terminalCalls += 1
+        if (terminalCalls === 1) {
+          return { id: 'terminal_created', status: 'running' }
         }
-        return {
-          manual_terminals: [{ id: 'terminal_created', status: 'idle' }],
-        }
+        return { id: 'terminal_created', status: 'idle' }
       }
 
       if (path === '/api/terminals' && method === 'POST') {
@@ -119,20 +115,16 @@ describe('useGraphExecution', () => {
       edges: [createChainEdge()],
     })
 
-    let listCalls = 0
+    let terminalCalls = 0
     apiRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
 
-      if (path === '/api/terminals' && method === 'GET') {
-        listCalls += 1
-        if (listCalls === 1) {
-          return {
-            manual_terminals: [{ id: 'terminal_1', status: 'idle' }],
-          }
+      if (path === '/api/terminals/terminal_1' && method === 'GET') {
+        terminalCalls += 1
+        if (terminalCalls === 1) {
+          return { id: 'terminal_1', status: 'idle' }
         }
-        return {
-          manual_terminals: [],
-        }
+        throw new Error('Terminal not found')
       }
 
       if (path === '/api/terminals/terminal_1/run' && method === 'POST') {
@@ -158,10 +150,8 @@ describe('useGraphExecution', () => {
     apiRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
       const method = init?.method ?? 'GET'
 
-      if (path === '/api/terminals' && method === 'GET') {
-        return {
-          manual_terminals: [{ id: 'terminal_1', status: 'running' }],
-        }
+      if (path === '/api/terminals/terminal_1' && method === 'GET') {
+        return { id: 'terminal_1', status: 'running' }
       }
 
       if (path === '/api/terminals/terminal_1/run' && method === 'POST') {
@@ -180,5 +170,39 @@ describe('useGraphExecution', () => {
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
 
     await rejectionExpectation
+  })
+
+  it('reuses an existing terminal after confirming it with the point lookup endpoint', async () => {
+    useGraphStore.setState({
+      nodes: [createCommandNode(), createTerminalNode('terminal_1')],
+      edges: [createChainEdge()],
+    })
+
+    let terminalCalls = 0
+    apiRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+
+      if (path === '/api/terminals/terminal_1' && method === 'GET') {
+        terminalCalls += 1
+        if (terminalCalls === 1) {
+          return { id: 'terminal_1', status: 'idle' }
+        }
+        return { id: 'terminal_1', status: 'success' }
+      }
+
+      if (path === '/api/terminals/terminal_1/run' && method === 'POST') {
+        return { id: 'terminal_1' }
+      }
+
+      throw new Error(`Unexpected request: ${method} ${path}`)
+    })
+
+    const { result } = renderHook(() => useGraphExecution())
+
+    await expect(result.current.executeTerminalNode('terminal_1')).resolves.toBeUndefined()
+    expect(apiRequestMock).not.toHaveBeenCalledWith(
+      '/api/terminals',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 })

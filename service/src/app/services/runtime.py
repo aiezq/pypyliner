@@ -266,6 +266,12 @@ class RuntimeManager:
             for terminal in self.manual_terminals.values()
         ]
 
+    def get_manual_terminal(self, terminal_id: str) -> ManualTerminalData:
+        terminal = self.manual_terminals.get(terminal_id)
+        if terminal is None:
+            raise ServiceError(status_code=404, detail="Terminal not found")
+        return self._serialize_terminal(terminal)
+
     def history(self) -> HistoryData:
         if self.history_db is None:
             return {"runs": self.list_runs(), "manual_terminal_history": []}
