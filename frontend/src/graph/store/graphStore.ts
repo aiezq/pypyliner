@@ -61,6 +61,7 @@ interface GraphState {
   addTerminalNode: (position: { x: number; y: number }, data?: Partial<TerminalNodeData>) => string
   addSshTerminalNode: (position: { x: number; y: number }, data?: Partial<SshTerminalNodeData>) => string
   addSequenceNode: (position: { x: number; y: number }, data?: Partial<SequenceNodeData>) => string
+  switchTerminalNodeType: (nodeId: string) => void
   updateNodeData: <T extends Record<string, unknown>>(nodeId: string, data: Partial<T>) => void
   deleteNode: (nodeId: string) => void
   deleteNodes: (nodeIds: string[]) => void
@@ -381,6 +382,46 @@ export const useGraphStore = create<GraphState>()(
 
         set((state) => ({ nodes: [...state.nodes, node] }))
         return id
+      },
+
+      switchTerminalNodeType: (nodeId) => {
+        set((state) => ({
+          nodes: state.nodes.map((node) => {
+            if (node.id !== nodeId) {
+              return node
+            }
+
+            if (node.type === NODE_TYPES.TERMINAL) {
+              const terminalData = node.data as TerminalNodeData
+              return {
+                ...node,
+                type: NODE_TYPES.SSH_TERMINAL,
+                data: {
+                  label: terminalData.label,
+                  terminalId: null,
+                  connectionId: null,
+                  sshUsername: '',
+                  sshHost: '',
+                  sshPassword: '',
+                },
+              } satisfies GraphNode
+            }
+
+            if (node.type === NODE_TYPES.SSH_TERMINAL) {
+              const terminalData = node.data as SshTerminalNodeData
+              return {
+                ...node,
+                type: NODE_TYPES.TERMINAL,
+                data: {
+                  label: terminalData.label,
+                  terminalId: null,
+                },
+              } satisfies GraphNode
+            }
+
+            return node
+          }) as GraphNode[],
+        }))
       },
 
       updateNodeData: (nodeId, data) => {
