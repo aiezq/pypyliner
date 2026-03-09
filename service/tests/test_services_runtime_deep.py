@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Awaitable, Callable, cast
+from typing import Any, Awaitable, Callable, Coroutine, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -390,6 +390,40 @@ async def test_runtime_marks_run_failed_when_background_pipeline_task_crashes() 
     assert run.status == "failed"
     assert run.finished_at is not None
     assert run.sessions[0].status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_runtime_marks_terminal_failed_when_background_task_crashes() -> None:
+    runtime = RuntimeManager()
+    terminal = _make_terminal("terminal_background_crash")
+    terminal.status = "running"
+    terminal.current_process = cast(Any, FakeProcess(returncode=None, wait_results=[0], stdin=FakeStdin()))
+    runtime.manual_terminals[terminal.id] = terminal
+    setattr(runtime, "_append_manual_line", AsyncMock())
+    setattr(runtime, "_emit_terminal_status", AsyncMock())
+
+    create_background_task = cast(
+        Callable[[Coroutine[Any, Any, Any]], object],
+        getattr(runtime, "_create_background_task"),
+    )
+
+    async def broken_task() -> None:
+        raise RuntimeError("terminal boom")
+
+    create_background_task(
+        broken_task(),
+        label=f"manual_terminal_watch:{terminal.id}",
+        on_error=lambda error: runtime._handle_manual_terminal_task_error(terminal.id, error),
+    )
+
+    for _ in range(4):
+        await asyncio.sleep(0)
+
+    assert terminal.status == "failed"
+    assert terminal.exit_code == -1
+    assert terminal.current_process is None
+    cast(AsyncMock, getattr(runtime, "_append_manual_line")).assert_awaited()
+    cast(AsyncMock, getattr(runtime, "_emit_terminal_status")).assert_awaited_once()
 
 
 @pytest.mark.asyncio
