@@ -150,6 +150,61 @@ describe('useRuntimeSocket', () => {
     expect(onOpenError).toHaveBeenCalled()
   })
 
+  it('keeps the same socket across callback rerenders and uses latest handlers', () => {
+    const firstOnEvent = vi.fn<(event: RuntimeSocketEvent) => void>()
+    const secondOnEvent = vi.fn<(event: RuntimeSocketEvent) => void>()
+    const firstOnErrorMessage = vi.fn()
+    const secondOnErrorMessage = vi.fn()
+
+    const { rerender } = renderHook(
+      ({
+        onEvent,
+        onErrorMessage,
+      }: {
+        onEvent: (event: RuntimeSocketEvent) => void
+        onErrorMessage: (message: string) => void
+      }) =>
+        useRuntimeSocket({
+          onEvent,
+          onErrorMessage,
+        }),
+      {
+        initialProps: {
+          onEvent: firstOnEvent,
+          onErrorMessage: firstOnErrorMessage,
+        },
+      },
+    )
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    const socket = MockWebSocket.instances[0]
+
+    rerender({
+      onEvent: secondOnEvent,
+      onErrorMessage: secondOnErrorMessage,
+    })
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+
+    act(() => {
+      socket?.onmessage?.({
+        data: JSON.stringify({
+          type: 'terminal_closed',
+          data: { terminal_id: 'terminal_2' },
+        }),
+      })
+      socket?.onerror?.()
+    })
+
+    expect(firstOnEvent).not.toHaveBeenCalled()
+    expect(secondOnEvent).toHaveBeenCalledWith({
+      type: 'terminal_closed',
+      data: { terminal_id: 'terminal_2' },
+    })
+    expect(firstOnErrorMessage).not.toHaveBeenCalled()
+    expect(secondOnErrorMessage).toHaveBeenCalledWith('WebSocket disconnected from backend')
+  })
+
   it('ignores socket events after unmount (disposed state)', () => {
     const onEvent = vi.fn()
     const onErrorMessage = vi.fn()
