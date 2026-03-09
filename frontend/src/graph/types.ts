@@ -90,6 +90,7 @@ export interface SerializedGraph {
   nodes: GraphNode[]
   edges: GraphEdge[]
   viewport: { x: number; y: number; zoom: number }
+  globalVariables: Record<string, string>
 }
 
 // ── Presets ────────────────────────────────────────────────────────
