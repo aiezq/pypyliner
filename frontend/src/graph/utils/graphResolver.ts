@@ -1,7 +1,6 @@
 import {
   NODE_TYPES,
   EDGE_TYPES,
-  HANDLE_IDS,
   type GraphNode,
   type GraphEdge,
   type CommandNodeData,

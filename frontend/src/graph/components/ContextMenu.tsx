@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGraphStore } from '../store/graphStore'
 import { usePresetsStore, deriveCollections } from '../store/presetsStore'
 import type { ContextMenuState } from '../hooks/useContextMenu'
@@ -34,25 +34,38 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     const [saveCollection, setSaveCollection] = useState('')
     const [saveName, setSaveName] = useState('')
 
+    const resetMenuState = useCallback(() => {
+        setPresetsExpanded(false)
+        setSaveDialogOpen(false)
+        setSaveIndividualDialogOpen(false)
+        setSaveCollection('')
+        setSaveName('')
+    }, [])
+
+    const closeMenu = useCallback(() => {
+        resetMenuState()
+        onClose()
+    }, [onClose, resetMenuState])
+
     // Close on click outside
     useEffect(() => {
         if (!menu.isOpen) return
 
-        const handleClick = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                onClose()
-            }
-        }
-
-        const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                if (saveDialogOpen) {
-                    setSaveDialogOpen(false)
-                } else {
-                    onClose()
+            const handleClick = (e: MouseEvent) => {
+                if (ref.current && !ref.current.contains(e.target as Node)) {
+                    closeMenu()
                 }
             }
-        }
+
+            const handleEsc = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    if (saveDialogOpen) {
+                        setSaveDialogOpen(false)
+                    } else {
+                        closeMenu()
+                    }
+                }
+            }
 
         document.addEventListener('mousedown', handleClick)
         document.addEventListener('keydown', handleEsc)
@@ -60,18 +73,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             document.removeEventListener('mousedown', handleClick)
             document.removeEventListener('keydown', handleEsc)
         }
-    }, [menu.isOpen, onClose, saveDialogOpen])
-
-    // Reset sub-state on close
-    useEffect(() => {
-        if (!menu.isOpen) {
-            setPresetsExpanded(false)
-            setSaveDialogOpen(false)
-            setSaveIndividualDialogOpen(false)
-            setSaveCollection('')
-            setSaveName('')
-        }
-    }, [menu.isOpen])
+    }, [closeMenu, menu.isOpen, saveDialogOpen])
 
     if (!menu.isOpen) return null
 
@@ -135,7 +137,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 break
             }
         }
-        onClose()
+        closeMenu()
     }
 
     // ── Save node as preset ──
@@ -169,7 +171,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
 
         setSaveDialogOpen(false)
         setSaveIndividualDialogOpen(false)
-        onClose()
+        closeMenu()
     }
 
     // ── Save multiple nodes individually ──
@@ -188,7 +190,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             }
         }
         setSaveIndividualDialogOpen(false)
-        onClose()
+        closeMenu()
     }
 
     const hasPresets = collections.length > 0 || uncategorized.length > 0
@@ -293,7 +295,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                             className={`${styles.menuItem} ${styles['menuItem--danger']}`}
                             onClick={() => {
                                 deleteNode(targetNode.id)
-                                onClose()
+                                closeMenu()
                             }}
                         >
                             <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
@@ -314,7 +316,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                     className={`${styles.menuItem} ${styles['menuItem--danger']}`}
                     onClick={() => {
                         deleteEdge(menu.edgeId!)
-                        onClose()
+                        closeMenu()
                     }}
                 >
                     <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
@@ -358,7 +360,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                                 className={`${styles.menuItem} ${styles['menuItem--danger']}`}
                                 onClick={() => {
                                     deleteNodes(menu.selectedNodeIds)
-                                    onClose()
+                                    closeMenu()
                                 }}
                             >
                                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
@@ -378,7 +380,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => { addCommandNode(pos); onClose() }}
+                onClick={() => { addCommandNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--command']}`}>⌘</span>
                 Command
@@ -387,7 +389,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => { addVariableNode(pos); onClose() }}
+                onClick={() => { addVariableNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--variable']}`}>x</span>
                 Variable
@@ -396,7 +398,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => { addTerminalNode(pos); onClose() }}
+                onClick={() => { addTerminalNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--terminal']}`}>▶</span>
                 Terminal
@@ -405,7 +407,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => { addSequenceNode(pos); onClose() }}
+                onClick={() => { addSequenceNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--sequence']}`}>⇶</span>
                 Sequence
