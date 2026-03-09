@@ -1,0 +1,28 @@
+[
+  {
+    "model_id": "gemma3",
+    "display_name": "Gemma 3",
+    "provider": "google",
+    "runtime": "ollama",
+    "install_ref": "gemma3",
+    "download_size_bytes": 3300000000,
+    "min_ram_gb": 8,
+    "recommended_ram_gb": 12,
+    "supports_json_mode": true,
+    "license": "Gemma license",
+    "status": "available"
+  },
+  {
+    "model_id": "gpt-oss-20b",
+    "display_name": "GPT OSS 20B",
+    "provider": "openai",
+    "runtime": "ollama",
+    "install_ref": "gpt-oss:20b",
+    "download_size_bytes": 13000000000,
+    "min_ram_gb": 16,
+    "recommended_ram_gb": 24,
+    "supports_json_mode": true,
+    "license": "Apache-2.0",
+    "status": "available"
+  }
+]

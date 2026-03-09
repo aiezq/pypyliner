@@ -4,12 +4,14 @@ interface HeaderBarProps {
   isSocketConnected: boolean
   terminalInstancesCount: number
   onCreateManualTerminal: () => void
+  onOpenLocalAi: () => void
 }
 
 function HeaderBar({
   isSocketConnected,
   terminalInstancesCount,
   onCreateManualTerminal,
+  onOpenLocalAi,
 }: HeaderBarProps) {
   return (
     <header className="hero">
@@ -31,6 +33,13 @@ function HeaderBar({
           </span>
         </div>
         <div className="hero__actions">
+          <button
+            type="button"
+            className="hero__actionButton hero__actionButton--settings"
+            onClick={onOpenLocalAi}
+          >
+            Local AI
+          </button>
           <button
             type="button"
             className="hero__actionButton hero__actionButton--newTerminal"

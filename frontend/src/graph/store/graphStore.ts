@@ -22,6 +22,7 @@ import {
   type SequenceNodeData,
   type SerializedGraph,
 } from '../types'
+import type { PipelineDraft } from '../../lib/schemas'
 import type { SessionStatus, SshConnectionVariable } from '../../types'
 import { parseVariables } from '../utils/variableParser'
 
@@ -65,6 +66,7 @@ interface GraphState {
   deleteNodes: (nodeIds: string[]) => void
   deleteEdge: (edgeId: string) => void
   addNodesAndEdges: (nodes: GraphNode[], edges: GraphEdge[]) => void
+  importPipelineDraft: (draft: PipelineDraft) => void
 
   // Serialization
   serialize: () => SerializedGraph
@@ -97,6 +99,46 @@ function inferEdgeType(connection: Connection): EdgeType | null {
 }
 
 type EdgeType = (typeof EDGE_TYPES)[keyof typeof EDGE_TYPES]
+
+function getImportAnchor(nodes: GraphNode[]): { x: number; y: number } {
+  if (nodes.length === 0) {
+    return { x: 80, y: 120 }
+  }
+
+  const maxX = nodes.reduce((value, node) => Math.max(value, node.position.x), 0)
+  const maxY = nodes.reduce((value, node) => Math.max(value, node.position.y), 0)
+  return { x: maxX + 180, y: maxY + 140 }
+}
+
+function parseSshConnectionHint(connectionHint: string | null): {
+  label: string
+  sshUsername: string
+  sshHost: string
+} {
+  const trimmed = connectionHint?.trim() ?? ''
+  if (!trimmed) {
+    return {
+      label: 'SSH Terminal',
+      sshUsername: '',
+      sshHost: '',
+    }
+  }
+
+  const match = /^([^@\s]+)@(.+)$/.exec(trimmed)
+  if (match) {
+    return {
+      label: `SSH ${trimmed}`,
+      sshUsername: match[1],
+      sshHost: match[2],
+    }
+  }
+
+  return {
+    label: `SSH ${trimmed}`,
+    sshUsername: '',
+    sshHost: trimmed,
+  }
+}
 
 // ── Store ──────────────────────────────────────────────────────────
 
@@ -364,6 +406,141 @@ export const useGraphStore = create<GraphState>()(
           nodes: [...state.nodes, ...newNodes],
           edges: [...state.edges, ...newEdges],
         }))
+      },
+
+      importPipelineDraft: (draft) => {
+        const currentNodes = get().nodes
+        const anchor = getImportAnchor(currentNodes)
+        const newNodes: GraphNode[] = []
+        const newEdges: GraphEdge[] = []
+        const commandNodeIds: string[] = []
+
+        const referencedVariables = new Set<string>()
+        for (const step of draft.steps) {
+          for (const variableName of step.uses_variables) {
+            if (variableName.trim()) {
+              referencedVariables.add(variableName.trim())
+            }
+          }
+          for (const variableName of parseVariables(step.command)) {
+            referencedVariables.add(variableName)
+          }
+        }
+
+        const variableOrder = Array.from(
+          new Set([
+            ...draft.variables.map((variable) => variable.name),
+            ...Array.from(referencedVariables),
+          ]),
+        )
+        const variableMap = new Map(draft.variables.map((variable) => [variable.name, variable]))
+        const variableNodeIds = new Map<string, string>()
+
+        variableOrder.forEach((variableName, index) => {
+          const variable = variableMap.get(variableName)
+          const nodeId = nextNodeId()
+          variableNodeIds.set(variableName, nodeId)
+          newNodes.push({
+            id: nodeId,
+            type: NODE_TYPES.VARIABLE,
+            position: {
+              x: anchor.x + index * 220,
+              y: anchor.y - 220,
+            },
+            data: {
+              label: variableName,
+              value: variable?.default_value ?? '',
+            },
+          })
+        })
+
+        draft.steps.forEach((step, index) => {
+          const nodeId = nextNodeId()
+          commandNodeIds.push(nodeId)
+          newNodes.push({
+            id: nodeId,
+            type: NODE_TYPES.COMMAND,
+            position: {
+              x: anchor.x + index * 300,
+              y: anchor.y,
+            },
+            data: {
+              label: step.label,
+              command: step.command,
+              description: step.description,
+              variableNames: parseVariables(step.command),
+            },
+          })
+        })
+
+        const terminalNodeId = nextNodeId()
+        if (draft.target_terminal.type === 'ssh') {
+          const connectionDetails = parseSshConnectionHint(draft.target_terminal.connection_hint)
+          newNodes.push({
+            id: terminalNodeId,
+            type: NODE_TYPES.SSH_TERMINAL,
+            position: {
+              x: anchor.x + Math.max(draft.steps.length - 1, 0) * 300 + 320,
+              y: anchor.y,
+            },
+            data: {
+              label: connectionDetails.label,
+              terminalId: null,
+              connectionId: null,
+              sshUsername: connectionDetails.sshUsername,
+              sshHost: connectionDetails.sshHost,
+              sshPassword: '',
+            },
+          })
+        } else {
+          newNodes.push({
+            id: terminalNodeId,
+            type: NODE_TYPES.TERMINAL,
+            position: {
+              x: anchor.x + Math.max(draft.steps.length - 1, 0) * 300 + 320,
+              y: anchor.y,
+            },
+            data: {
+              label: draft.flow_name || 'Generated Terminal',
+              terminalId: null,
+            },
+          })
+        }
+
+        commandNodeIds.forEach((nodeId, index) => {
+          const nextTargetId = commandNodeIds[index + 1] ?? terminalNodeId
+          newEdges.push({
+            id: nextEdgeId(),
+            source: nodeId,
+            target: nextTargetId,
+            sourceHandle: HANDLE_IDS.CHAIN_OUT,
+            targetHandle: HANDLE_IDS.CHAIN_IN,
+            type: EDGE_TYPES.CHAIN,
+          } as GraphEdge)
+        })
+
+        draft.steps.forEach((step, index) => {
+          const commandNodeId = commandNodeIds[index]
+          const variableNames = Array.from(
+            new Set([...step.uses_variables, ...parseVariables(step.command)]),
+          )
+          variableNames.forEach((variableName) => {
+            const variableNodeId = variableNodeIds.get(variableName)
+            if (!variableNodeId) {
+              return
+            }
+            newEdges.push({
+              id: nextEdgeId(),
+              source: variableNodeId,
+              target: commandNodeId,
+              sourceHandle: HANDLE_IDS.VARIABLE_OUT,
+              targetHandle: HANDLE_IDS.variableIn(variableName),
+              type: EDGE_TYPES.VARIABLE,
+            } as GraphEdge)
+          })
+        })
+
+        get().addNodesAndEdges(newNodes, newEdges)
       },
 
       serialize: () => {
