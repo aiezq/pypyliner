@@ -296,8 +296,8 @@ export const useGraphStore = create<GraphState>()(
       },
 
       serialize: () => {
-        const { nodes, edges, viewport } = get()
-        return { nodes, edges, viewport }
+        const { nodes, edges, viewport, globalVariables } = get()
+        return { nodes, edges, viewport, globalVariables }
       },
 
       deserialize: (graph) => {
@@ -312,12 +312,18 @@ export const useGraphStore = create<GraphState>()(
           nodes: graph.nodes,
           edges: graph.edges,
           viewport: graph.viewport,
+          globalVariables: graph.globalVariables,
         })
       },
 
       clear: () => {
         nodeIdCounter = 0
-        set({ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } })
+        set({
+          nodes: [],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+          globalVariables: {},
+        })
       },
     }),
     {
@@ -326,6 +332,7 @@ export const useGraphStore = create<GraphState>()(
         nodes: state.nodes,
         edges: state.edges,
         viewport: state.viewport,
+        globalVariables: state.globalVariables,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
