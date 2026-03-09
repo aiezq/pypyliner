@@ -4,6 +4,7 @@ import LocalAiPanel from '../../../src/features/ai/LocalAiPanel'
 import { useGraphStore } from '../../../src/graph/store/graphStore'
 
 const apiMock = vi.hoisted(() => ({
+  analyzeDocumentation: vi.fn(),
   cancelAiModelInstall: vi.fn(),
   fetchAiModels: vi.fn(),
   fetchAiModelStatus: vi.fn(),
@@ -77,6 +78,29 @@ describe('LocalAiPanel', () => {
       runtime_available: true,
       model: readyModel,
     })
+    apiMock.analyzeDocumentation.mockResolvedValue({
+      questions: [
+        {
+          id: 'region',
+          question: 'Which region is used?',
+          description: 'Choose the region branch from the SOP.',
+          answer_type: 'choice',
+          choices: ['Moscow', 'Belgrade'],
+          required: true,
+        },
+        {
+          id: 'set_number',
+          question: 'Which item set number is used?',
+          description: 'Provide the exact set number for dfs-items-path.',
+          answer_type: 'text',
+          choices: [],
+          required: true,
+        },
+      ],
+      warnings: ['Documentation contains multiple region branches.'],
+      install_state: 'installed',
+      model_state: 'ready',
+    })
     apiMock.generatePipelineDraft.mockResolvedValue({
       draft: {
         flow_name: 'Deploy flow',
@@ -130,7 +154,7 @@ describe('LocalAiPanel', () => {
     })
   })
 
-  it('generates preview and imports draft into graph store', async () => {
+  it('analyzes documentation, collects clarification answers, and imports draft into graph store', async () => {
     const onImportComplete = vi.fn()
     render(<LocalAiPanel onImportComplete={onImportComplete} />)
 
@@ -138,9 +162,29 @@ describe('LocalAiPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate from docs' }))
 
     fireEvent.change(screen.getByPlaceholderText('Paste operator documentation here.'), {
-      target: { value: 'Use ping to verify the host before deployment.' },
+      target: { value: 'Use Moscow or Belgrade branch and choose a set number before running the collect command.' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Generate draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze docs' }))
+
+    await screen.findByText('Answer missing operator choices first')
+    fireEvent.change(screen.getByDisplayValue('Moscow'), {
+      target: { value: 'Belgrade' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('Type operator answer'), {
+      target: { value: '5' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate final draft' }))
+
+    await waitFor(() => {
+      expect(apiMock.generatePipelineDraft).toHaveBeenCalledWith(
+        'gemma3',
+        expect.stringContaining('Use Moscow or Belgrade branch'),
+        [
+          { question_id: 'region', answer: 'Belgrade' },
+          { question_id: 'set_number', answer: '5' },
+        ],
+      )
+    })
 
     await screen.findByText('Deploy flow')
     fireEvent.click(screen.getByRole('button', { name: 'Import to graph' }))

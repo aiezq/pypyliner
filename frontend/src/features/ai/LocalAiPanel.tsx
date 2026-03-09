@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useGraphStore } from '../../graph'
-import type { AIModel, GeneratePipelineDraftResponse } from '../../lib/schemas'
+import type {
+  AIModel,
+  AnalyzeDocumentationResponse,
+  DocumentationClarificationQuestion,
+  GeneratePipelineDraftResponse,
+} from '../../lib/schemas'
 import {
+  analyzeDocumentation,
   cancelAiModelInstall,
   fetchAiModelStatus,
   fetchAiModels,
@@ -54,7 +60,10 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [documentationText, setDocumentationText] = useState('')
+  const [clarificationResponse, setClarificationResponse] = useState<AnalyzeDocumentationResponse | null>(null)
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({})
   const [draftResponse, setDraftResponse] = useState<GeneratePipelineDraftResponse | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
   useEffect(() => {
@@ -161,6 +170,34 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
     }
   }
 
+  async function handleAnalyze(): Promise<void> {
+    if (!selectedModelId) {
+      return
+    }
+    setIsAnalyzing(true)
+    setErrorMessage(null)
+    setDraftResponse(null)
+    try {
+      const response = await analyzeDocumentation(selectedModelId, documentationText)
+      setClarificationResponse(response)
+      setClarificationAnswers((current) => {
+        const next = { ...current }
+        for (const question of response.questions) {
+          if (next[question.id]) {
+            continue
+          }
+          next[question.id] = question.answer_type === 'choice' ? (question.choices[0] ?? '') : ''
+        }
+        return next
+      })
+    } catch (error) {
+      setClarificationResponse(null)
+      setErrorMessage(error instanceof Error ? error.message : 'Documentation analysis failed.')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   async function handleGenerate(): Promise<void> {
     if (!selectedModelId) {
       return
@@ -168,7 +205,14 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
     setIsGenerating(true)
     setErrorMessage(null)
     try {
-      const response = await generatePipelineDraft(selectedModelId, documentationText)
+      const response = await generatePipelineDraft(
+        selectedModelId,
+        documentationText,
+        clarificationQuestions.map((question) => ({
+          question_id: question.id,
+          answer: clarificationAnswers[question.id] ?? '',
+        })),
+      )
       setDraftResponse(response)
     } catch (error) {
       setDraftResponse(null)
@@ -178,11 +222,32 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
     }
   }
 
+  function resetDraftModalState(): void {
+    setClarificationResponse(null)
+    setClarificationAnswers({})
+    setDraftResponse(null)
+  }
+
+  function updateClarificationAnswer(question: DocumentationClarificationQuestion, value: string): void {
+    setClarificationAnswers((current) => ({
+      ...current,
+      [question.id]: value,
+    }))
+  }
+
   const selectedModel = models.find((model) => model.model_id === selectedModelId) ?? null
+  const clarificationQuestions = clarificationResponse?.questions ?? []
+  const clarificationWarnings = clarificationResponse?.warnings ?? []
+  const hasRequiredClarificationAnswers = clarificationQuestions.every((question) => {
+    if (!question.required) {
+      return true
+    }
+    return Boolean(clarificationAnswers[question.id]?.trim())
+  })
   const riskFlags = draftResponse ? detectDraftRiskFlags(draftResponse.draft) : []
   const previewWarnings = draftResponse
-    ? Array.from(new Set([...draftResponse.warnings, ...draftResponse.draft.warnings]))
-    : []
+    ? Array.from(new Set([...clarificationWarnings, ...draftResponse.warnings, ...draftResponse.draft.warnings]))
+    : clarificationWarnings
 
   return (
     <section className={styles.panel}>
@@ -191,7 +256,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
           <p className={styles.kicker}>Local AI</p>
           <h2>Local pipeline draft generator</h2>
           <p className={styles.subtitle}>
-            Install a local model, paste operator documentation, review the draft, then import it into the graph.
+            Install a local model, paste operator documentation, answer clarification questions, review the draft, then import it into the graph.
           </p>
         </div>
         <div className={styles.runtimeCard}>
@@ -346,7 +411,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
                   disabled={!canGenerate}
                   onClick={() => {
                     setSelectedModelId(model.model_id)
-                    setDraftResponse(null)
+                    resetDraftModalState()
                     setIsModalOpen(true)
                   }}
                 >
@@ -365,7 +430,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
               <div>
                 <h2>Generate draft with {selectedModel.display_name}</h2>
                 <p className="modalHint">
-                  Model must stay in `ready` state. Import stays manual and does not execute commands.
+                  The model first extracts clarification questions, then generates the final draft from your answers.
                 </p>
               </div>
               <button
@@ -373,7 +438,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
                 className="buttonGhost"
                 onClick={() => {
                   setIsModalOpen(false)
-                  setDraftResponse(null)
+                  resetDraftModalState()
                 }}
               >
                 Close
@@ -394,22 +459,88 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
               <button
                 type="button"
                 className={styles.generateButton}
-                disabled={isGenerating || selectedModel.model_state !== 'ready' || !documentationText.trim()}
-                onClick={() => void handleGenerate()}
+                disabled={isAnalyzing || selectedModel.model_state !== 'ready' || !documentationText.trim()}
+                onClick={() => void handleAnalyze()}
               >
-                {isGenerating ? 'Generating...' : 'Generate draft'}
+                {isAnalyzing ? 'Analyzing...' : 'Analyze docs'}
               </button>
               <button
                 type="button"
                 className="buttonGhost"
                 onClick={() => {
-                  setDraftResponse(null)
+                  resetDraftModalState()
                   setDocumentationText('')
                 }}
               >
                 Reset
               </button>
             </div>
+
+            {clarificationResponse ? (
+              <div className={styles.preview}>
+                <div className={styles.previewHeader}>
+                  <div>
+                    <p className={styles.previewKicker}>Clarifications</p>
+                    <h3>Answer missing operator choices first</h3>
+                    <p>
+                      The model extracted decision points like region, mode, item set, app IP, or operator login before building commands.
+                    </p>
+                  </div>
+                </div>
+
+                {clarificationQuestions.length === 0 ? (
+                  <div className={styles.emptyState}>No clarification questions were required for this documentation.</div>
+                ) : (
+                  <div className={styles.questionsList}>
+                    {clarificationQuestions.map((question) => (
+                      <label key={question.id} className={styles.questionCard}>
+                        <span className={styles.questionTitle}>
+                          {question.question}
+                          {question.required ? ' *' : ''}
+                        </span>
+                        <span className={styles.questionDescription}>{question.description}</span>
+                        {question.answer_type === 'choice' ? (
+                          <select
+                            className={styles.questionInput}
+                            value={clarificationAnswers[question.id] ?? ''}
+                            onChange={(event) => updateClarificationAnswer(question, event.target.value)}
+                          >
+                            {question.choices.map((choice) => (
+                              <option key={choice} value={choice}>
+                                {choice}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className={styles.questionInput}
+                            value={clarificationAnswers[question.id] ?? ''}
+                            onChange={(event) => updateClarificationAnswer(question, event.target.value)}
+                            placeholder="Type operator answer"
+                          />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className={styles.modalActions}>
+                  <button
+                    type="button"
+                    className={styles.generateButton}
+                    disabled={
+                      isGenerating ||
+                      selectedModel.model_state !== 'ready' ||
+                      !documentationText.trim() ||
+                      !hasRequiredClarificationAnswers
+                    }
+                    onClick={() => void handleGenerate()}
+                  >
+                    {isGenerating ? 'Generating...' : 'Generate final draft'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {draftResponse ? (
               <div className={styles.preview}>
@@ -493,7 +624,7 @@ export default function LocalAiPanel({ onImportComplete }: LocalAiPanelProps) {
                     onClick={() => {
                       importPipelineDraft(draftResponse.draft)
                       setIsModalOpen(false)
-                      setDraftResponse(null)
+                      resetDraftModalState()
                       onImportComplete()
                     }}
                   >

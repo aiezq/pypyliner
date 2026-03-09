@@ -160,4 +160,76 @@ describe('useGraphStore serialization', () => {
     expect(state.edges.filter((edge) => edge.type === 'chain')).toHaveLength(2)
     expect(state.edges.filter((edge) => edge.type === 'variable')).toHaveLength(2)
   })
+
+  it('imports multi-terminal pipeline draft with a sequence node', () => {
+    resetGraphStore()
+
+    useGraphStore.getState().importPipelineDraft({
+      flow_name: 'Unitree G1 Collection - General',
+      summary: 'Run teleop in one terminal and collect in another.',
+      assumptions: [],
+      warnings: [],
+      variables: [],
+      steps: [
+        {
+          id: 'step_1',
+          label: 'Obtain Code',
+          command: 'download_physical_ai_code.sh --fetch stable',
+          description: 'Fetch the code.',
+          uses_variables: [],
+          template_id: null,
+          terminal_type: 'local',
+          terminal_group: 'teleop_terminal',
+        },
+        {
+          id: 'step_2',
+          label: 'Start Teleop',
+          command: '$HOME/ruka/third_party/xr_teleoperate/teleop/run_with_robo_app.sh --hands=right --ee=dex3',
+          description: 'Run teleop.',
+          uses_variables: [],
+          template_id: null,
+          terminal_type: 'local',
+          terminal_group: 'teleop_terminal',
+        },
+        {
+          id: 'step_3',
+          label: 'Start Docker',
+          command: 'cd ~/ruka && ./ruka docker -i dev2',
+          description: 'Start docker.',
+          uses_variables: [],
+          template_id: null,
+          terminal_type: 'local',
+          terminal_group: 'collect_terminal',
+        },
+        {
+          id: 'step_4',
+          label: 'Collect Snacks',
+          command: './ruka skill collect --track pretraining --app {app_ip}',
+          description: 'Run collect.',
+          uses_variables: ['app_ip'],
+          template_id: null,
+          terminal_type: 'local',
+          terminal_group: 'collect_terminal',
+        },
+      ],
+      target_terminal: {
+        type: 'local',
+        connection_hint: null,
+      },
+      confidence: 0.91,
+    })
+
+    const state = useGraphStore.getState()
+
+    expect(state.nodes.filter((node) => node.type === 'command')).toHaveLength(4)
+    expect(state.nodes.filter((node) => node.type === 'terminal')).toHaveLength(2)
+    expect(state.nodes.filter((node) => node.type === 'sequence')).toHaveLength(1)
+    expect(state.edges.filter((edge) => edge.type === 'chain')).toHaveLength(4)
+    expect(state.edges.filter((edge) => edge.type === 'sequence')).toHaveLength(2)
+
+    const terminalLabels = state.nodes
+      .filter((node) => node.type === 'terminal')
+      .map((node) => String(node.data.label))
+    expect(terminalLabels).toEqual(expect.arrayContaining(['Teleop Terminal', 'Collect Terminal']))
+  })
 })
