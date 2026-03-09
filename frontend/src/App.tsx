@@ -5,10 +5,11 @@ import { useHistoryFeature } from './features/history/useHistoryFeature'
 import { useWorkbenchFeature } from './features/workbench/useWorkbenchFeature'
 import type { SessionStatus } from './types'
 
-type AppView = 'graph' | 'history'
+type AppView = 'graph' | 'history' | 'ai'
 
 const HistoryPanel = lazy(() => import('./components/HistoryPanel'))
 const TerminalWindowsLayer = lazy(() => import('./components/TerminalWindowsLayer'))
+const LocalAiPanel = lazy(() => import('./features/ai/LocalAiPanel'))
 
 function App() {
   const [activeView, setActiveView] = useState<AppView>('graph')
@@ -38,6 +39,7 @@ function App() {
       <HeaderBar
         isSocketConnected={workbench.isSocketConnected}
         terminalInstancesCount={workbench.terminalInstancesCount}
+        onOpenLocalAi={() => setActiveView('ai')}
         onCreateManualTerminal={() => {
           void workbench.createManualTerminal()
         }}
@@ -66,17 +68,30 @@ function App() {
         >
           History
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'ai'}
+          className={`appTabButton${activeView === 'ai' ? ' appTabButton--active' : ''}`}
+          onClick={() => setActiveView('ai')}
+        >
+          Local AI
+        </button>
       </div>
 
       {activeView === 'graph' ? (
         <GraphEditor />
-      ) : (
+      ) : activeView === 'history' ? (
         <Suspense fallback={<p className="empty">Loading history...</p>}>
           <HistoryPanel
             terminalHistory={history.terminalHistory}
             isLoading={history.isLoading}
             errorMessage={history.errorMessage}
           />
+        </Suspense>
+      ) : (
+        <Suspense fallback={<p className="empty">Loading Local AI...</p>}>
+          <LocalAiPanel onImportComplete={() => setActiveView('graph')} />
         </Suspense>
       )}
 

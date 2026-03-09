@@ -9,6 +9,7 @@ def test_create_app_registers_routes_and_service_error_handler():
 
     paths = {path for route in app.routes if isinstance(path := getattr(route, "path", None), str)}
     assert "/health" in paths
+    assert "/api/ai/models" in paths
     assert "/api/state" in paths
     assert "/ws/events" in paths
 

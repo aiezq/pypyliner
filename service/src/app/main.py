@@ -8,6 +8,7 @@ from src.app.api.router import api_router
 from src.app.core.database import run_migrations
 from src.app.core.logging import configure_logging
 from src.app.deps import (
+    get_ai_model_manager,
     get_command_pack_manager,
     get_history_database,
     get_pipeline_flow_manager,
@@ -24,10 +25,12 @@ async def lifespan(_: FastAPI):
     command_packs = get_command_pack_manager()
     pipeline_flows = get_pipeline_flow_manager()
     history_db = get_history_database()
+    ai_models = get_ai_model_manager()
     history_db.ensure_ready()
     await runtime.ensure_dirs()
     await command_packs.ensure_ready()
     await pipeline_flows.ensure_ready()
+    await ai_models.ensure_ready()
     yield
 
 

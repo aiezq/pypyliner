@@ -108,4 +108,56 @@ describe('useGraphStore serialization', () => {
       },
     ])
   })
+
+  it('imports pipeline draft into executable graph nodes and edges', () => {
+    resetGraphStore()
+
+    useGraphStore.getState().importPipelineDraft({
+      flow_name: 'Deploy flow',
+      summary: 'Deploy app',
+      assumptions: [],
+      warnings: [],
+      variables: [
+        {
+          name: 'host',
+          description: 'Deployment target',
+          default_value: 'srv-01',
+          required: true,
+        },
+      ],
+      steps: [
+        {
+          id: 'step_1',
+          label: 'Check host',
+          command: 'ping -c 1 {host}',
+          description: 'Check connectivity',
+          uses_variables: ['host'],
+          template_id: null,
+          terminal_type: 'local',
+        },
+        {
+          id: 'step_2',
+          label: 'Run deploy',
+          command: 'deploy-tool --host {host}',
+          description: 'Deploy application',
+          uses_variables: ['host'],
+          template_id: null,
+          terminal_type: 'local',
+        },
+      ],
+      target_terminal: {
+        type: 'local',
+        connection_hint: null,
+      },
+      confidence: 0.74,
+    })
+
+    const state = useGraphStore.getState()
+
+    expect(state.nodes.filter((node) => node.type === 'variable')).toHaveLength(1)
+    expect(state.nodes.filter((node) => node.type === 'command')).toHaveLength(2)
+    expect(state.nodes.filter((node) => node.type === 'terminal')).toHaveLength(1)
+    expect(state.edges.filter((edge) => edge.type === 'chain')).toHaveLength(2)
+    expect(state.edges.filter((edge) => edge.type === 'variable')).toHaveLength(2)
+  })
 })
