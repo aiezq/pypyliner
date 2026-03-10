@@ -6,6 +6,8 @@ import os
 import pty
 import re
 import shlex
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -802,12 +804,14 @@ class RuntimeManager:
         argv: list[str],
         *,
         cwd: str | None = None,
+        env: dict[str, str] | None = None,
     ) -> tuple[asyncio.subprocess.Process, int]:
         master_fd, slave_fd = pty.openpty()
         try:
             process = await asyncio.create_subprocess_exec(
                 *argv,
                 cwd=cwd,
+                env=env,
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
@@ -845,6 +849,43 @@ class RuntimeManager:
             return terminal.ssh_command.strip()
         return "ssh"
 
+    @staticmethod
+    def _resolve_ssh_auth_sock() -> str | None:
+        candidate = os.environ.get("SSH_AUTH_SOCK")
+        if candidate and Path(candidate).exists():
+            return candidate
+
+        if sys.platform != "darwin":
+            return None
+
+        try:
+            result = subprocess.run(
+                ["launchctl", "getenv", "SSH_AUTH_SOCK"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+        candidate = result.stdout.strip()
+        if candidate and Path(candidate).exists():
+            return candidate
+        return None
+
+    @classmethod
+    def _build_terminal_env(cls) -> dict[str, str]:
+        env = dict(os.environ)
+        env.setdefault("TERM", "xterm-256color")
+        env.setdefault("HOME", str(Path.home()))
+
+        ssh_auth_sock = cls._resolve_ssh_auth_sock()
+        if ssh_auth_sock:
+            env["SSH_AUTH_SOCK"] = ssh_auth_sock
+
+        return env
+
     async def _start_manual_terminal_shell(self, terminal: ManualTerminalState) -> None:
         if self._is_process_running(terminal.current_process):
             return
@@ -860,6 +901,7 @@ class RuntimeManager:
         process, master_fd = await self._create_pty_process(
             argv,
             cwd=str(MANUAL_TERMINAL_CWD),
+            env=self._build_terminal_env(),
         )
 
         terminal.current_process = process
@@ -892,7 +934,8 @@ class RuntimeManager:
             return
 
         argv = self._build_ssh_argv(terminal)
-        process, master_fd = await self._create_pty_process(argv)
+        env = self._build_terminal_env()
+        process, master_fd = await self._create_pty_process(argv, env=env)
 
         terminal.current_process = process
         terminal.pty_master_fd = master_fd
@@ -911,6 +954,18 @@ class RuntimeManager:
             "meta",
             f"[start] ssh session connecting: {connection_target}",
         )
+        if env.get("SSH_AUTH_SOCK"):
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[auth] SSH agent detected",
+            )
+        else:
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[auth] SSH agent not detected; key-based auth may fail",
+            )
         await self._emit_terminal_status(terminal)
 
         self._create_background_task(

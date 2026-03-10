@@ -741,8 +741,10 @@ async def test_runtime_start_shell_and_additional_pipeline_branches(
         _argv: list[str],
         *,
         cwd: str | None = None,
+        env: dict[str, str] | None = None,
     ) -> tuple[FakeProcess, int]:
         assert cwd is not None
+        assert env is not None
         return process, 123
 
     monkeypatch.setattr(runtime, "_create_pty_process", fake_create_pty_process)
@@ -789,6 +791,22 @@ async def test_runtime_start_shell_and_additional_pipeline_branches(
     setattr(runtime, "_execute_command", AsyncMock(side_effect=execute_and_request_stop))
     await execute_pipeline(run_stop_after_command)
     assert run_stop_after_command.status == "stopped"
+
+
+def test_runtime_build_terminal_env_uses_resolved_ssh_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
+    monkeypatch.setattr(
+        RuntimeManager,
+        "_resolve_ssh_auth_sock",
+        staticmethod(lambda: "/tmp/operator-helper-agent.sock"),
+    )
+
+    env = RuntimeManager._build_terminal_env()
+
+    assert env["SSH_AUTH_SOCK"] == "/tmp/operator-helper-agent.sock"
+    assert env["TERM"] == "xterm-256color"
 
 
 @pytest.mark.asyncio
