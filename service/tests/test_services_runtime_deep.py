@@ -737,10 +737,15 @@ async def test_runtime_start_shell_and_additional_pipeline_branches(
         stderr=FakeStream([b""]),
     )
 
-    async def fake_create_subprocess_exec(*_args: object, **_kwargs: object) -> FakeProcess:
-        return process
+    async def fake_create_pty_process(
+        _argv: list[str],
+        *,
+        cwd: str | None = None,
+    ) -> tuple[FakeProcess, int]:
+        assert cwd is not None
+        return process, 123
 
-    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(runtime, "_create_pty_process", fake_create_pty_process)
     spawned: list[object] = []
 
     def fake_create_task(coro: Any) -> object:
@@ -757,7 +762,8 @@ async def test_runtime_start_shell_and_additional_pipeline_branches(
     await start_shell(terminal)
     assert terminal.status == "running"
     assert terminal.current_process is process
-    assert len(spawned) == 3
+    assert terminal.pty_master_fd == 123
+    assert len(spawned) == 2
 
     await start_shell(terminal)
 

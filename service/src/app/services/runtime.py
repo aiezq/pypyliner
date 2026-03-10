@@ -857,15 +857,13 @@ class RuntimeManager:
         if not argv:
             raise ServiceError(status_code=500, detail="Invalid default terminal command")
 
-        process = await asyncio.create_subprocess_exec(
-            *argv,
+        process, master_fd = await self._create_pty_process(
+            argv,
             cwd=str(MANUAL_TERMINAL_CWD),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
         )
 
         terminal.current_process = process
+        terminal.pty_master_fd = master_fd
         terminal.stop_requested = False
         terminal.status = "running"
         terminal.exit_code = None
@@ -878,12 +876,9 @@ class RuntimeManager:
         await self._emit_terminal_status(terminal)
 
         self._create_background_task(
-            self._stream_manual_terminal_output(terminal, process.stdout, "out"),
-            label=f"manual_terminal_stream_out:{terminal.id}",
-        )
-        self._create_background_task(
-            self._stream_manual_terminal_output(terminal, process.stderr, "err"),
-            label=f"manual_terminal_stream_err:{terminal.id}",
+            self._stream_manual_terminal_pty_output(terminal, master_fd),
+            label=f"manual_terminal_stream_pty:{terminal.id}",
+            on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
         )
         self._create_background_task(
             self._watch_manual_terminal_process(terminal, process),
@@ -989,7 +984,14 @@ class RuntimeManager:
         pending = ""
         try:
             while True:
-                chunk = await asyncio.to_thread(os.read, master_fd, 4096)
+                try:
+                    chunk = await asyncio.to_thread(os.read, master_fd, 4096)
+                except OSError as error:
+                    if error.errno in {5, 9}:
+                        if not self._is_process_running(terminal.current_process):
+                            return
+                        break
+                    raise
                 if not chunk:
                     break
 
