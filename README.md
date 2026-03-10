@@ -141,13 +141,13 @@ pnpm install
 pnpm dev
 ```
 
-Документация API: `http://localhost:8000/docs`
+Документация API: `http://127.0.0.1:8000/docs`
 
 ## Конфигурация
 
 ### Переменные окружения фронтенда
 
-- `VITE_API_BASE_URL` (по умолчанию вычисляется из host/port бэкенда).
+- `VITE_API_BASE_URL` (по умолчанию `http://127.0.0.1:8000`).
 
 ### Переменные окружения бэкенда (префикс `OPERATOR_`)
 
@@ -169,6 +169,12 @@ pnpm dev
 
 ## Хранение данных и логи
 
+При запуске из исходников сервис по умолчанию использует директории внутри `service/`.
+Если сервис запущен из read-only bundle, runtime-данные автоматически переезжают в пользовательскую writable-директорию:
+- macOS: `~/Library/Application Support/Operator Helper/`
+- Linux/XDG: `$XDG_DATA_HOME/operator-helper/` или `~/.local/share/operator-helper/`
+
+Для запуска из исходников:
 - Логи запусков pipeline: `service/logs/runs/run_<id>.log`
 - Логи терминалов: `service/logs/terminals/terminal_<id>.log`
 - БД истории: `service/data/history.sqlite3`
@@ -179,7 +185,7 @@ pnpm dev
 
 ## Обзор API
 
-Базовый URL: `http://localhost:8000`
+Базовый URL: `http://127.0.0.1:8000`
 
 - Состояние и история:
   - `GET /health`

@@ -13,6 +13,10 @@ _DEFAULT_SERVICE_DIR = Path(__file__).resolve().parents[3]
 _APP_DIR_NAME = "Operator Helper"
 
 
+def _is_writable_directory(path: Path) -> bool:
+    return os.access(path, os.W_OK)
+
+
 def _default_support_root() -> Path:
     system = platform.system().lower()
     home = Path.home()
@@ -27,12 +31,18 @@ def _default_support_root() -> Path:
     return home / ".local" / "share" / "operator-helper"
 
 
+def _default_runtime_root() -> Path:
+    if _is_writable_directory(_DEFAULT_SERVICE_DIR):
+        return _DEFAULT_SERVICE_DIR
+    return _default_support_root()
+
+
 def _default_logs_dir() -> Path:
-    return _default_support_root() / "logs"
+    return _default_runtime_root() / "logs"
 
 
 def _default_data_dir() -> Path:
-    return _default_support_root() / "data"
+    return _default_runtime_root() / "data"
 
 
 def _default_db_path() -> Path:
@@ -40,11 +50,11 @@ def _default_db_path() -> Path:
 
 
 def _default_command_packs_dir() -> Path:
-    return _default_support_root() / "command_packs"
+    return _default_runtime_root() / "command_packs"
 
 
 def _default_pipeline_flows_dir() -> Path:
-    return _default_support_root() / "pipeline_flows"
+    return _default_runtime_root() / "pipeline_flows"
 
 
 def _default_ai_data_dir() -> Path:

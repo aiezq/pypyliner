@@ -32,9 +32,24 @@ def test_get_settings_is_cached():
     assert first is second
 
 
+def test_app_settings_defaults_to_service_dir_when_writable(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr("src.app.core.settings._DEFAULT_SERVICE_DIR", tmp_path)
+    monkeypatch.setattr("src.app.core.settings._is_writable_directory", lambda path: True)
+
+    settings = AppSettings()
+
+    assert settings.logs_dir == tmp_path / "logs"
+    assert settings.data_dir == tmp_path / "data"
+    assert settings.db_path == tmp_path / "data" / "history.sqlite3"
+    assert settings.command_packs_dir == tmp_path / "command_packs"
+    assert settings.pipeline_flows_dir == tmp_path / "pipeline_flows"
+    assert settings.ai_data_dir == tmp_path / "data" / "ai"
+
+
 def test_app_settings_defaults_to_user_writable_support_dir(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr("src.app.core.settings._is_writable_directory", lambda path: False)
 
     settings = AppSettings()
 
