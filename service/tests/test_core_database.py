@@ -11,13 +11,16 @@ from src.app.core import database as db
 def test_init_db_imports_models_and_creates_metadata(monkeypatch: pytest.MonkeyPatch):
     import_module = MagicMock()
     create_all = MagicMock()
+    ensure_sqlite_parent_dir = MagicMock()
 
     monkeypatch.setattr(db.importlib, "import_module", import_module)
     monkeypatch.setattr(db.SQLModel.metadata, "create_all", create_all)
+    monkeypatch.setattr(db, "_ensure_sqlite_parent_dir", ensure_sqlite_parent_dir)
 
     db.init_db()
 
     import_module.assert_called_once_with("src.app.models")
+    ensure_sqlite_parent_dir.assert_called_once_with()
     create_all.assert_called_once_with(db.engine)
 
 
@@ -54,12 +57,27 @@ def test_run_migrations_executes_upgrade_when_ini_present(
             self.options[key] = value
 
     monkeypatch.setattr("alembic.config.Config", FakeConfig)
+    ensure_sqlite_parent_dir = MagicMock()
+    monkeypatch.setattr(db, "_ensure_sqlite_parent_dir", ensure_sqlite_parent_dir)
 
     db.run_migrations()
 
+    ensure_sqlite_parent_dir.assert_called_once_with()
     upgrade.assert_called_once()
     config_arg, revision_arg = upgrade.call_args.args
     assert isinstance(config_arg, FakeConfig)
     assert config_arg.path == str(tmp_path / "alembic.ini")
     assert config_arg.options["sqlalchemy.url"] == "sqlite:///tmp/test.sqlite3"
     assert revision_arg == "head"
+
+
+def test_ensure_sqlite_parent_dir_creates_database_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    database_path = tmp_path / "nested" / "history.sqlite3"
+    monkeypatch.setattr(db.settings, "database_url", f"sqlite:///{database_path}")
+
+    db._ensure_sqlite_parent_dir()
+
+    assert database_path.parent.exists()

@@ -30,3 +30,21 @@ def test_get_settings_is_cached():
     first = get_settings()
     second = get_settings()
     assert first is second
+
+
+def test_app_settings_defaults_to_user_writable_support_dir(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    settings = AppSettings()
+
+    support_root = tmp_path / "Library" / "Application Support" / "Operator Helper"
+    assert settings.logs_dir == support_root / "logs"
+    assert settings.data_dir == support_root / "data"
+    assert settings.runs_logs_dir == support_root / "logs" / "runs"
+    assert settings.terminal_logs_dir == support_root / "logs" / "terminals"
+    assert settings.db_path == support_root / "data" / "history.sqlite3"
+    assert settings.database_url == f"sqlite:///{support_root / 'data' / 'history.sqlite3'}"
+    assert settings.command_packs_dir == support_root / "command_packs"
+    assert settings.pipeline_flows_dir == support_root / "pipeline_flows"
+    assert settings.ai_data_dir == support_root / "data" / "ai"

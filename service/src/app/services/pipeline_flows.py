@@ -3,12 +3,13 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from typing import Any, TypeAlias, cast
 
 from sqlalchemy import delete, desc
 from sqlmodel import Session, select
 
-from src.app.core.database import engine
+from src.app.core import database as database_module
 from src.app.core.settings import get_settings
 from src.app.models.db import PipelineFlowRecord, PipelineFlowStepRecord
 from src.app.schemas.pipeline_flow import (
@@ -35,10 +36,24 @@ def _now_iso() -> str:
 
 class PipelineFlowManager:
     def __init__(self) -> None:
-        self._legacy_flows_dir = get_settings().pipeline_flows_dir
+        settings = get_settings()
+        self._bundled_flows_dir = Path(settings.service_dir) / "pipeline_flows"
+        self._legacy_flows_dir = settings.pipeline_flows_dir
+
+    @staticmethod
+    def _collect_bootstrap_dirs(*directories: Path) -> list[Path]:
+        unique_dirs: list[Path] = []
+        seen: set[Path] = set()
+        for directory in directories:
+            resolved = directory.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            unique_dirs.append(directory)
+        return unique_dirs
 
     async def ensure_ready(self) -> None:
-        with Session(engine) as session:
+        with Session(database_module.engine) as session:
             existing = session.exec(select(PipelineFlowRecord).limit(1)).first()
             
             if existing is not None:
@@ -47,58 +62,58 @@ class PipelineFlowManager:
             session.commit()
 
     def _bootstrap_from_legacy_files(self, session: Session) -> None:
-        legacy_dir = self._legacy_flows_dir
-        if not legacy_dir.exists():
-            return
-
-        for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
-            try:
-                raw_data: object = json.loads(file_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if not isinstance(raw_data, dict):
-                continue
-            raw_flow = cast(dict[str, Any], raw_data)
-
-            try:
-                parsed = self._validate_flow(raw_flow, file_path.stem)
-            except ServiceError:
+        for legacy_dir in self._collect_bootstrap_dirs(self._bundled_flows_dir, self._legacy_flows_dir):
+            if not legacy_dir.exists():
                 continue
 
-            flow = session.get(PipelineFlowRecord, parsed.flow_id)
+            for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
+                try:
+                    raw_data: object = json.loads(file_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not isinstance(raw_data, dict):
+                    continue
+                raw_flow = cast(dict[str, Any], raw_data)
 
-            if flow is None:
-                flow = PipelineFlowRecord(
-                    flow_id=parsed.flow_id,
-                    flow_name=parsed.flow_name,
-                    created_at=parsed.created_at,
-                    updated_at=parsed.updated_at,
-                )
-                session.add(flow)
-            else:
-                flow.flow_name = parsed.flow_name
-                flow.created_at = parsed.created_at
-                flow.updated_at = parsed.updated_at
+                try:
+                    parsed = self._validate_flow(raw_flow, file_path.stem)
+                except ServiceError:
+                    continue
 
-            existing_steps = session.exec(
-                select(PipelineFlowStepRecord).where(
-                    STEP_FLOW_ID_COLUMN == parsed.flow_id
-                )
-            ).all()
-            step_records = cast(list[PipelineFlowStepRecord], existing_steps)
-            for step in step_records:
-                session.delete(step)
+                flow = session.get(PipelineFlowRecord, parsed.flow_id)
 
-            for position, step in enumerate(parsed.steps, start=1):
-                session.add(
-                    PipelineFlowStepRecord(
+                if flow is None:
+                    flow = PipelineFlowRecord(
                         flow_id=parsed.flow_id,
-                        position=position,
-                        step_type=step.type,
-                        label=step.label,
-                        command=step.command,
+                        flow_name=parsed.flow_name,
+                        created_at=parsed.created_at,
+                        updated_at=parsed.updated_at,
                     )
-                )
+                    session.add(flow)
+                else:
+                    flow.flow_name = parsed.flow_name
+                    flow.created_at = parsed.created_at
+                    flow.updated_at = parsed.updated_at
+
+                existing_steps = session.exec(
+                    select(PipelineFlowStepRecord).where(
+                        STEP_FLOW_ID_COLUMN == parsed.flow_id
+                    )
+                ).all()
+                step_records = cast(list[PipelineFlowStepRecord], existing_steps)
+                for step in step_records:
+                    session.delete(step)
+
+                for position, step in enumerate(parsed.steps, start=1):
+                    session.add(
+                        PipelineFlowStepRecord(
+                            flow_id=parsed.flow_id,
+                            position=position,
+                            step_type=step.type,
+                            label=step.label,
+                            command=step.command,
+                        )
+                    )
 
     @staticmethod
     def _slugify(value: str, fallback: str) -> str:
@@ -176,7 +191,7 @@ class PipelineFlowManager:
         flows: list[PipelineFlowData] = []
         errors: list[str] = []
 
-        with Session(engine) as session:
+        with Session(database_module.engine) as session:
             flow_rows = session.exec(
                 select(PipelineFlowRecord).order_by(desc(FLOW_UPDATED_AT_COLUMN))
             ).all()
@@ -197,7 +212,7 @@ class PipelineFlowManager:
         base_flow_id = self._slugify(payload.flow_name, "flow")
         timestamp = _now_iso()
 
-        with Session(engine) as session:
+        with Session(database_module.engine) as session:
             next_flow_id = base_flow_id
             suffix = 2
             while session.get(PipelineFlowRecord, next_flow_id) is not None:
@@ -250,7 +265,7 @@ class PipelineFlowManager:
     ) -> PipelineFlowData:
         normalized_flow_id = self._normalized_flow_id(flow_id)
 
-        with Session(engine) as session:
+        with Session(database_module.engine) as session:
             flow = session.get(PipelineFlowRecord, normalized_flow_id)
             if flow is None:
                 raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
@@ -301,7 +316,7 @@ class PipelineFlowManager:
     def delete_flow(self, flow_id: str) -> PipelineFlowDeleteData:
         normalized_flow_id = self._normalized_flow_id(flow_id)
 
-        with Session(engine) as session:
+        with Session(database_module.engine) as session:
             flow = session.get(PipelineFlowRecord, normalized_flow_id)
             
             if flow is None:

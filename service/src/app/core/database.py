@@ -5,6 +5,7 @@ import importlib
 from pathlib import Path
 from typing import Iterator
 
+from sqlalchemy.engine import make_url
 from sqlmodel import Session, SQLModel, create_engine
 
 from src.app.core.settings import get_settings
@@ -24,9 +25,26 @@ def session_scope() -> Iterator[Session]:
         yield session
 
 
+def _ensure_sqlite_parent_dir() -> None:
+    try:
+        url = make_url(settings.database_url)
+    except Exception:
+        return
+
+    if not url.drivername.startswith("sqlite"):
+        return
+
+    database = url.database
+    if not database or database == ":memory:":
+        return
+
+    Path(database).expanduser().parent.mkdir(parents=True, exist_ok=True)
+
+
 def init_db() -> None:
     # Load models so SQLModel metadata is populated before create_all.
     importlib.import_module("src.app.models")
+    _ensure_sqlite_parent_dir()
 
     SQLModel.metadata.create_all(engine)
 
@@ -47,4 +65,5 @@ def run_migrations() -> None:
 
     config = Config(str(ini_path))
     config.set_main_option("sqlalchemy.url", settings.database_url)
+    _ensure_sqlite_parent_dir()
     command.upgrade(config, "head")

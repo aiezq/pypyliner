@@ -41,7 +41,21 @@ def _now_iso() -> str:
 
 class CommandPackManager:
     def __init__(self) -> None:
-        self._legacy_packs_dir = get_settings().command_packs_dir
+        settings = get_settings()
+        self._bundled_packs_dir = Path(settings.service_dir) / "command_packs"
+        self._legacy_packs_dir = settings.command_packs_dir
+
+    @staticmethod
+    def _collect_bootstrap_dirs(*directories: Path) -> list[Path]:
+        unique_dirs: list[Path] = []
+        seen: set[Path] = set()
+        for directory in directories:
+            resolved = directory.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            unique_dirs.append(directory)
+        return unique_dirs
 
     async def ensure_ready(self) -> None:
         with session_scope() as session:
@@ -81,60 +95,60 @@ class CommandPackManager:
             )
 
     def _bootstrap_from_legacy_files(self, session: Session) -> None:
-        legacy_dir = self._legacy_packs_dir
-        if not legacy_dir.exists():
-            return
-
         imported = False
-        for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
-            try:
-                raw_pack = json.loads(file_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if not isinstance(raw_pack, dict):
+        for legacy_dir in self._collect_bootstrap_dirs(self._bundled_packs_dir, self._legacy_packs_dir):
+            if not legacy_dir.exists():
                 continue
 
-            try:
-                parsed = self._validate_pack(cast(JsonObject, raw_pack), file_path.name)
-            except ServiceError:
-                continue
+            for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
+                try:
+                    raw_pack = json.loads(file_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if not isinstance(raw_pack, dict):
+                    continue
 
-            imported = True
-            pack = session.get(CommandPackRecord, parsed.pack_id)
-            if pack is None:
-                pack = CommandPackRecord(
-                    pack_id=parsed.pack_id,
-                    pack_name=parsed.pack_name,
-                    description=parsed.description,
-                    source_name=file_path.name,
-                    is_core=parsed.pack_id == "core",
-                    updated_at=_now_iso(),
-                )
-                session.add(pack)
-            else:
-                pack.pack_name = parsed.pack_name
-                pack.description = parsed.description
-                pack.source_name = file_path.name
-                pack.is_core = pack.pack_id == "core"
-                pack.updated_at = _now_iso()
+                try:
+                    parsed = self._validate_pack(cast(JsonObject, raw_pack), file_path.name)
+                except ServiceError:
+                    continue
 
-            existing_templates = session.exec(
-                select(CommandTemplateRecord).where(CommandTemplateRecord.pack_id == parsed.pack_id)
-            ).all()
-            for item in existing_templates:
-                session.delete(item)
-
-            for index, item in enumerate(parsed.commands, start=1):
-                session.add(
-                    CommandTemplateRecord(
+                imported = True
+                pack = session.get(CommandPackRecord, parsed.pack_id)
+                if pack is None:
+                    pack = CommandPackRecord(
                         pack_id=parsed.pack_id,
-                        template_id=item.id or f"cmd_{index}",
-                        name=item.name,
-                        command=item.command,
-                        description=item.description,
-                        position=index,
+                        pack_name=parsed.pack_name,
+                        description=parsed.description,
+                        source_name=file_path.name,
+                        is_core=parsed.pack_id == "core",
+                        updated_at=_now_iso(),
                     )
-                )
+                    session.add(pack)
+                else:
+                    pack.pack_name = parsed.pack_name
+                    pack.description = parsed.description
+                    pack.source_name = file_path.name
+                    pack.is_core = pack.pack_id == "core"
+                    pack.updated_at = _now_iso()
+
+                existing_templates = session.exec(
+                    select(CommandTemplateRecord).where(CommandTemplateRecord.pack_id == parsed.pack_id)
+                ).all()
+                for item in existing_templates:
+                    session.delete(item)
+
+                for index, item in enumerate(parsed.commands, start=1):
+                    session.add(
+                        CommandTemplateRecord(
+                            pack_id=parsed.pack_id,
+                            template_id=item.id or f"cmd_{index}",
+                            name=item.name,
+                            command=item.command,
+                            description=item.description,
+                            position=index,
+                        )
+                    )
 
         if imported:
             session.commit()
