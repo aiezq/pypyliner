@@ -61,6 +61,15 @@ def _default_ai_data_dir() -> Path:
     return _default_data_dir() / "ai"
 
 
+def _default_shell_executable() -> str:
+    shell = os.environ.get("SHELL", "").strip()
+    if shell:
+        return shell
+    if Path("/bin/zsh").exists():
+        return "/bin/zsh"
+    return "/bin/bash"
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -72,7 +81,6 @@ class AppSettings(BaseSettings):
     logs_dir: Path = Field(default_factory=_default_logs_dir)
     data_dir: Path = Field(default_factory=_default_data_dir)
     runs_logs_dir: Path = Field(default_factory=lambda: _default_logs_dir() / "runs")
-    terminal_logs_dir: Path = Field(default_factory=lambda: _default_logs_dir() / "terminals")
 
     db_path: Path = Field(default_factory=_default_db_path)
     database_url: str = Field(default_factory=lambda: f"sqlite:///{_default_db_path()}")
@@ -88,11 +96,7 @@ class AppSettings(BaseSettings):
     ai_install_timeout_sec: int = 3600
 
     max_lines_in_memory: int = 600
-    shell_executable: str = "/bin/bash"
-    default_manual_terminal_command: str = "/bin/bash --noprofile --norc"
-    default_manual_terminal_cwd: Path = Field(default_factory=Path.home)
-    prompt_state_marker: str = "__OPERATOR_HELPER_PROMPT__"
-    pipeline_open_terminal_command: str = "operator:create_terminal"
+    shell_executable: str = Field(default_factory=_default_shell_executable)
 
     @model_validator(mode="after")
     def finalize(self) -> "AppSettings":
@@ -106,8 +110,6 @@ class AppSettings(BaseSettings):
 
         if "runs_logs_dir" not in fields_set:
             self.runs_logs_dir = self.logs_dir / "runs"
-        if "terminal_logs_dir" not in fields_set:
-            self.terminal_logs_dir = self.logs_dir / "terminals"
 
         if service_dir_overridden and "db_path" not in fields_set:
             self.db_path = self.data_dir / "history.sqlite3"
@@ -120,9 +122,6 @@ class AppSettings(BaseSettings):
             self.pipeline_flows_dir = self.service_dir / "pipeline_flows"
         if service_dir_overridden and "ai_data_dir" not in fields_set:
             self.ai_data_dir = self.data_dir / "ai"
-
-        if "default_manual_terminal_command" not in fields_set:
-            self.default_manual_terminal_command = f"{self.shell_executable} --noprofile --norc"
 
         return self
 

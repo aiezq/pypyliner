@@ -34,60 +34,12 @@ class RunsListResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
 
 
-class ManualTerminalResponse(BaseModel):
-    id: str
-    title: str
-    terminal_type: str = "local"
-    is_sequence: bool = False
-    prompt_user: str
-    prompt_cwd: str
-    status: str
-    exit_code: int | None = None
-    created_at: str
-    draft_command: str = ""
-    log_file_path: str
-    ssh_connection_name: str | None = None
-    ssh_host: str | None = None
-    ssh_username: str | None = None
-    lines: list[TerminalLineResponse] = Field(default_factory=list)
-
-
-class ManualTerminalsListResponse(BaseModel):
-    manual_terminals: list[ManualTerminalResponse] = Field(default_factory=list)
-
-
-class ManualTerminalCompletionResponse(BaseModel):
-    terminal_id: str
-    command: str
-    base_command: str
-    completed_command: str
-    matches: list[str] = Field(default_factory=list)
-
-
-class ManualTerminalDeleteResponse(BaseModel):
-    deleted: bool
-    terminal_id: str
-
-
-class ManualTerminalHistoryItemResponse(BaseModel):
-    terminal_id: str
-    title: str
-    is_sequence: bool = False
-    created_at: str
-    updated_at: str
-    closed_at: str | None = None
-    log_file_path: str
-    commands: list[str] = Field(default_factory=list)
-
-
 class HistoryResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
-    manual_terminal_history: list[ManualTerminalHistoryItemResponse] = Field(default_factory=list)
 
 
 class StateSnapshotResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
-    manual_terminals: list[ManualTerminalResponse] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):

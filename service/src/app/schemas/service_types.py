@@ -30,51 +30,12 @@ class PipelineRunData(TypedDict):
     sessions: list[PipelineSessionData]
 
 
-class ManualTerminalData(TypedDict):
-    id: str
-    title: str
-    terminal_type: str
-    is_sequence: bool
-    prompt_user: str
-    prompt_cwd: str
-    status: str
-    exit_code: int | None
-    created_at: str
-    draft_command: str
-    log_file_path: str
-    ssh_connection_name: str | None
-    ssh_host: str | None
-    ssh_username: str | None
-    lines: list[TerminalLineData]
-
-
-class ManualTerminalHistoryItemData(TypedDict):
-    terminal_id: str
-    title: str
-    is_sequence: bool
-    created_at: str
-    updated_at: str
-    closed_at: str | None
-    log_file_path: str
-    commands: list[str]
-
-
 class HistoryData(TypedDict):
     runs: list[PipelineRunData]
-    manual_terminal_history: list[ManualTerminalHistoryItemData]
 
 
 class StateSnapshotData(TypedDict):
     runs: list[PipelineRunData]
-    manual_terminals: list[ManualTerminalData]
-
-
-class CompletionData(TypedDict):
-    terminal_id: str
-    command: str
-    base_command: str
-    completed_command: str
-    matches: list[str]
 
 
 class CommandTemplateData(TypedDict):

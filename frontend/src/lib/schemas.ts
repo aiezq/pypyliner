@@ -18,39 +18,32 @@ export const BackendLineSchema = z.object({
   created_at: z.string(),
 })
 
-export const BackendManualTerminalSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  terminal_type: TerminalTypeSchema.default('local'),
-  is_sequence: z.boolean(),
-  prompt_user: z.string(),
-  prompt_cwd: z.string(),
-  status: SessionStatusSchema,
-  exit_code: z.number().int().nullable(),
-  draft_command: z.string(),
-  ssh_connection_name: z.string().nullable().default(null),
-  ssh_host: z.string().nullable().default(null),
-  ssh_username: z.string().nullable().default(null),
-  lines: z.array(BackendLineSchema),
-})
-
 export const BackendSnapshotSchema = z.object({
-  manual_terminals: z.array(BackendManualTerminalSchema),
-})
-
-export const BackendManualTerminalHistorySchema = z.object({
-  terminal_id: z.string(),
-  title: z.string(),
-  is_sequence: z.boolean(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  closed_at: z.string().nullable(),
-  log_file_path: z.string(),
-  commands: z.array(z.string()),
+  runs: z.array(
+    z.object({
+      id: z.string(),
+      pipeline_name: z.string(),
+      status: z.string(),
+      started_at: z.string(),
+      finished_at: z.string().nullable(),
+      log_file_path: z.string(),
+      sessions: z.array(
+        z.object({
+          id: z.string(),
+          step_id: z.string(),
+          title: z.string(),
+          command: z.string(),
+          status: z.string(),
+          exit_code: z.number().int().nullable(),
+          lines: z.array(BackendLineSchema),
+        }),
+      ),
+    }),
+  ),
 })
 
 export const BackendHistorySchema = z.object({
-  manual_terminal_history: z.array(BackendManualTerminalHistorySchema),
+  runs: BackendSnapshotSchema.shape.runs,
 })
 
 export const AIInstallStateSchema = z.enum([
@@ -163,39 +156,6 @@ export const SocketEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('snapshot'),
     data: BackendSnapshotSchema,
-  }),
-  z.object({
-    type: z.literal('terminal_created'),
-    data: z.object({
-      terminal: BackendManualTerminalSchema,
-    }),
-  }),
-  z.object({
-    type: z.literal('terminal_updated'),
-    data: z.object({
-      terminal: BackendManualTerminalSchema,
-    }),
-  }),
-  z.object({
-    type: z.literal('terminal_status'),
-    data: z.object({
-      terminal_id: z.string(),
-      status: SessionStatusSchema,
-      exit_code: z.number().int().nullable(),
-    }),
-  }),
-  z.object({
-    type: z.literal('terminal_line'),
-    data: z.object({
-      terminal_id: z.string(),
-      line: BackendLineSchema,
-    }),
-  }),
-  z.object({
-    type: z.literal('terminal_closed'),
-    data: z.object({
-      terminal_id: z.string(),
-    }),
   }),
 ])
 

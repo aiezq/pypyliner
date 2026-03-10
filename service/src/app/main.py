@@ -52,7 +52,7 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Operator Helper API",
-        description="Local API for sequential Linux command pipelines and manual terminals.",
+        description="Local API for sequential Linux command pipelines and workflow state.",
         version="0.1.0",
         lifespan=lifespan,
     )

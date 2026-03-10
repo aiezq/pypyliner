@@ -1,7 +1,7 @@
 # Pypyliner Operator Helper
 
 Pypyliner Operator Helper — локальное desktop-приложение для Linux-операторов.
-Оно объединяет визуальный запуск пайплайнов, интерактивные терминальные окна, локальную AI-генерацию черновиков и постоянную историю запусков.
+Оно объединяет визуальный запуск пайплайнов, UI-окна терминалов, локальную AI-генерацию черновиков и постоянную историю запусков.
 
 - Фронтенд: React 19 + TypeScript + Vite
 - Бэкенд: FastAPI + runtime на asyncio subprocess
@@ -22,11 +22,6 @@ Pypyliner Operator Helper — локальное desktop-приложение д
 - Импорт и управление JSON command packs из интерфейса.
 - Сохранение pipeline workflow с переключением, переименованием и удалением через `Workflow settings`.
 - Плавающие терминальные окна с pin/unpin в workbench.
-- Возможности терминала:
-  - отправка команды по `Enter`;
-  - история команд стрелками;
-  - автодополнение по `Tab` с циклическим перебором совпадений;
-  - копирование последних `N` строк вывода.
 - Вкладка истории (данные приходят из базы бэкенда).
 - Синхронизация runtime в реальном времени по WebSocket.
 - Вкладка `Local AI`:
@@ -41,10 +36,10 @@ Pypyliner Operator Helper — локальное desktop-приложение д
 ### Бэкенд
 
 - Модульные FastAPI-роуты (`/api/*` + `/ws/events`).
-- Runtime-менеджер для последовательного выполнения pipeline и ручных терминалов.
+- Runtime-менеджер для последовательного выполнения pipeline.
 - Управление command packs (`service/command_packs/*.json`).
 - Управление pipeline flows (`service/pipeline_flows/*.json`).
-- SQLite-персистентность запусков и истории терминалов (`service/data/history.sqlite3`).
+- SQLite-персистентность запусков (`service/data/history.sqlite3`).
 - Модели SQLModel + автозапуск Alembic-миграций при старте.
 - Инициализация структурированного логирования и централизованных настроек (`pydantic-settings`).
 - Local AI backend:
@@ -87,39 +82,6 @@ operator_helper/
 - `pnpm` или `npm`
 
 ## Запуск приложения
-
-### Одной командой
-
-Из корня репозитория:
-
-```bash
-make dev
-```
-
-С кастомными портами и хостами:
-
-```bash
-make dev -- --backend-port 9000 --frontend-port 5174 --backend-host 0.0.0.0 --frontend-host 0.0.0.0
-```
-
-Поддерживаемые флаги `scripts/dev.sh`:
-- `--backend-port <port>`
-- `--frontend-port <port>`
-- `--backend-host <host>`
-- `--frontend-host <host>`
-- `--api-base-url <url>`
-- `--setup-only`
-- `--skip-setup`
-
-Полезные команды:
-
-```bash
-make setup     # только установка зависимостей
-make update    # git pull --rebase + очистка локальных frontend-артефактов/кэша
-```
-
-`make dev` автоматически проверяет Node.js и может локально установить Node в
-`$HOME/.local/operator-helper/node`, если системный Node отсутствует или устарел.
 
 ### Ручной запуск
 
@@ -176,7 +138,6 @@ pnpm dev
 
 Для запуска из исходников:
 - Логи запусков pipeline: `service/logs/runs/run_<id>.log`
-- Логи терминалов: `service/logs/terminals/terminal_<id>.log`
 - БД истории: `service/data/history.sqlite3`
 - Наборы команд: `service/command_packs/*.json`
 - Pipeline flow: `service/pipeline_flows/*.json`
@@ -197,16 +158,6 @@ pnpm dev
   - `POST /api/runs`
   - `POST /api/runs/{run_id}/stop`
   - `GET /api/runs/{run_id}/log`
-- Терминалы (Terminals):
-  - `GET /api/terminals`
-  - `POST /api/terminals`
-  - `POST /api/terminals/{terminal_id}/run`
-  - `POST /api/terminals/{terminal_id}/complete`
-  - `PATCH /api/terminals/{terminal_id}`
-  - `POST /api/terminals/{terminal_id}/stop`
-  - `POST /api/terminals/{terminal_id}/clear`
-  - `DELETE /api/terminals/{terminal_id}`
-  - `GET /api/terminals/{terminal_id}/log`
 - Наборы команд (Command packs):
   - `GET /api/command-packs`
   - `POST /api/command-packs/templates`
@@ -230,9 +181,6 @@ pnpm dev
   - `POST /api/ai/pipeline-drafts/generate`
 - WebSocket:
   - `WS /ws/events`
-
-Специальная команда:
-- `operator:create_terminal` перехватывается бэкендом и создает ручной терминал вместо выполнения shell-команды как текста.
 
 ## Тесты и покрытие
 

@@ -32,29 +32,6 @@ export interface ManualTerminal {
   lines: TerminalLine[]
 }
 
-export interface BackendLine {
-  id: string
-  stream: StreamType
-  text: string
-  created_at: string
-}
-
-export interface BackendManualTerminal {
-  id: string
-  title: string
-  terminal_type: TerminalType
-  is_sequence: boolean
-  prompt_user: string
-  prompt_cwd: string
-  status: SessionStatus
-  exit_code: number | null
-  draft_command: string
-  ssh_connection_name: string | null
-  ssh_host: string | null
-  ssh_username: string | null
-  lines: BackendLine[]
-}
-
 export interface SshConnectionVariable {
   id: string
   username: string
@@ -62,25 +39,27 @@ export interface SshConnectionVariable {
   password: string
 }
 
-export interface BackendTerminalCompletion {
-  terminal_id: string
-  command: string
-  base_command: string
-  completed_command: string
-  matches: string[]
-}
-
-export interface BackendManualTerminalHistory {
-  terminal_id: string
-  title: string
-  is_sequence: boolean
-  created_at: string
-  updated_at: string
-  closed_at: string | null
-  log_file_path: string
-  commands: string[]
-}
-
 export interface BackendHistory {
-  manual_terminal_history: BackendManualTerminalHistory[]
+  runs: Array<{
+    id: string
+    pipeline_name: string
+    status: string
+    started_at: string
+    finished_at: string | null
+    log_file_path: string
+    sessions: Array<{
+      id: string
+      step_id: string
+      title: string
+      command: string
+      status: string
+      exit_code: number | null
+      lines: Array<{
+        id: string
+        stream: StreamType
+        text: string
+        created_at: string
+      }>
+    }>
+  }>
 }

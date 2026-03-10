@@ -7,6 +7,7 @@ import type {
   TerminalWindowDescriptor,
   TerminalWindowFrame,
 } from '../../../src/hooks/useFloatingTerminalWindowsController'
+import { I18nProvider } from '../../../src/i18n/I18nProvider'
 
 const terminalPanelMock = vi.hoisted(() => vi.fn())
 
@@ -80,11 +81,13 @@ describe('FloatingTerminalWindow', () => {
     }
 
     render(
-      <FloatingTerminalWindow
-        {...props}
-        editingManualTitleId="terminal_1"
-        windowItem={windowItem}
-      />,
+      <I18nProvider>
+        <FloatingTerminalWindow
+          {...props}
+          editingManualTitleId="terminal_1"
+          windowItem={windowItem}
+        />
+      </I18nProvider>,
     )
 
     fireEvent.click(screen.getByTitle('Stop terminal'))
@@ -100,35 +103,16 @@ describe('FloatingTerminalWindow', () => {
     expect(panelProps.kind).toBe('manual')
     expect(panelProps.isEditingTitle).toBe(true)
     expect(typeof panelProps.onUpdateTitleDraft).toBe('function')
-    expect(panelProps.copyTailLineCount).toBe(20)
-    expect(panelProps.isCopyTailRecentlyCopied).toBe(false)
 
       ; (panelProps.onUpdateTitleDraft as (value: string) => void)('New title')
       ; (panelProps.onStartTitleEdit as () => void)()
       ; (panelProps.onCancelTitleEdit as () => void)()
       ; (panelProps.onSaveTitleEdit as () => void)()
-      ; (panelProps.onUpdateCommand as (value: string) => void)('ls')
-      ; (panelProps.onAutocompleteCommand as () => void)()
-      ; (panelProps.onNavigateHistory as (dir: 'up' | 'down', draft: string) => void)(
-        'up',
-        '',
-      )
-      ; (panelProps.onRunCommand as () => void)()
-      ; (panelProps.onClearTerminal as () => void)()
-      ; (panelProps.onUpdateCopyTailLineCount as (value: string) => void)('25')
-      ; (panelProps.onCopyTail as () => void)()
 
     expect(props.onUpdateManualTitle).toHaveBeenCalledWith('terminal_1', 'New title')
     expect(props.onStartManualTitleEdit).toHaveBeenCalledWith('terminal_1', 'Manual #1')
     expect(props.onCancelManualTitleEdit).toHaveBeenCalledWith('terminal_1', 'Manual #1')
     expect(props.onSaveManualTitleEdit).toHaveBeenCalledWith('terminal_1')
-    expect(props.onUpdateManualCommand).toHaveBeenCalledWith('terminal_1', 'ls')
-    expect(props.onAutocompleteManualCommand).toHaveBeenCalledWith('terminal_1')
-    expect(props.onNavigateManualHistory).toHaveBeenCalledWith('terminal_1', 'up', '')
-    expect(props.onRunManualCommand).toHaveBeenCalledWith('terminal_1')
-    expect(props.onClearManualTerminal).toHaveBeenCalledWith('terminal_1')
-    expect(props.onUpdateCopyTailLineCount).toHaveBeenCalledWith('terminal_1', '25')
-    expect(props.onCopyManualTerminalTail).toHaveBeenCalledWith('terminal_1')
 
     const resizeHandles = document.querySelectorAll('.resizeHandle')
     fireEvent.mouseDown(resizeHandles[resizeHandles.length - 1] as Element)
@@ -158,7 +142,11 @@ describe('FloatingTerminalWindow', () => {
       },
     }
 
-    render(<FloatingTerminalWindow {...props} windowItem={windowItem} />)
+    render(
+      <I18nProvider>
+        <FloatingTerminalWindow {...props} windowItem={windowItem} />
+      </I18nProvider>,
+    )
 
     expect(screen.getByTitle('Stop terminal')).toBeDisabled()
   })

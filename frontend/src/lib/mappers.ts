@@ -1,10 +1,3 @@
-import type {
-  BackendLine,
-  BackendManualTerminal,
-  ManualTerminal,
-  TerminalLine,
-} from '../types'
-
 let idSequence = 0
 
 export const createId = (prefix: string): string => {
@@ -29,59 +22,4 @@ export const getErrorMessage = (error: unknown): string => {
     return error.message
   }
   return 'Unknown backend error'
-}
-
-export const toTerminalLine = (line: BackendLine): TerminalLine => ({
-  id: line.id,
-  stream: line.stream,
-  text: line.text,
-  createdAt: line.created_at,
-})
-
-
-
-export const toManualTerminal = (
-  terminal: BackendManualTerminal,
-): ManualTerminal => ({
-  id: terminal.id,
-  title: terminal.title,
-  titleDraft: terminal.title,
-  terminalType: terminal.terminal_type,
-  promptUser: terminal.prompt_user,
-  promptCwd: terminal.prompt_cwd,
-  isSequence: terminal.is_sequence,
-  status: terminal.status,
-  exitCode: terminal.exit_code,
-  draftCommand: terminal.draft_command,
-  sshConnectionName: terminal.ssh_connection_name,
-  sshHost: terminal.ssh_host,
-  sshUsername: terminal.ssh_username,
-  lines: terminal.lines.map(toTerminalLine),
-})
-
-
-
-export const upsertManualTerminal = (
-  terminals: ManualTerminal[],
-  incoming: ManualTerminal,
-): ManualTerminal[] => {
-  const existing = terminals.find((terminal) => terminal.id === incoming.id)
-  if (!existing) {
-    return [...terminals, incoming]
-  }
-
-  return terminals.map((terminal) =>
-    terminal.id === incoming.id
-      ? {
-          ...incoming,
-          titleDraft:
-            terminal.titleDraft &&
-            terminal.titleDraft !== terminal.title &&
-            incoming.title === terminal.title
-              ? terminal.titleDraft
-              : incoming.title,
-          draftCommand: terminal.draftCommand,
-        }
-      : terminal,
-  )
 }

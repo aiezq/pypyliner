@@ -30,27 +30,6 @@ class RunSessionRecord(SQLModel, table=True):
     exit_code: int | None = None
 
 
-class ManualTerminalHistoryRecord(SQLModel, table=True):
-    __tablename__: Any = "manual_terminals_history"
-
-    terminal_id: str = Field(primary_key=True)
-    title: str
-    is_sequence: bool = Field(default=False)
-    created_at: str
-    updated_at: str = Field(index=True)
-    closed_at: str | None = None
-    log_file_path: str
-
-
-class ManualTerminalCommandRecord(SQLModel, table=True):
-    __tablename__: Any = "manual_terminal_commands"
-
-    id: int | None = Field(default=None, primary_key=True)
-    terminal_id: str = Field(foreign_key="manual_terminals_history.terminal_id", index=True)
-    command: str
-    created_at: str
-
-
 class CommandPackRecord(SQLModel, table=True):
     __tablename__: Any = "command_packs"
 

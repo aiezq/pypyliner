@@ -2,11 +2,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import TerminalWindowsDock from '../../../src/components/terminal-windows/TerminalWindowsDock'
 import type { TerminalWindowDescriptor } from '../../../src/hooks/useFloatingTerminalWindowsController'
+import { I18nProvider } from '../../../src/i18n/I18nProvider'
 
 describe('TerminalWindowsDock', () => {
   it('does not render when dock is empty', () => {
     const { container } = render(
-      <TerminalWindowsDock windows={[]} onRestoreWindow={vi.fn()} />,
+      <I18nProvider>
+        <TerminalWindowsDock windows={[]} onRestoreWindow={vi.fn()} />
+      </I18nProvider>,
     )
 
     expect(container.firstChild).toBeNull()
@@ -37,7 +40,11 @@ describe('TerminalWindowsDock', () => {
       },
     ]
 
-    render(<TerminalWindowsDock windows={windows} onRestoreWindow={onRestoreWindow} />)
+    render(
+      <I18nProvider>
+        <TerminalWindowsDock windows={windows} onRestoreWindow={onRestoreWindow} />
+      </I18nProvider>,
+    )
 
     expect(screen.getByLabelText('Minimized terminals dock')).toBeInTheDocument()
     expect(screen.getByText('Manual #1')).toBeInTheDocument()

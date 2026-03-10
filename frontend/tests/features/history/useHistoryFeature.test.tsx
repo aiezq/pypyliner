@@ -15,7 +15,7 @@ vi.mock('../../../src/lib/api', () => ({
 import { useHistoryFeature } from '../../../src/features/history/useHistoryFeature'
 
 describe('useHistoryFeature', () => {
-  it('maps successful query payload into ui shape', () => {
+  it('returns an empty terminal history for successful payloads', () => {
     useQueryMock.mockReturnValue({
       data: {
         runs: [
@@ -29,17 +29,6 @@ describe('useHistoryFeature', () => {
             sessions: [],
           },
         ],
-        manual_terminal_history: [
-          {
-            terminal_id: 'terminal_1',
-            title: 'Terminal #1',
-            created_at: '2026-03-01T09:00:00Z',
-            updated_at: '2026-03-01T09:10:00Z',
-            closed_at: null,
-            log_file_path: '/tmp/terminal.log',
-            commands: ['pwd'],
-          },
-        ],
       },
       isLoading: false,
       isFetching: false,
@@ -49,7 +38,7 @@ describe('useHistoryFeature', () => {
 
     const { result } = renderHook(() => useHistoryFeature({ isActive: true }))
 
-    expect(result.current.terminalHistory).toHaveLength(1)
+    expect(result.current.terminalHistory).toEqual([])
     expect(result.current.isLoading).toBe(false)
     expect(result.current.errorMessage).toBeNull()
 
@@ -71,7 +60,6 @@ describe('useHistoryFeature', () => {
     })
     apiRequestMock.mockResolvedValue({
       runs: [],
-      manual_terminal_history: [],
     })
 
     renderHook(() => useHistoryFeature({ isActive: true }))
@@ -81,9 +69,7 @@ describe('useHistoryFeature', () => {
     const payload = await queryOptions.queryFn()
 
     expect(apiRequestMock).toHaveBeenCalledWith('/api/history')
-    expect(payload).toEqual({
-      manual_terminal_history: [],
-    })
+    expect(payload).toEqual({ runs: [] })
   })
 
   it('reports loading and query errors', () => {

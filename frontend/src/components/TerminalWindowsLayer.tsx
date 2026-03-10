@@ -11,22 +11,9 @@ export interface TerminalWindowsLayerProps {
   requestedMinimizedWindowIds: string[]
   onConsumeRequestedMinimizeWindow: (windowId: string) => void
 
-  getCopyTailLineCount: (terminalId: string) => number
-  isCopyTailRecentlyCopied: (terminalId: string) => boolean
-  onUpdateCopyTailLineCount: (terminalId: string, value: string) => void
-  onCopyManualTerminalTail: (terminalId: string) => void
   onUpdateManualTitle: (terminalId: string, title: string) => void
   onRenameManualTerminal: (terminalId: string) => void
-  onUpdateManualCommand: (terminalId: string, command: string) => void
-  onNavigateManualHistory: (
-    terminalId: string,
-    direction: 'up' | 'down',
-    currentDraft: string,
-  ) => void
-  onRunManualCommand: (terminalId: string) => void
-  onAutocompleteManualCommand: (terminalId: string) => void
   onStopManualTerminal: (terminalId: string) => void
-  onClearManualTerminal: (terminalId: string) => void
   onRemoveManualTerminal: (terminalId: string) => void
 }
 
@@ -36,18 +23,9 @@ function TerminalWindowsLayer({
   requestedMinimizedWindowIds,
   onConsumeRequestedMinimizeWindow,
 
-  getCopyTailLineCount,
-  isCopyTailRecentlyCopied,
-  onUpdateCopyTailLineCount,
-  onCopyManualTerminalTail,
   onUpdateManualTitle,
   onRenameManualTerminal,
-  onUpdateManualCommand,
-  onNavigateManualHistory,
-  onRunManualCommand,
-  onAutocompleteManualCommand,
   onStopManualTerminal,
-  onClearManualTerminal,
   onRemoveManualTerminal,
 }: TerminalWindowsLayerProps) {
   const {
@@ -95,20 +73,11 @@ function TerminalWindowsLayer({
             }
 
             onMinimize={() => minimizeWindow(windowItem.windowId)}
-            getCopyTailLineCount={getCopyTailLineCount}
-            isCopyTailRecentlyCopied={isCopyTailRecentlyCopied}
-            onUpdateCopyTailLineCount={onUpdateCopyTailLineCount}
-            onCopyManualTerminalTail={onCopyManualTerminalTail}
             onUpdateManualTitle={onUpdateManualTitle}
             onStartManualTitleEdit={startManualTitleEdit}
             onCancelManualTitleEdit={cancelManualTitleEdit}
             onSaveManualTitleEdit={saveManualTitleEdit}
-            onUpdateManualCommand={onUpdateManualCommand}
-            onNavigateManualHistory={onNavigateManualHistory}
-            onRunManualCommand={onRunManualCommand}
-            onAutocompleteManualCommand={onAutocompleteManualCommand}
             onStopManualTerminal={onStopManualTerminal}
-            onClearManualTerminal={onClearManualTerminal}
             onRemoveManualTerminal={onRemoveManualTerminal}
           />
         ))}

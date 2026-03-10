@@ -33,7 +33,7 @@ async def test_log_http_request_logs_method_path_and_status(monkeypatch: pytest.
         {
             "type": "http",
             "method": "POST",
-            "path": "/api/terminals",
+            "path": "/api/runs",
             "scheme": "http",
             "server": ("127.0.0.1", 8000),
             "headers": [],
@@ -47,4 +47,4 @@ async def test_log_http_request_logs_method_path_and_status(monkeypatch: pytest.
     call_next.assert_awaited_once_with(request)
     logger.info.assert_called_once()
     args = logger.info.call_args.args
-    assert args[:4] == ("%s %s -> %s %.2fms", "POST", "/api/terminals", 201)
+    assert args[:4] == ("%s %s -> %s %.2fms", "POST", "/api/runs", 201)

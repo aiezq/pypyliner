@@ -25,7 +25,7 @@ export const useHistoryFeature = ({ isActive }: UseHistoryFeatureOptions) => {
   })
 
   return {
-    terminalHistory: historyQuery.data?.manual_terminal_history ?? [],
+    terminalHistory: [],
     isLoading: historyQuery.isLoading || historyQuery.isFetching,
     errorMessage: historyQuery.isError ? getErrorMessage(historyQuery.error) : null,
   }

@@ -1,8 +1,6 @@
 from src.app.models.db import (
     CommandPackRecord,
     CommandTemplateRecord,
-    ManualTerminalCommandRecord,
-    ManualTerminalHistoryRecord,
     PipelineFlowRecord,
     PipelineFlowStepRecord,
     RunRecord,
@@ -12,8 +10,6 @@ from src.app.models.db import (
 __all__ = [
     "CommandPackRecord",
     "CommandTemplateRecord",
-    "ManualTerminalCommandRecord",
-    "ManualTerminalHistoryRecord",
     "PipelineFlowRecord",
     "PipelineFlowStepRecord",
     "RunRecord",

@@ -8,7 +8,6 @@ from typing import Any, TypeAlias, cast
 
 from sqlmodel import Session, select
 
-from src.app.core.constants import PIPELINE_OPEN_TERMINAL_COMMAND
 from src.app.core.database import session_scope
 from src.app.core.settings import get_settings
 from src.app.models.db import CommandPackRecord, CommandTemplateRecord
@@ -160,12 +159,6 @@ class CommandPackManager:
             "pack_name": "Core Commands",
             "description": "Built-in command templates.",
             "commands": [
-                {
-                    "id": "open_terminal",
-                    "name": "Open terminal shell",
-                    "command": PIPELINE_OPEN_TERMINAL_COMMAND,
-                    "description": "Создает новый интерактивный терминал в приложении.",
-                },
                 {
                     "id": "sync_repository",
                     "name": "Sync repository",

@@ -21,24 +21,11 @@ interface FloatingTerminalWindowProps {
   ) => void
 
   onMinimize: () => void
-  getCopyTailLineCount: (terminalId: string) => number
-  isCopyTailRecentlyCopied: (terminalId: string) => boolean
-  onUpdateCopyTailLineCount: (terminalId: string, value: string) => void
-  onCopyManualTerminalTail: (terminalId: string) => void
   onUpdateManualTitle: (terminalId: string, title: string) => void
   onStartManualTitleEdit: (terminalId: string, currentTitle: string) => void
   onCancelManualTitleEdit: (terminalId: string, originalTitle: string) => void
   onSaveManualTitleEdit: (terminalId: string) => void
-  onUpdateManualCommand: (terminalId: string, command: string) => void
-  onNavigateManualHistory: (
-    terminalId: string,
-    direction: 'up' | 'down',
-    currentDraft: string,
-  ) => void
-  onRunManualCommand: (terminalId: string) => void
-  onAutocompleteManualCommand: (terminalId: string) => void
   onStopManualTerminal: (terminalId: string) => void
-  onClearManualTerminal: (terminalId: string) => void
   onRemoveManualTerminal: (terminalId: string) => void
 }
 
@@ -52,20 +39,11 @@ function FloatingTerminalWindow({
   onBeginResize,
 
   onMinimize,
-  getCopyTailLineCount,
-  isCopyTailRecentlyCopied,
-  onUpdateCopyTailLineCount,
-  onCopyManualTerminalTail,
   onUpdateManualTitle,
   onStartManualTitleEdit,
   onCancelManualTitleEdit,
   onSaveManualTitleEdit,
-  onUpdateManualCommand,
-  onNavigateManualHistory,
-  onRunManualCommand,
-  onAutocompleteManualCommand,
   onStopManualTerminal,
-  onClearManualTerminal,
   onRemoveManualTerminal,
 }: FloatingTerminalWindowProps) {
   const { messages } = useI18n()
@@ -98,19 +76,6 @@ function FloatingTerminalWindow({
         }
         onCancelTitleEdit={() => onCancelManualTitleEdit(terminal.id, terminal.title)}
         onSaveTitleEdit={() => onSaveManualTitleEdit(terminal.id)}
-        onUpdateCommand={(command) => onUpdateManualCommand(terminal.id, command)}
-        onAutocompleteCommand={() => onAutocompleteManualCommand(terminal.id)}
-        onNavigateHistory={(direction, currentDraft) =>
-          onNavigateManualHistory(terminal.id, direction, currentDraft)
-        }
-        onRunCommand={() => onRunManualCommand(terminal.id)}
-        onClearTerminal={() => onClearManualTerminal(terminal.id)}
-        copyTailLineCount={getCopyTailLineCount(terminal.id)}
-        onUpdateCopyTailLineCount={(rawValue) =>
-          onUpdateCopyTailLineCount(terminal.id, rawValue)
-        }
-        onCopyTail={() => onCopyManualTerminalTail(terminal.id)}
-        isCopyTailRecentlyCopied={isCopyTailRecentlyCopied(terminal.id)}
         controls={
           <>
             <button

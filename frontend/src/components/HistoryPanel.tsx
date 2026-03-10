@@ -1,11 +1,19 @@
 import { useState, useMemo } from 'react'
 import { formatTime } from '../lib/mappers'
-import type { BackendManualTerminalHistory } from '../types'
 import styles from './HistoryPanel.module.scss'
 import { useI18n } from '../i18n/I18nProvider'
 
 interface HistoryPanelProps {
-  terminalHistory: BackendManualTerminalHistory[]
+  terminalHistory: Array<{
+    terminal_id: string
+    title: string
+    is_sequence: boolean
+    created_at: string
+    updated_at: string
+    closed_at: string | null
+    log_file_path: string
+    commands: string[]
+  }>
   isLoading: boolean
   errorMessage?: string | null
 }

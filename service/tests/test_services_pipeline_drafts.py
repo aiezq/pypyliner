@@ -186,7 +186,7 @@ async def test_pipeline_draft_generator_repairs_invalid_json_and_adds_risk_warni
 
 
 @pytest.mark.asyncio
-async def test_pipeline_draft_generator_preserves_explicit_docker_command_and_drops_synthetic_open_terminal(
+async def test_pipeline_draft_generator_preserves_explicit_docker_command_and_drops_synthetic_terminal_step(
     tmp_path: Path,
 ) -> None:
     runtime = RuntimeClientStub(
@@ -202,10 +202,10 @@ async def test_pipeline_draft_generator_preserves_explicit_docker_command_and_dr
                 {
                   "id": "step_1",
                   "label": "Start terminal",
-                  "command": "core:open_terminal",
+                  "command": "operator:create_terminal",
                   "description": "Synthetic open terminal step.",
                   "uses_variables": [],
-                  "template_id": "core:open_terminal",
+                  "template_id": null,
                   "terminal_type": "local"
                 },
                 {
@@ -263,7 +263,7 @@ cd ~/ruka && ./ruka docker -i dev2
 
     commands = [step.command for step in response.draft.steps]
     terminal_groups = {step.label: step.terminal_group for step in response.draft.steps}
-    assert "core:open_terminal" not in commands
+    assert "operator:create_terminal" not in commands
     assert any("./ruka docker -i dev2" in command for command in commands)
     assert any("run_with_robo_app.sh" in command for command in commands)
     assert any("--dfs-items-path lobach/snacks_box_x_set_x" in command for command in commands)

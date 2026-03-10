@@ -11,7 +11,6 @@ def test_app_settings_finalize_defaults(tmp_path: Path):
     assert settings.logs_dir == tmp_path / "logs"
     assert settings.data_dir == tmp_path / "data"
     assert settings.runs_logs_dir == tmp_path / "logs" / "runs"
-    assert settings.terminal_logs_dir == tmp_path / "logs" / "terminals"
     assert settings.db_path == tmp_path / "data" / "history.sqlite3"
     assert settings.database_url == f"sqlite:///{tmp_path / 'data' / 'history.sqlite3'}"
     assert settings.command_packs_dir == tmp_path / "command_packs"
@@ -23,7 +22,7 @@ def test_app_settings_finalize_defaults(tmp_path: Path):
     assert settings.ai_max_doc_chars == 120_000
     assert settings.ai_request_timeout_sec == 180
     assert settings.ai_install_timeout_sec == 3600
-    assert settings.default_manual_terminal_command == "/bin/zsh --noprofile --norc"
+    assert settings.shell_executable == "/bin/zsh"
 
 
 def test_get_settings_is_cached():
@@ -57,7 +56,6 @@ def test_app_settings_defaults_to_user_writable_support_dir(monkeypatch, tmp_pat
     assert settings.logs_dir == support_root / "logs"
     assert settings.data_dir == support_root / "data"
     assert settings.runs_logs_dir == support_root / "logs" / "runs"
-    assert settings.terminal_logs_dir == support_root / "logs" / "terminals"
     assert settings.db_path == support_root / "data" / "history.sqlite3"
     assert settings.database_url == f"sqlite:///{support_root / 'data' / 'history.sqlite3'}"
     assert settings.command_packs_dir == support_root / "command_packs"

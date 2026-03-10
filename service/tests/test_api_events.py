@@ -28,7 +28,7 @@ class FakeRuntime:
         self.events = FakeEventsHub()
 
     def snapshot_event(self) -> SnapshotEventMessage:
-        return {"type": "snapshot", "data": {"runs": [], "manual_terminals": []}}
+        return {"type": "snapshot", "data": {"runs": []}}
 
 
 class FakeWebSocket:

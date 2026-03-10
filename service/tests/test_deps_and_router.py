@@ -24,6 +24,5 @@ def test_api_router_contains_expected_paths():
     assert "/api/state" in paths
     assert "/api/history" in paths
     assert "/api/runs" in paths
-    assert "/api/terminals" in paths
     assert "/api/command-packs" in paths
     assert "/ws/events" in paths

@@ -486,7 +486,7 @@ class PipelineDraftGenerator:
             if resolved_command in template_by_id:
                 template_id = resolved_command
                 resolved_command = template_by_id[resolved_command]
-            if resolved_command == "operator:create_terminal" or resolved_command == "core:open_terminal":
+            if resolved_command == "operator:create_terminal":
                 collected_warnings.append(
                     f"Dropped synthetic step '{step.label.strip()}' because terminal creation is handled by the graph UI."
                 )

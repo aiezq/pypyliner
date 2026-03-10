@@ -73,39 +73,6 @@ def upgrade() -> None:
     _create_index_if_missing("ix_run_sessions_run_id", "run_sessions", ["run_id"])
     _create_index_if_missing("ix_run_sessions_position", "run_sessions", ["position"])
 
-    if not _table_exists("manual_terminals_history"):
-        op.create_table(
-            "manual_terminals_history",
-            sa.Column("terminal_id", sa.String(), nullable=False),
-            sa.Column("title", sa.String(), nullable=False),
-            sa.Column("created_at", sa.String(), nullable=False),
-            sa.Column("updated_at", sa.String(), nullable=False),
-            sa.Column("closed_at", sa.String(), nullable=True),
-            sa.Column("log_file_path", sa.String(), nullable=False),
-            sa.PrimaryKeyConstraint("terminal_id"),
-        )
-    _create_index_if_missing(
-        "ix_manual_terminals_history_updated_at",
-        "manual_terminals_history",
-        ["updated_at"],
-    )
-
-    if not _table_exists("manual_terminal_commands"):
-        op.create_table(
-            "manual_terminal_commands",
-            sa.Column("id", sa.Integer(), nullable=False),
-            sa.Column("terminal_id", sa.String(), nullable=False),
-            sa.Column("command", sa.String(), nullable=False),
-            sa.Column("created_at", sa.String(), nullable=False),
-            sa.ForeignKeyConstraint(["terminal_id"], ["manual_terminals_history.terminal_id"]),
-            sa.PrimaryKeyConstraint("id"),
-        )
-    _create_index_if_missing(
-        "ix_manual_terminal_commands_terminal_id",
-        "manual_terminal_commands",
-        ["terminal_id"],
-    )
-
     if not _table_exists("command_packs"):
         op.create_table(
             "command_packs",
@@ -179,12 +146,6 @@ def downgrade() -> None:
 
     op.drop_index("ix_command_packs_updated_at", table_name="command_packs")
     op.drop_table("command_packs")
-
-    op.drop_index("ix_manual_terminal_commands_terminal_id", table_name="manual_terminal_commands")
-    op.drop_table("manual_terminal_commands")
-
-    op.drop_index("ix_manual_terminals_history_updated_at", table_name="manual_terminals_history")
-    op.drop_table("manual_terminals_history")
 
     op.drop_index("ix_run_sessions_position", table_name="run_sessions")
     op.drop_index("ix_run_sessions_run_id", table_name="run_sessions")

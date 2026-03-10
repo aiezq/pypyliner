@@ -1,8 +1,7 @@
-import { useEffect, useRef, type MouseEventHandler, type ReactNode } from 'react'
-import type { ManualTerminal, TerminalLine } from '../types'
+import type { MouseEventHandler, ReactNode } from 'react'
+import type { ManualTerminal } from '../types'
 import { useI18n } from '../i18n/I18nProvider'
 
-type TerminalHistoryDirection = 'up' | 'down'
 type TerminalPanelVariant = 'pinned' | 'floating'
 
 interface TerminalPanelBaseProps {
@@ -21,48 +20,9 @@ interface ManualTerminalPanelProps extends TerminalPanelBaseProps {
   onStartTitleEdit: () => void
   onCancelTitleEdit: () => void
   onSaveTitleEdit: () => void
-  onUpdateCommand: (command: string) => void
-  onAutocompleteCommand: () => void
-  onNavigateHistory: (direction: TerminalHistoryDirection, currentDraft: string) => void
-  onRunCommand: () => void
-  onClearTerminal: () => void
-  copyTailLineCount: number
-  onUpdateCopyTailLineCount: (rawValue: string) => void
-  onCopyTail: () => void
-  isCopyTailRecentlyCopied: boolean
 }
 
 type TerminalPanelProps = ManualTerminalPanelProps
-
-interface TerminalOutputProps {
-  lines: TerminalLine[]
-}
-
-function TerminalOutput({ lines }: TerminalOutputProps) {
-  const bodyRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const element = bodyRef.current
-    if (!element) {
-      return
-    }
-    element.scrollTop = element.scrollHeight
-  }, [lines.length])
-
-  return (
-    <div className="terminalBody" ref={bodyRef}>
-      {lines.map((line) => (
-        <p
-          key={line.id}
-          className={`line line--${line.stream}`}
-          title={new Date(line.createdAt).toLocaleTimeString()}
-        >
-          {line.text}
-        </p>
-      ))}
-    </div>
-  )
-}
 
 const getControlsClassName = (
   variant: TerminalPanelVariant,
@@ -78,29 +38,16 @@ function TerminalPanel(props: TerminalPanelProps) {
     controlsClassName,
     onHeaderMouseDown,
     titleHint,
-  } = props
-  const headerClassName = variant === 'floating' ? 'terminalWindow__dragbar' : 'section__head'
-  const bodyClassName = variant === 'floating' ? 'terminalWindow__content' : undefined
-
-
-
-  const {
     terminal,
     isEditingTitle,
     onUpdateTitleDraft,
     onStartTitleEdit,
     onCancelTitleEdit,
     onSaveTitleEdit,
-    onUpdateCommand,
-    onAutocompleteCommand,
-    onNavigateHistory,
-    onRunCommand,
-    onClearTerminal,
-    copyTailLineCount,
-    onUpdateCopyTailLineCount,
-    onCopyTail,
-    isCopyTailRecentlyCopied,
   } = props
+
+  const headerClassName = variant === 'floating' ? 'terminalWindow__dragbar' : 'section__head'
+  const bodyClassName = variant === 'floating' ? 'terminalWindow__content' : undefined
 
   return (
     <>
@@ -207,92 +154,19 @@ function TerminalPanel(props: TerminalPanelProps) {
       </div>
 
       <div className={bodyClassName}>
-        <p className="terminalWindow__meta">{messages.terminal.exitCode}: {terminal.exitCode ?? '...'}</p>
-
-        <div className="terminalActions">
-          <span className="terminalPrompt" title={`${terminal.promptUser}:${terminal.promptCwd}`}>
-            {terminal.promptUser}:{terminal.promptCwd}$
-          </span>
-          <div className="terminalCommandInputWrap">
-            <input
-              value={terminal.draftCommand}
-              onChange={(event) => onUpdateCommand(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Tab' && !event.shiftKey) {
-                  event.preventDefault()
-                  onAutocompleteCommand()
-                  return
-                }
-
-                if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-                  event.preventDefault()
-                  onNavigateHistory(
-                    event.key === 'ArrowUp' ? 'up' : 'down',
-                    terminal.draftCommand,
-                  )
-                  return
-                }
-
-                if (event.key !== 'Enter') {
-                  return
-                }
-                if (event.nativeEvent.isComposing || !terminal.draftCommand.trim()) {
-                  return
-                }
-                event.preventDefault()
-                onRunCommand()
-              }}
-              placeholder={messages.terminal.typeCommandPlaceholder}
-            />
-            <div className="terminalInputActions">
-              <button
-                type="button"
-                className="terminalInputAction terminalInputAction--clear"
-                onClick={onClearTerminal}
-                title={messages.terminal.clearOutput}
-                aria-label={messages.terminal.clearOutput}
-              >
-                <span className="terminalInputActionIcon" aria-hidden="true">
-                  🗑
-                </span>
-              </button>
-              <button
-                type="button"
-                className="terminalInputAction terminalInputAction--send"
-                onClick={onRunCommand}
-                disabled={!terminal.draftCommand.trim()}
-                title={messages.terminal.sendCommand}
-                aria-label={messages.terminal.sendCommand}
-              >
-                <span className="terminalInputActionIcon" aria-hidden="true">
-                  ➜
-                </span>
-              </button>
-            </div>
-          </div>
+        <div className="terminalWindow__metaRow">
+          <p className="terminalWindow__meta">
+            {messages.terminal.exitCode}: {terminal.exitCode ?? '...'}
+          </p>
+          <p className="terminalWindow__meta terminalWindow__meta--muted">
+            {terminal.promptUser}:{terminal.promptCwd}
+          </p>
         </div>
-        <TerminalOutput lines={terminal.lines} />
-        <div className="terminalFooterActions">
-          <label className="terminalCopyTailControl">
-            <span>{messages.terminal.last}</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={copyTailLineCount}
-              onChange={(event) => onUpdateCopyTailLineCount(event.target.value)}
-              title={messages.terminal.numberOfLinesToCopy}
-            />
-            <span>{messages.terminal.lines}</span>
-          </label>
-          <button
-            type="button"
-            className="terminalFooterCopyButton"
-            onClick={onCopyTail}
-            title={messages.terminal.copyLastLines}
-          >
-            {isCopyTailRecentlyCopied ? messages.terminal.copied : messages.terminal.copyTail}
-          </button>
+        <div className="terminalBody terminalEmulator terminalEmulator--placeholder">
+          <div className="terminalPlaceholder">
+            <strong>{terminal.title}</strong>
+            <p>Terminal runtime removed. UI window preserved.</p>
+          </div>
         </div>
       </div>
     </>

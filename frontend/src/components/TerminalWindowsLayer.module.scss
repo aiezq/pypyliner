@@ -158,11 +158,66 @@
     font-size: 0.78rem;
   }
 
+  .terminalWindow__metaRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .terminalWindow__meta--muted {
+    color: rgba(201, 214, 227, 0.72);
+  }
+
   .terminalWindow .terminalBody {
     max-height: none;
     min-height: 0;
     height: 100%;
     flex: 1;
+  }
+
+  .terminalEmulator {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(104, 124, 146, 0.2);
+    border-radius: 12px;
+    background:
+      radial-gradient(circle at top, rgba(34, 58, 84, 0.2), transparent 48%),
+      linear-gradient(180deg, rgba(7, 12, 19, 0.98), rgba(10, 15, 22, 0.98));
+    padding: 0.3rem;
+  }
+
+  .terminalEmulator--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .terminalPlaceholder {
+    display: grid;
+    gap: 0.45rem;
+    text-align: center;
+    color: rgba(217, 226, 236, 0.88);
+    max-width: 22rem;
+    padding: 1rem;
+  }
+
+  .terminalPlaceholder p {
+    margin: 0;
+    color: rgba(201, 214, 227, 0.66);
+  }
+
+  .terminalEmulator :global(.xterm) {
+    height: 100%;
+  }
+
+  .terminalEmulator :global(.xterm-viewport) {
+    border-radius: 9px;
+  }
+
+  .terminalEmulator :global(.xterm-screen canvas) {
+    width: 100% !important;
   }
 
   .terminalActions {
