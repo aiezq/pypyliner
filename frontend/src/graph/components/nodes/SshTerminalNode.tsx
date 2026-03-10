@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import BaseNode from './BaseNode'
-import { HANDLE_IDS, type SshTerminalNodeData } from '../../types'
+import { DEFAULT_SSH_COMMAND_TEMPLATE, HANDLE_IDS, type SshTerminalNodeData } from '../../types'
 import { useGraphStore } from '../../store/graphStore'
 import { useGraphExecution } from '../../hooks/useGraphExecution'
 import styles from './BaseNode.module.scss'
@@ -162,6 +162,17 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
             </div>
           </>
         )}
+
+        <div className={styles.nodeField}>
+          <span className={styles.nodeFieldLabel}>{messages.nodes.sshCommand}</span>
+          <input
+            className={styles.nodeInput}
+            value={data.sshCommand || DEFAULT_SSH_COMMAND_TEMPLATE}
+            onChange={(e) => updateSshNodeData({ sshCommand: e.target.value })}
+            onPointerDown={(e) => e.stopPropagation()}
+            placeholder={messages.nodes.sshCommandPlaceholder}
+          />
+        </div>
 
         {sshConnections.length === 0 ? (
           <div className={styles.nodeHint}>{messages.nodes.noSavedSshVariables}</div>

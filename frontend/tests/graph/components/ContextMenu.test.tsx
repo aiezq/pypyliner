@@ -54,6 +54,7 @@ describe('ContextMenu terminal switching', () => {
             sshUsername: 'ops',
             sshHost: '10.0.0.12',
             sshPassword: 'secret',
+            sshCommand: 'ssh -tt {username}@{host}',
           },
         },
       ],

@@ -37,14 +37,14 @@ export default function GlobalVariablesWidget() {
     const username = sshUsername.trim()
     const host = sshHost.trim()
 
-    if (!username || !host || !sshPassword.trim()) {
+    if (!username || !host) {
       return
     }
 
     saveSshConnection({
       username,
       host,
-      password: sshPassword,
+      password: sshPassword.trim(),
     })
     setSshUsername('')
     setSshHost('')
@@ -189,7 +189,7 @@ export default function GlobalVariablesWidget() {
               <button
                 type="submit"
                 className={styles.addButton}
-                disabled={!sshUsername.trim() || !sshHost.trim() || !sshPassword.trim()}
+                disabled={!sshUsername.trim() || !sshHost.trim()}
               >
                 {messages.globalVariables.addSshVariable}
               </button>

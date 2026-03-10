@@ -13,6 +13,7 @@ import {
   NODE_TYPES,
   EDGE_TYPES,
   HANDLE_IDS,
+  DEFAULT_SSH_COMMAND_TEMPLATE,
   type GraphNode,
   type GraphEdge,
   type CommandNodeData,
@@ -144,6 +145,28 @@ function parseSshConnectionHint(connectionHint: string | null): {
     sshUsername: '',
     sshHost: trimmed,
   }
+}
+
+function normalizeSshTerminalNodeData(data: SshTerminalNodeData): SshTerminalNodeData {
+  return {
+    ...data,
+    sshPassword: typeof data.sshPassword === 'string' ? data.sshPassword : '',
+    sshCommand:
+      typeof data.sshCommand === 'string' && data.sshCommand.trim()
+        ? data.sshCommand
+        : DEFAULT_SSH_COMMAND_TEMPLATE,
+  }
+}
+
+function normalizeGraphNode(node: GraphNode): GraphNode {
+  if (node.type !== NODE_TYPES.SSH_TERMINAL) {
+    return node
+  }
+
+  return {
+    ...node,
+    data: normalizeSshTerminalNodeData(node.data as SshTerminalNodeData),
+  } satisfies GraphNode
 }
 
 function getNodeDimensions(node: GraphNode): { width: number; height: number } {
@@ -640,6 +663,7 @@ export const useGraphStore = create<GraphState>()(
             sshUsername: data?.sshUsername ?? '',
             sshHost: data?.sshHost ?? '',
             sshPassword: data?.sshPassword ?? '',
+            sshCommand: data?.sshCommand ?? DEFAULT_SSH_COMMAND_TEMPLATE,
           },
         }
 
@@ -682,6 +706,7 @@ export const useGraphStore = create<GraphState>()(
                   sshUsername: '',
                   sshHost: '',
                   sshPassword: '',
+                  sshCommand: DEFAULT_SSH_COMMAND_TEMPLATE,
                 },
               } satisfies GraphNode
             }
@@ -920,6 +945,7 @@ export const useGraphStore = create<GraphState>()(
                 sshUsername: connectionDetails.sshUsername,
                 sshHost: connectionDetails.sshHost,
                 sshPassword: '',
+                sshCommand: DEFAULT_SSH_COMMAND_TEMPLATE,
               },
             })
           } else {
@@ -1017,7 +1043,7 @@ export const useGraphStore = create<GraphState>()(
         nodeIdCounter = maxNum
 
         set({
-          nodes: graph.nodes,
+          nodes: graph.nodes.map((node) => normalizeGraphNode(node as GraphNode)),
           edges: graph.edges,
           viewport: graph.viewport,
           globalVariables: graph.globalVariables,
@@ -1047,6 +1073,7 @@ export const useGraphStore = create<GraphState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          state.nodes = state.nodes.map((node) => normalizeGraphNode(node as GraphNode))
           const maxNum = state.nodes.reduce((max, n) => {
             const num = parseInt(n.id.replace('node-', ''), 10)
             return isNaN(num) ? max : Math.max(max, num)

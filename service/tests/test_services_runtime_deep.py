@@ -573,13 +573,22 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
             terminal_type="ssh",
             ssh_username="deploy",
             ssh_host="10.0.0.15",
-            ssh_password="secret",
             ssh_connection_name="deploy@10.0.0.15",
         )
     )
     assert created_ssh["title"] == "SSH terminal #3"
     assert created_ssh["terminal_type"] == "ssh"
     assert created_ssh["ssh_host"] == "10.0.0.15"
+
+    created_ssh_custom = await runtime.create_manual_terminal(
+        ManualTerminalCreatePayload(
+            title="Jump host",
+            terminal_type="ssh",
+            ssh_command="ssh -tt -J bastion deploy@10.0.0.15",
+        )
+    )
+    assert created_ssh_custom["title"] == "Jump host"
+    assert created_ssh_custom["terminal_type"] == "ssh"
 
     is_open_terminal_command = cast(
         Callable[[str], bool],
@@ -637,8 +646,10 @@ async def test_runtime_create_manual_terminal_and_misc_helpers(monkeypatch: pyte
     ssh_terminal.terminal_type = "ssh"
     ssh_terminal.ssh_username = "deploy"
     ssh_terminal.ssh_host = "10.0.0.15"
-    ssh_terminal.ssh_password = "secret"
-    assert "deploy@10.0.0.15" in build_ssh_argv(ssh_terminal)
+    assert build_ssh_argv(ssh_terminal) == ["ssh", "-tt", "deploy@10.0.0.15"]
+
+    ssh_terminal.ssh_command = "ssh -tt -J bastion deploy@10.0.0.15"
+    assert build_ssh_argv(ssh_terminal) == ["ssh", "-tt", "-J", "bastion", "deploy@10.0.0.15"]
 
     ssh_prefix, ssh_quote, ssh_completions = await token(ssh_terminal, "ls /op")
     assert ssh_prefix == "ls "

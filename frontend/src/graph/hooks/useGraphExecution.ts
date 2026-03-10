@@ -72,9 +72,9 @@ export function useGraphExecution(): UseGraphExecutionReturn {
 
     if (
       chain.terminalType === 'ssh' &&
-      (!chain.sshUsername?.trim() || !chain.sshHost?.trim() || !chain.sshPassword?.trim())
+      (chain.sshCommand?.includes('{username}') || chain.sshCommand?.includes('{host}'))
     ) {
-      throw new Error('SSH terminal requires username, host, and password')
+      throw new Error('SSH terminal requires username and host placeholders to be resolved')
     }
 
     // Validate or create terminal
@@ -102,6 +102,7 @@ export function useGraphExecution(): UseGraphExecutionReturn {
           ssh_host: chain.sshHost,
           ssh_username: chain.sshUsername,
           ssh_password: chain.sshPassword,
+          ssh_command: chain.sshCommand,
         }),
       })
       terminalId = result.id

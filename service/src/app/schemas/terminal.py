@@ -13,10 +13,14 @@ class ManualTerminalCreatePayload(BaseModel):
     ssh_host: str | None = None
     ssh_username: str | None = None
     ssh_password: str | None = None
+    ssh_command: str | None = None
 
     @model_validator(mode="after")
     def validate_ssh_payload(self) -> "ManualTerminalCreatePayload":
         if self.terminal_type != "ssh":
+            return self
+
+        if self.ssh_command and self.ssh_command.strip():
             return self
 
         missing_fields: list[str] = []
@@ -24,8 +28,6 @@ class ManualTerminalCreatePayload(BaseModel):
             missing_fields.append("ssh_username")
         if not (self.ssh_host and self.ssh_host.strip()):
             missing_fields.append("ssh_host")
-        if not (self.ssh_password and self.ssh_password.strip()):
-            missing_fields.append("ssh_password")
 
         if missing_fields:
             joined = ", ".join(missing_fields)

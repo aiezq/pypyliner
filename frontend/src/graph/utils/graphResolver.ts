@@ -1,6 +1,7 @@
 import {
   NODE_TYPES,
   EDGE_TYPES,
+  DEFAULT_SSH_COMMAND_TEMPLATE,
   type GraphNode,
   type GraphEdge,
   type CommandNodeData,
@@ -21,6 +22,7 @@ export interface ResolvedChain {
   sshHost: string | null
   sshUsername: string | null
   sshPassword: string | null
+  sshCommand: string | null
   commands: ResolvedCommand[]
 }
 
@@ -57,6 +59,7 @@ export function resolveChain(
   const selectedSshConnection = isSshTerminal
     ? sshConnections.find((connection) => connection.id === termData.connectionId)
     : undefined
+  const sshNodeData = isSshTerminal ? (termData as SshTerminalNodeData) : null
 
   // Build adjacency: which node chains INTO which node
   // chain edge: source chain-out → target chain-in
@@ -123,13 +126,19 @@ export function resolveChain(
       ? `${selectedSshConnection.username}@${selectedSshConnection.host}`
       : null,
     sshHost: isSshTerminal
-      ? (selectedSshConnection?.host ?? (termData as SshTerminalNodeData).sshHost)
+      ? (selectedSshConnection?.host ?? sshNodeData?.sshHost ?? null)
       : null,
     sshUsername: isSshTerminal
-      ? (selectedSshConnection?.username ?? (termData as SshTerminalNodeData).sshUsername)
+      ? (selectedSshConnection?.username ?? sshNodeData?.sshUsername ?? null)
       : null,
     sshPassword: isSshTerminal
-      ? (selectedSshConnection?.password ?? (termData as SshTerminalNodeData).sshPassword)
+      ? (selectedSshConnection?.password ?? sshNodeData?.sshPassword ?? null)
+      : null,
+    sshCommand: isSshTerminal
+      ? substituteVariables(sshNodeData?.sshCommand?.trim() || DEFAULT_SSH_COMMAND_TEMPLATE, {
+          username: selectedSshConnection?.username ?? sshNodeData?.sshUsername ?? '',
+          host: selectedSshConnection?.host ?? sshNodeData?.sshHost ?? '',
+        })
       : null,
     commands,
   }

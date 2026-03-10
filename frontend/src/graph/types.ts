@@ -22,6 +22,8 @@ export const EDGE_TYPES = {
   SEQUENCE: 'sequence',
 } as const
 
+export const DEFAULT_SSH_COMMAND_TEMPLATE = 'ssh -tt {username}@{host}'
+
 export type EdgeType = (typeof EDGE_TYPES)[keyof typeof EDGE_TYPES]
 
 // ── Handle ID conventions ──────────────────────────────────────────
@@ -65,6 +67,7 @@ export interface SshTerminalNodeData {
   sshUsername: string
   sshHost: string
   sshPassword: string
+  sshCommand: string
   [key: string]: unknown
 }
 

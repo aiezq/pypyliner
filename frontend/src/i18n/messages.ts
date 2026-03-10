@@ -207,6 +207,8 @@ export interface Messages {
     host: string
     hostPlaceholder: string
     password: string
+    sshCommand: string
+    sshCommandPlaceholder: string
     hideSshPassword: string
     showSshPassword: string
     noSavedSshVariables: string
@@ -427,6 +429,8 @@ export const messages: Record<Language, Messages> = {
       host: 'Host',
       hostPlaceholder: '10.0.0.12',
       password: 'Password',
+      sshCommand: 'SSH command',
+      sshCommandPlaceholder: 'ssh -tt {username}@{host}',
       hideSshPassword: 'Hide SSH password',
       showSshPassword: 'Show SSH password',
       noSavedSshVariables: 'No saved SSH variables yet. Fill credentials here or add one in Global Variables.',
@@ -645,6 +649,8 @@ export const messages: Record<Language, Messages> = {
       host: 'Хост',
       hostPlaceholder: '10.0.0.12',
       password: 'Пароль',
+      sshCommand: 'SSH команда',
+      sshCommandPlaceholder: 'ssh -tt {username}@{host}',
       hideSshPassword: 'Скрыть SSH пароль',
       showSshPassword: 'Показать SSH пароль',
       noSavedSshVariables: 'Сохраненных SSH переменных пока нет. Заполните credentials здесь или добавьте их в Global Variables.',

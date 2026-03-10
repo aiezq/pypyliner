@@ -130,6 +130,7 @@ class ManualTerminalState:
     ssh_host: str | None = None
     ssh_username: str | None = None
     ssh_password: str | None = None
+    ssh_command: str | None = None
     lines: list[TerminalLine] = field(default_factory=_new_line_buffer)
     stop_requested: bool = False
     current_process: asyncio.subprocess.Process | None = None
@@ -822,24 +823,27 @@ class RuntimeManager:
 
     @staticmethod
     def _build_ssh_argv(terminal: ManualTerminalState) -> list[str]:
-        if not terminal.ssh_host or not terminal.ssh_username:
-            raise ServiceError(status_code=400, detail="SSH terminal requires host and username")
+        if terminal.ssh_command and terminal.ssh_command.strip():
+            argv = shlex.split(terminal.ssh_command)
+            if not argv:
+                raise ServiceError(status_code=400, detail="SSH terminal requires a valid ssh command")
+            return argv
 
-        return [
-            "ssh",
-            "-tt",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "PreferredAuthentications=password,keyboard-interactive",
-            "-o",
-            "PubkeyAuthentication=no",
-            "-o",
-            "NumberOfPasswordPrompts=1",
-            f"{terminal.ssh_username}@{terminal.ssh_host}",
-        ]
+        if not terminal.ssh_host or not terminal.ssh_username:
+            raise ServiceError(
+                status_code=400,
+                detail="SSH terminal requires host and username when ssh_command is not provided",
+            )
+
+        return ["ssh", "-tt", f"{terminal.ssh_username}@{terminal.ssh_host}"]
+
+    @staticmethod
+    def _describe_ssh_target(terminal: ManualTerminalState) -> str:
+        if terminal.ssh_username and terminal.ssh_host:
+            return f"{terminal.ssh_username}@{terminal.ssh_host}"
+        if terminal.ssh_command and terminal.ssh_command.strip():
+            return terminal.ssh_command.strip()
+        return "ssh"
 
     async def _start_manual_terminal_shell(self, terminal: ManualTerminalState) -> None:
         if self._is_process_running(terminal.current_process):
@@ -903,10 +907,10 @@ class RuntimeManager:
         terminal.ssh_password_sent = False
         terminal.ssh_host_confirmation_sent = False
         terminal.ssh_prompt_ready = False
-        terminal.prompt_user = f"{terminal.ssh_username}@{terminal.ssh_host}"
+        terminal.prompt_user = self._describe_ssh_target(terminal)
         terminal.prompt_cwd = "~"
 
-        connection_target = f"{terminal.ssh_username}@{terminal.ssh_host}"
+        connection_target = self._describe_ssh_target(terminal)
         await self._append_manual_line(
             terminal,
             "meta",
@@ -1276,6 +1280,7 @@ class RuntimeManager:
         ssh_host = payload.ssh_host.strip() if payload.ssh_host else None
         ssh_username = payload.ssh_username.strip() if payload.ssh_username else None
         ssh_password = payload.ssh_password if payload.ssh_password else None
+        ssh_command = payload.ssh_command.strip() if payload.ssh_command else None
         terminal = ManualTerminalState(
             id=terminal_id,
             title=title,
@@ -1284,6 +1289,8 @@ class RuntimeManager:
             prompt_user=(
                 f"{ssh_username}@{ssh_host}"
                 if terminal_type == "ssh" and ssh_username and ssh_host
+                else "ssh"
+                if terminal_type == "ssh"
                 else os.environ.get("USER", "operator")
             ),
             prompt_cwd="~",
@@ -1295,6 +1302,7 @@ class RuntimeManager:
             ssh_host=ssh_host,
             ssh_username=ssh_username,
             ssh_password=ssh_password,
+            ssh_command=ssh_command,
         )
         self.manual_terminals[terminal.id] = terminal
         self._persist_manual_terminal(
@@ -1311,7 +1319,7 @@ class RuntimeManager:
             "meta",
             "[ready] terminal created"
             if terminal.terminal_type == "local"
-            else f"[ready] ssh terminal created for {terminal.ssh_username}@{terminal.ssh_host}",
+            else f"[ready] ssh terminal created for {self._describe_ssh_target(terminal)}",
         )
         await self._start_manual_terminal_shell(terminal)
         event_payload: TerminalCreatedEventData = {"terminal": self._serialize_terminal(terminal)}
