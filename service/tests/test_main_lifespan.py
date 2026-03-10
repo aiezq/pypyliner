@@ -16,6 +16,7 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     pipeline_flows = SimpleNamespace(ensure_ready=AsyncMock())
     ai_models = SimpleNamespace(ensure_ready=AsyncMock())
     history_db = SimpleNamespace(ensure_ready=MagicMock())
+    logger = MagicMock()
 
     configure_logging = MagicMock()
     run_migrations = MagicMock()
@@ -27,6 +28,7 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(app_main, "get_pipeline_flow_manager", lambda: pipeline_flows)
     monkeypatch.setattr(app_main, "get_ai_model_manager", lambda: ai_models)
     monkeypatch.setattr(app_main, "get_history_database", lambda: history_db)
+    monkeypatch.setattr(app_main, "LOGGER", logger)
 
     async with app_main.lifespan(FastAPI()):
         pass
@@ -38,3 +40,4 @@ async def test_lifespan_initializes_dependencies(monkeypatch: pytest.MonkeyPatch
     command_packs.ensure_ready.assert_awaited_once()
     pipeline_flows.ensure_ready.assert_awaited_once()
     ai_models.ensure_ready.assert_awaited_once()
+    assert logger.info.call_args_list[-1].args == ("Application startup complete",)

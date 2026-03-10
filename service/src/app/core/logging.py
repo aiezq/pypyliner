@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
+from collections.abc import Awaitable, Callable
 
 import structlog
+from fastapi import Request, Response
 
 
 _logging_configured = False
+ACCESS_LOGGER = logging.getLogger("operator_helper.http")
 
 
 def configure_logging(level: int = logging.INFO) -> None:
@@ -29,3 +33,20 @@ def configure_logging(level: int = logging.INFO) -> None:
     )
 
     _logging_configured = True
+
+
+async def log_http_request(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - started_at) * 1000
+    ACCESS_LOGGER.info(
+        '%s %s -> %s %.2fms',
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
