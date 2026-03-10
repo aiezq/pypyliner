@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 from unittest.mock import MagicMock
 
 import pytest
@@ -81,3 +82,46 @@ def test_ensure_sqlite_parent_dir_creates_database_parent(
     db._ensure_sqlite_parent_dir()
 
     assert database_path.parent.exists()
+
+
+def test_run_migrations_adds_missing_is_sequence_column(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    database_path = tmp_path / "history.sqlite3"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE manual_terminals_history (
+                terminal_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                closed_at TEXT,
+                log_file_path TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+        )
+        connection.execute(
+            "INSERT INTO alembic_version (version_num) VALUES ('20260304_000001')"
+        )
+        connection.commit()
+
+    service_dir = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(service_dir)
+    monkeypatch.setattr(db.settings, "service_dir", service_dir)
+    monkeypatch.setattr(db.settings, "database_url", f"sqlite:///{database_path}")
+
+    db.run_migrations()
+
+    with sqlite3.connect(database_path) as connection:
+        columns = {
+            row[1]: row for row in connection.execute("PRAGMA table_info(manual_terminals_history)")
+        }
+        version = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+
+    assert "is_sequence" in columns
+    assert version == ("20260310_000002",)
