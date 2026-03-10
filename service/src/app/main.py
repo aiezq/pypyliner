@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.app.api.errors import service_error_handler
+from src.app.api.errors import service_error_handler, unexpected_error_handler
 from src.app.api.router import api_router
 from src.app.core.database import run_migrations
 from src.app.core.logging import configure_logging
@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_exception_handler(ServiceError, service_error_handler)
+    app.add_exception_handler(Exception, unexpected_error_handler)
     app.include_router(api_router)
     return app
 

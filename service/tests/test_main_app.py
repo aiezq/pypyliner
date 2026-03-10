@@ -15,3 +15,4 @@ def test_create_app_registers_routes_and_service_error_handler():
 
     handler = app.exception_handlers.get(ServiceError)
     assert handler is not None
+    assert app.exception_handlers.get(Exception) is not None

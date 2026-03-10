@@ -4,7 +4,7 @@ import json
 
 from starlette.requests import Request
 
-from src.app.api.errors import service_error_handler
+from src.app.api.errors import service_error_handler, unexpected_error_handler
 from src.app.services.runtime import ServiceError
 
 
@@ -26,3 +26,11 @@ def test_service_error_handler_for_generic_exception():
 
     assert response.status_code == 500
     assert json.loads(body) == {"detail": "boom"}
+
+
+def test_unexpected_error_handler_returns_generic_message():
+    response = unexpected_error_handler(_request(), RuntimeError("boom"))
+    body = response.body.tobytes() if isinstance(response.body, memoryview) else response.body
+
+    assert response.status_code == 500
+    assert json.loads(body) == {"detail": "Internal Server Error"}
