@@ -1,11 +1,11 @@
 .panel {
-  border: 1px solid rgba(151, 161, 167, 0.22);
+  border: 1px solid rgba(188, 198, 204, 0.28);
   border-radius: 18px;
   padding: 1rem;
   background:
-    radial-gradient(circle at top left, rgba(104, 116, 122, 0.12), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(120, 136, 125, 0.1), transparent 36%),
-    linear-gradient(180deg, rgba(26, 31, 36, 0.98), rgba(18, 22, 26, 1));
+    radial-gradient(circle at top left, rgba(118, 132, 141, 0.14), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(128, 149, 138, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(33, 40, 46, 0.98), rgba(23, 28, 33, 1));
   box-shadow: var(--shadow);
   overflow: auto;
   display: flex;
@@ -53,8 +53,8 @@
   align-items: center;
   padding: 0.7rem 0.85rem;
   border-radius: 14px;
-  border: 1px solid rgba(110, 146, 199, 0.22);
-  background: rgba(24, 29, 33, 0.86);
+  border: 1px solid rgba(188, 198, 204, 0.24);
+  background: rgba(31, 37, 43, 0.92);
 }
 
 .footerBar {
@@ -70,19 +70,19 @@
   border-radius: 999px;
   padding: 0.25rem 0.7rem;
   font-size: 0.78rem;
-  border: 1px solid rgba(151, 161, 167, 0.24);
+  border: 1px solid rgba(188, 198, 204, 0.3);
 }
 
 .runtimeOk {
-  color: #c7ddd1;
-  border-color: rgba(142, 169, 153, 0.4);
-  background: rgba(44, 54, 49, 0.55);
+  color: #def0e8;
+  border-color: rgba(145, 180, 169, 0.48);
+  background: rgba(58, 71, 64, 0.72);
 }
 
 .runtimeWarn {
-  color: #e2d4ad;
-  border-color: rgba(181, 165, 126, 0.36);
-  background: rgba(57, 51, 39, 0.55);
+  color: #efe1bb;
+  border-color: rgba(198, 180, 140, 0.44);
+  background: rgba(72, 63, 46, 0.72);
 }
 
 .notice {
@@ -105,13 +105,13 @@
   gap: 0.9rem;
   padding: 1rem;
   border-radius: 16px;
-  border: 1px solid rgba(151, 161, 167, 0.18);
-  background: rgba(25, 30, 35, 0.92);
+  border: 1px solid rgba(188, 198, 204, 0.22);
+  background: rgba(31, 37, 43, 0.94);
 }
 
 .modelCardActive {
-  border-color: rgba(142, 169, 153, 0.36);
-  box-shadow: 0 0 0 1px rgba(142, 169, 153, 0.14), 0 12px 26px rgba(6, 8, 10, 0.12);
+  border-color: rgba(145, 180, 169, 0.5);
+  box-shadow: 0 0 0 1px rgba(145, 180, 169, 0.18), 0 14px 28px rgba(0, 0, 0, 0.18);
 }
 
 .modelHead {
@@ -137,9 +137,9 @@
   align-items: center;
   padding: 0.28rem 0.64rem;
   border-radius: 999px;
-  border: 1px solid rgba(142, 169, 153, 0.34);
-  background: rgba(44, 54, 49, 0.52);
-  color: #c7ddd1;
+  border: 1px solid rgba(145, 180, 169, 0.4);
+  background: rgba(58, 71, 64, 0.72);
+  color: #def0e8;
   font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
@@ -181,8 +181,8 @@
   gap: 0.45rem;
   padding: 0.75rem 0.85rem;
   border-radius: 12px;
-  background: rgba(22, 27, 31, 0.88);
-  border: 1px solid rgba(151, 161, 167, 0.14);
+  background: rgba(25, 31, 36, 0.92);
+  border: 1px solid rgba(188, 198, 204, 0.18);
 }
 
 .progressHeader {
@@ -198,14 +198,14 @@
   height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(36, 42, 47, 0.96);
-  border: 1px solid rgba(151, 161, 167, 0.12);
+  background: rgba(17, 21, 25, 0.96);
+  border: 1px solid rgba(188, 198, 204, 0.16);
 }
 
 .progressFill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #789686, #9db3a6);
+  background: linear-gradient(90deg, #86a99d, #afc4b9);
   box-shadow: none;
   transition: width 220ms ease;
 }
@@ -258,8 +258,8 @@
   min-height: 220px;
   resize: vertical;
   border-radius: 14px;
-  border: 1px solid rgba(151, 161, 167, 0.24);
-  background: rgba(19, 23, 27, 0.96);
+  border: 1px solid rgba(188, 198, 204, 0.24);
+  background: rgba(15, 19, 23, 0.98);
   color: var(--text);
   padding: 0.85rem 0.95rem;
   font: inherit;

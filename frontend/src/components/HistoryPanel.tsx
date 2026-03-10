@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { formatTime } from '../lib/mappers'
 import type { BackendManualTerminalHistory } from '../types'
 import styles from './HistoryPanel.module.scss'
+import { useI18n } from '../i18n/I18nProvider'
 
 interface HistoryPanelProps {
   terminalHistory: BackendManualTerminalHistory[]
@@ -16,6 +17,7 @@ function HistoryPanel({
   isLoading,
   errorMessage = null,
 }: HistoryPanelProps) {
+  const { messages } = useI18n()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<FilterType>('all')
@@ -41,10 +43,10 @@ function HistoryPanel({
       {/* LEFT SIDEBAR */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
-          <h2>Terminal History</h2>
+          <h2>{messages.history.title}</h2>
           <input
             type="text"
-            placeholder="Search terminals..."
+            placeholder={messages.history.searchPlaceholder}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className={styles.searchBox}
@@ -53,23 +55,23 @@ function HistoryPanel({
             <button
               className={filterType === 'all' ? styles.active : ''}
               onClick={() => setFilterType('all')}
-            >All</button>
+            >{messages.history.filterAll}</button>
             <button
               className={filterType === 'single' ? styles.active : ''}
               onClick={() => setFilterType('single')}
-            >Singles</button>
+            >{messages.history.filterSingle}</button>
             <button
               className={filterType === 'sequence' ? styles.active : ''}
               onClick={() => setFilterType('sequence')}
-            >Sequences</button>
+            >{messages.history.filterSequence}</button>
           </div>
         </div>
 
         <div className={styles.sessionList}>
           {isLoading && terminalHistory.length === 0 ? (
-            <div className={styles.emptyState}>Loading...</div>
+            <div className={styles.emptyState}>{messages.history.loading}</div>
           ) : filteredHistory.length === 0 ? (
-            <div className={styles.emptyState}>No results.</div>
+            <div className={styles.emptyState}>{messages.history.noResults}</div>
           ) : (
             filteredHistory.map((item) => (
               <div
@@ -79,13 +81,13 @@ function HistoryPanel({
               >
                 <div className={styles.sessionItemHeader}>
                   <strong>{item.title}</strong>
-                  <span className={styles.badge}>{item.commands.length} cmds</span>
+                  <span className={styles.badge}>{messages.history.commandsCount(item.commands.length)}</span>
                 </div>
                 <div className={styles.sessionItemMeta}>
                   {item.is_sequence ? (
-                    <span className={styles.iconSequence} title="Sequence Node Run">⇶</span>
+                    <span className={styles.iconSequence} title={messages.history.sequenceRun}>⇶</span>
                   ) : (
-                    <span className={styles.iconSingle} title="Single Terminal Run">⌨</span>
+                    <span className={styles.iconSingle} title={messages.history.singleRun}>⌨</span>
                   )}
                   <span>{formatTime(item.updated_at)}</span>
                 </div>
@@ -101,9 +103,7 @@ function HistoryPanel({
       {/* RIGHT MAIN AREA */}
       <section className={styles.mainArea}>
         {!selectedTerminal ? (
-          <div className={styles.emptyState}>
-            Select a terminal history session from the left to view details.
-          </div>
+          <div className={styles.emptyState}>{messages.history.emptySelection}</div>
         ) : (
           <>
             <div className={styles.detailHeader}>
@@ -112,16 +112,16 @@ function HistoryPanel({
                 {selectedTerminal.title}
               </h3>
               <div className={styles.metaRow}>
-                <span><strong>Created:</strong> {formatTime(selectedTerminal.created_at)}</span>
+                <span><strong>{messages.history.created}:</strong> {formatTime(selectedTerminal.created_at)}</span>
                 {selectedTerminal.closed_at && (
-                  <span><strong>Closed:</strong> {formatTime(selectedTerminal.closed_at)}</span>
+                  <span><strong>{messages.history.closed}:</strong> {formatTime(selectedTerminal.closed_at)}</span>
                 )}
-                <span><strong>Log File:</strong> <code>{selectedTerminal.log_file_path}</code></span>
+                <span><strong>{messages.history.logFile}:</strong> <code>{selectedTerminal.log_file_path}</code></span>
               </div>
             </div>
             <div className={styles.detailBody}>
               {selectedTerminal.commands.length === 0 ? (
-                <div className={styles.emptyState}>No commands recorded.</div>
+                <div className={styles.emptyState}>{messages.history.noCommands}</div>
               ) : (
                 <div className={styles.commandList}>
                   {selectedTerminal.commands.map((cmd, idx) => (

@@ -5,10 +5,12 @@ import { HANDLE_IDS, type TerminalNodeData } from '../../types'
 import { useGraphStore } from '../../store/graphStore'
 import { useGraphExecution } from '../../hooks/useGraphExecution'
 import styles from './BaseNode.module.scss'
+import { useI18n } from '../../../i18n/I18nProvider'
 
 type Props = NodeProps & { data: TerminalNodeData }
 
 export default function TerminalNode({ id, data, selected }: Props) {
+    const { messages } = useI18n()
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
     const activeTerminalIds = useGraphStore((s) => s.activeTerminalIds)
     const { executeTerminalNode } = useGraphExecution()
@@ -23,10 +25,10 @@ export default function TerminalNode({ id, data, selected }: Props) {
     const statusLabel = error
         ? error
         : isConnected
-            ? `Terminal: ${data.terminalId}`
+            ? messages.nodes.terminalId(data.terminalId!)
             : isClosed
-                ? 'Terminal Closed'
-                : 'Not connected to backend'
+                ? messages.nodes.terminalClosed
+                : messages.nodes.notConnectedToBackend
 
     const handleRun = async () => {
         setError(null)
@@ -34,7 +36,7 @@ export default function TerminalNode({ id, data, selected }: Props) {
         try {
             await executeTerminalNode(id)
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Execution failed')
+            setError(err instanceof Error ? err.message : messages.nodes.executionFailed)
         } finally {
             setIsRunning(false)
         }
@@ -81,7 +83,7 @@ export default function TerminalNode({ id, data, selected }: Props) {
                     onClick={handleRun}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {isRunning ? '⏳ Running…' : '▶ Run Chain'}
+                    {isRunning ? `⏳ ${messages.nodes.running}` : `▶ ${messages.nodes.runChain}`}
                 </button>
             </BaseNode>
         </>

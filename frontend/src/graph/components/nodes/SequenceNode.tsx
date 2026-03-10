@@ -5,10 +5,12 @@ import { HANDLE_IDS, NODE_TYPES, EDGE_TYPES, type SequenceNodeData } from '../..
 import { useGraphStore } from '../../store/graphStore'
 import { useSequenceExecution } from '../../hooks/useSequenceExecution'
 import styles from './BaseNode.module.scss'
+import { useI18n } from '../../../i18n/I18nProvider'
 
 type Props = NodeProps & { data: SequenceNodeData }
 
 export default function SequenceNode({ id, data, selected }: Props) {
+    const { messages } = useI18n()
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
     // Read edges to determine how many sequence input handles to render
     const edges = useGraphStore((s) => s.edges)
@@ -41,7 +43,7 @@ export default function SequenceNode({ id, data, selected }: Props) {
         try {
             await executeSequenceNode(id)
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Execution failed')
+            setError(err instanceof Error ? err.message : messages.nodes.executionFailed)
         } finally {
             setIsRunning(false)
         }
@@ -66,7 +68,7 @@ export default function SequenceNode({ id, data, selected }: Props) {
             }
         >
             <div className={styles.varHandles} style={{ borderColor: 'rgba(243, 179, 94, 0.2)' }}>
-                <span className={styles.varHandlesTitle} style={{ color: 'rgba(243, 179, 94, 0.7)' }}>Execution Order</span>
+                <span className={styles.varHandlesTitle} style={{ color: 'rgba(243, 179, 94, 0.7)' }}>{messages.nodes.executionOrder}</span>
 
                 {Array.from({ length: pinsToRender }).map((_, i) => {
                     const handleId = HANDLE_IDS.sequenceIn(i)
@@ -102,7 +104,7 @@ export default function SequenceNode({ id, data, selected }: Props) {
                                 }}
                             />
                             <span className={styles.varHandleName} style={{ color: '#f3b35e', fontSize: '0.68rem' }}>
-                                {i + 1}. {terminalName ? terminalName : <span style={{ opacity: 0.5 }}>(connect terminal)</span>}
+                                {i + 1}. {terminalName ? terminalName : <span style={{ opacity: 0.5 }}>({messages.nodes.connectTerminal})</span>}
                             </span>
                         </div>
                     )
@@ -116,7 +118,7 @@ export default function SequenceNode({ id, data, selected }: Props) {
                 onClick={handleRun}
                 onPointerDown={(e) => e.stopPropagation()}
             >
-                {isRunning ? '⏳ Running Sequence…' : '⇶ Run Sequence'}
+                {isRunning ? `⏳ ${messages.nodes.runningSequence}` : `⇶ ${messages.nodes.runSequence}`}
             </button>
         </BaseNode>
     )

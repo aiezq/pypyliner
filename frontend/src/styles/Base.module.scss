@@ -1,19 +1,19 @@
   :root {
-    --bg-start: #171b1f;
-    --bg-end: #0f1215;
-    --text: #edf0f1;
-    --muted: #9ea8ad;
-    --accent: #8ea999;
-    --accent-glow: rgba(142, 169, 153, 0.18);
-    --border: rgba(151, 161, 167, 0.24);
-    --border-hover: rgba(174, 184, 190, 0.38);
-    --surface: rgba(22, 27, 31, 0.9);
-    --surface-elevated: rgba(28, 34, 39, 0.96);
-    --shadow: 0 16px 38px rgba(4, 6, 8, 0.24);
+    --bg-start: #12171b;
+    --bg-end: #080a0d;
+    --text: #f6f7f8;
+    --muted: #b9c1c6;
+    --accent: #91b4a9;
+    --accent-glow: rgba(145, 180, 169, 0.2);
+    --border: rgba(188, 198, 204, 0.3);
+    --border-hover: rgba(216, 223, 227, 0.46);
+    --surface: rgba(24, 30, 35, 0.94);
+    --surface-elevated: rgba(34, 41, 47, 0.98);
+    --shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
     --shadow-glow: 0 0 0 rgba(0, 0, 0, 0);
-    --gradient-primary: linear-gradient(135deg, rgba(74, 87, 93, 0.96), rgba(96, 109, 112, 0.96));
-    --gradient-danger: linear-gradient(135deg, rgba(88, 54, 56, 0.96), rgba(109, 67, 69, 0.96));
-    --bg-color: rgba(21, 26, 30, 0.94);
+    --gradient-primary: linear-gradient(135deg, rgba(87, 101, 109, 0.98), rgba(115, 130, 138, 0.98));
+    --gradient-danger: linear-gradient(135deg, rgba(103, 62, 66, 0.98), rgba(126, 78, 82, 0.98));
+    --bg-color: rgba(22, 27, 31, 0.96);
     --text-color: var(--text);
     --text-muted: var(--muted);
     --border-color: var(--border);
@@ -37,9 +37,9 @@
     min-height: 100vh;
     color: var(--text);
     background:
-      radial-gradient(circle at 18% 14%, rgba(95, 110, 118, 0.18), transparent 34%),
-      radial-gradient(circle at 82% 16%, rgba(104, 125, 112, 0.16), transparent 32%),
-      radial-gradient(circle at 50% 100%, rgba(52, 61, 68, 0.18), transparent 46%),
+      radial-gradient(circle at 18% 14%, rgba(116, 132, 142, 0.14), transparent 32%),
+      radial-gradient(circle at 82% 16%, rgba(117, 138, 130, 0.12), transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(70, 80, 88, 0.16), transparent 42%),
       linear-gradient(180deg, var(--bg-start), var(--bg-end));
     background-attachment: fixed;
   }
@@ -58,7 +58,7 @@
   textarea {
     border-radius: 12px;
     border: 1px solid var(--border);
-    background: rgba(17, 21, 24, 0.92);
+    background: rgba(15, 19, 23, 0.96);
     color: var(--text);
     padding: 0.64rem 0.72rem;
     transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
@@ -68,8 +68,8 @@
   textarea:focus {
     outline: none;
     border-color: var(--accent);
-    background: rgba(20, 25, 28, 0.98);
-    box-shadow: 0 0 0 3px rgba(142, 169, 153, 0.1);
+    background: rgba(19, 24, 28, 0.99);
+    box-shadow: 0 0 0 3px rgba(145, 180, 169, 0.14);
   }
 
   textarea {
@@ -108,7 +108,7 @@
   code {
     font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', Menlo, Consolas, monospace;
     font-size: 0.8rem;
-    color: #b8d2c4;
+    color: #d0e0d7;
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -133,7 +133,7 @@
   .panel {
     border: 1px solid var(--border);
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(25, 30, 35, 0.96), rgba(17, 21, 25, 0.98));
+    background: linear-gradient(180deg, rgba(31, 37, 43, 0.97), rgba(22, 27, 32, 0.99));
     padding: 1.2rem;
     box-shadow: var(--shadow);
     backdrop-filter: blur(12px);
@@ -141,7 +141,7 @@
   }
 
   .panel:hover {
-    border-color: rgba(172, 181, 186, 0.28);
+    border-color: rgba(202, 211, 216, 0.34);
   }
 
   .panel h2 {
@@ -197,7 +197,7 @@
   .terminalCard {
     border: 1px solid var(--border);
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(28, 34, 39, 0.92), rgba(21, 25, 29, 0.96));
+    background: linear-gradient(180deg, rgba(35, 42, 48, 0.94), rgba(24, 30, 35, 0.98));
     padding: 0.8rem;
     display: grid;
     gap: 0.55rem;
@@ -208,8 +208,8 @@
   .templateCard:hover,
   .stepCard:hover,
   .terminalCard:hover {
-    border-color: rgba(178, 187, 192, 0.34);
-    box-shadow: 0 10px 24px rgba(5, 7, 9, 0.18);
+    border-color: rgba(206, 214, 218, 0.4);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
   }
 
   .templateCard {
@@ -290,7 +290,7 @@
   .empty {
     margin: 0;
     padding: 0.75rem;
-    border: 1px dashed rgba(151, 161, 167, 0.28);
+    border: 1px dashed rgba(188, 198, 204, 0.34);
     border-radius: 12px;
     color: var(--muted);
     font-size: 0.88rem;

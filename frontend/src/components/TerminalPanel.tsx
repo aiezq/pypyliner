@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MouseEventHandler, type ReactNode } from 'react'
 import type { ManualTerminal, TerminalLine } from '../types'
+import { useI18n } from '../i18n/I18nProvider'
 
 type TerminalHistoryDirection = 'up' | 'down'
 type TerminalPanelVariant = 'pinned' | 'floating'
@@ -70,6 +71,7 @@ const getControlsClassName = (
   controlsClassName ?? (variant === 'floating' ? 'terminalWindow__controls' : 'pinnedTerminalHeadActions')
 
 function TerminalPanel(props: TerminalPanelProps) {
+  const { messages } = useI18n()
   const {
     variant,
     controls,
@@ -124,7 +126,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                       onCancelTitleEdit()
                     }
                   }}
-                  placeholder="Terminal name"
+                  placeholder={messages.terminal.terminalNamePlaceholder}
                   autoFocus
                 />
                 <button
@@ -133,7 +135,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                   onMouseDown={(event) => event.stopPropagation()}
                   onClick={onSaveTitleEdit}
                   disabled={!terminal.titleDraft.trim() || terminal.titleDraft.trim() === terminal.title}
-                  title={`Save terminal name: ${terminal.title}`}
+                  title={messages.terminal.saveTerminalName(terminal.title)}
                 >
                   ✓
                 </button>
@@ -146,7 +148,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                   className="templateEditButton terminalTitleEditButton"
                   onMouseDown={(event) => event.stopPropagation()}
                   onClick={onStartTitleEdit}
-                  aria-label={`Edit terminal name: ${terminal.title}`}
+                  aria-label={messages.terminal.editTerminalName(terminal.title)}
                 >
                   ✎
                 </button>
@@ -172,7 +174,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                       onCancelTitleEdit()
                     }
                   }}
-                  placeholder="Terminal name"
+                  placeholder={messages.terminal.terminalNamePlaceholder}
                   autoFocus
                 />
                 <button
@@ -180,7 +182,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                   className="templateSaveButton"
                   onClick={onSaveTitleEdit}
                   disabled={!terminal.titleDraft.trim() || terminal.titleDraft.trim() === terminal.title}
-                  title={`Save terminal name: ${terminal.title}`}
+                  title={messages.terminal.saveTerminalName(terminal.title)}
                 >
                   ✓
                 </button>
@@ -192,7 +194,7 @@ function TerminalPanel(props: TerminalPanelProps) {
                   type="button"
                   className="templateEditButton terminalTitleEditButton"
                   onClick={onStartTitleEdit}
-                  aria-label={`Edit terminal name: ${terminal.title}`}
+                  aria-label={messages.terminal.editTerminalName(terminal.title)}
                 >
                   ✎
                 </button>
@@ -205,7 +207,7 @@ function TerminalPanel(props: TerminalPanelProps) {
       </div>
 
       <div className={bodyClassName}>
-        <p className="terminalWindow__meta">exit: {terminal.exitCode ?? '...'}</p>
+        <p className="terminalWindow__meta">{messages.terminal.exitCode}: {terminal.exitCode ?? '...'}</p>
 
         <div className="terminalActions">
           <span className="terminalPrompt" title={`${terminal.promptUser}:${terminal.promptCwd}`}>
@@ -240,15 +242,15 @@ function TerminalPanel(props: TerminalPanelProps) {
                 event.preventDefault()
                 onRunCommand()
               }}
-              placeholder="Type command, e.g. ls -la /opt/app"
+              placeholder={messages.terminal.typeCommandPlaceholder}
             />
             <div className="terminalInputActions">
               <button
                 type="button"
                 className="terminalInputAction terminalInputAction--clear"
                 onClick={onClearTerminal}
-                title="Clear output"
-                aria-label="Clear output"
+                title={messages.terminal.clearOutput}
+                aria-label={messages.terminal.clearOutput}
               >
                 <span className="terminalInputActionIcon" aria-hidden="true">
                   🗑
@@ -259,8 +261,8 @@ function TerminalPanel(props: TerminalPanelProps) {
                 className="terminalInputAction terminalInputAction--send"
                 onClick={onRunCommand}
                 disabled={!terminal.draftCommand.trim()}
-                title="Send command"
-                aria-label="Send command"
+                title={messages.terminal.sendCommand}
+                aria-label={messages.terminal.sendCommand}
               >
                 <span className="terminalInputActionIcon" aria-hidden="true">
                   ➜
@@ -272,24 +274,24 @@ function TerminalPanel(props: TerminalPanelProps) {
         <TerminalOutput lines={terminal.lines} />
         <div className="terminalFooterActions">
           <label className="terminalCopyTailControl">
-            <span>Last</span>
+            <span>{messages.terminal.last}</span>
             <input
               type="number"
               min={1}
               step={1}
               value={copyTailLineCount}
               onChange={(event) => onUpdateCopyTailLineCount(event.target.value)}
-              title="Number of lines to copy"
+              title={messages.terminal.numberOfLinesToCopy}
             />
-            <span>lines</span>
+            <span>{messages.terminal.lines}</span>
           </label>
           <button
             type="button"
             className="terminalFooterCopyButton"
             onClick={onCopyTail}
-            title="Copy last lines to clipboard"
+            title={messages.terminal.copyLastLines}
           >
-            {isCopyTailRecentlyCopied ? 'Copied' : 'Copy tail'}
+            {isCopyTailRecentlyCopied ? messages.terminal.copied : messages.terminal.copyTail}
           </button>
         </div>
       </div>

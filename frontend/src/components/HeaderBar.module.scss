@@ -3,12 +3,12 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
-  border: 1px solid rgba(151, 161, 167, 0.24);
+  border: 1px solid rgba(188, 198, 204, 0.28);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 12% 14%, rgba(94, 110, 120, 0.15), transparent 34%),
-    radial-gradient(circle at 86% 78%, rgba(108, 131, 118, 0.12), transparent 36%),
-    linear-gradient(145deg, rgba(28, 34, 39, 0.96), rgba(19, 23, 27, 0.98));
+    radial-gradient(circle at 12% 14%, rgba(112, 128, 138, 0.16), transparent 32%),
+    radial-gradient(circle at 86% 78%, rgba(119, 140, 131, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(33, 40, 46, 0.97), rgba(23, 28, 33, 0.99));
   padding: 0.9rem 1.2rem;
   box-shadow: var(--shadow);
   backdrop-filter: blur(10px);
@@ -16,7 +16,7 @@
 }
 
 .hero:hover {
-  border-color: rgba(175, 184, 189, 0.3);
+  border-color: rgba(216, 223, 227, 0.34);
 }
 
 .hero h1 {
@@ -65,26 +65,26 @@
   font-size: 0.7rem;
   font-weight: 500;
   backdrop-filter: blur(4px);
-  background: rgba(28, 34, 39, 0.66);
+  background: rgba(33, 40, 46, 0.78);
   transition: border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .badge--ok {
-  border-color: rgba(142, 169, 153, 0.48) !important;
-  color: #c7ddd1 !important;
-  background: rgba(44, 54, 49, 0.72) !important;
+  border-color: rgba(145, 180, 169, 0.56) !important;
+  color: #ddf0e7 !important;
+  background: rgba(56, 71, 64, 0.78) !important;
   animation: glow 3s ease-in-out infinite;
 }
 
 .badge--warn {
-  border-color: rgba(181, 165, 126, 0.42) !important;
-  color: #e2d4ad !important;
-  background: rgba(58, 52, 38, 0.72) !important;
+  border-color: rgba(198, 180, 140, 0.46) !important;
+  color: #eee0b9 !important;
+  background: rgba(71, 63, 45, 0.78) !important;
 }
 
 .hero__actionButton {
-  border-color: rgba(151, 161, 167, 0.34);
-  background: linear-gradient(135deg, rgba(52, 64, 71, 0.96), rgba(72, 84, 91, 0.96));
+  border-color: rgba(188, 198, 204, 0.34);
+  background: linear-gradient(135deg, rgba(72, 84, 92, 0.98), rgba(101, 114, 122, 0.98));
   border-radius: 10px;
   padding: 0.42rem 0.72rem;
   font-size: 0.75rem;
@@ -98,8 +98,8 @@
 }
 
 .hero__actionButton--newTerminal {
-  border-color: rgba(137, 164, 148, 0.44);
-  background: linear-gradient(135deg, rgba(74, 97, 85, 0.96), rgba(97, 118, 107, 0.94));
+  border-color: rgba(145, 180, 169, 0.5);
+  background: linear-gradient(135deg, rgba(79, 102, 92, 0.98), rgba(106, 129, 119, 0.98));
 }
 
 .hero__actionButton--newTerminal:hover {
@@ -107,31 +107,73 @@
 }
 
 .hero__actionButton--settings {
-  border-color: rgba(151, 161, 167, 0.34);
-  background: linear-gradient(135deg, rgba(57, 67, 74, 0.96), rgba(76, 85, 92, 0.96));
+  border-color: rgba(188, 198, 204, 0.34);
+  background: linear-gradient(135deg, rgba(76, 88, 96, 0.98), rgba(104, 117, 125, 0.98));
 }
 
 .hero__actionButton--settings:hover {
   box-shadow: 0 8px 16px rgba(7, 9, 11, 0.16);
 }
 
-  .hero__actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
+.hero__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
 
-  @media (max-width: 1060px) {
+.hero__languageSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.18rem;
+  border: 1px solid rgba(188, 198, 204, 0.34);
+  border-radius: 999px;
+  background: rgba(24, 29, 34, 0.78);
+}
+
+.hero__languageButton {
+  min-width: 2.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.28rem 0.54rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.hero__languageButton:hover:enabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.hero__languageButton--active {
+  background: rgba(145, 180, 169, 0.22);
+  color: #eff8f3;
+}
+
+.hero__languageButton--active:hover:enabled {
+  box-shadow: none;
+}
+
+@media (max-width: 1060px) {
   .hero {
     flex-direction: column;
     align-items: flex-start;
   }
 
-    .hero__right,
-    .hero__actions,
-    .hero__badges {
-      justify-items: start;
-      justify-content: flex-start;
-    }
+  .hero__right,
+  .hero__actions,
+  .hero__badges {
+    justify-items: start;
+    justify-content: flex-start;
   }
+
+  .hero__actions {
+    width: 100%;
+  }
+}

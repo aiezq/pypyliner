@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import styles from './BaseNode.module.scss'
+import { useI18n } from '../../../i18n/I18nProvider'
 
 interface BaseNodeProps {
     icon: ReactNode
@@ -20,6 +21,7 @@ export default function BaseNode({
     children,
     footer,
 }: BaseNodeProps) {
+    const { messages } = useI18n()
     const [isEditingLabel, setIsEditingLabel] = useState(false)
     const [draftLabel, setDraftLabel] = useState(label)
     const labelInputRef = useRef<HTMLInputElement | null>(null)
@@ -62,7 +64,7 @@ export default function BaseNode({
                                 }
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            aria-label="Node title editor"
+                            aria-label={messages.nodes.nodeTitleEditor}
                         />
                     ) : (
                         <button
@@ -73,7 +75,7 @@ export default function BaseNode({
                                 setIsEditingLabel(true)
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            aria-label={`Edit node title: ${label}`}
+                            aria-label={messages.nodes.editNodeTitle(label)}
                         >
                             <span className={styles.nodeLabel}>{label}</span>
                         </button>

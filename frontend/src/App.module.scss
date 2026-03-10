@@ -30,8 +30,8 @@
   }
 
   .appTabButton {
-    border-color: rgba(151, 161, 167, 0.28);
-    background: rgba(25, 30, 35, 0.82);
+    border-color: rgba(188, 198, 204, 0.3);
+    background: rgba(30, 36, 42, 0.92);
     color: var(--muted);
     padding: 0.48rem 0.88rem;
     border-radius: 999px;
@@ -42,17 +42,17 @@
   }
 
   .appTabButton:hover:enabled {
-    background: rgba(31, 37, 42, 0.9);
-    border-color: rgba(175, 184, 189, 0.34);
+    background: rgba(38, 45, 51, 0.96);
+    border-color: rgba(216, 223, 227, 0.4);
     color: var(--text);
     box-shadow: 0 8px 16px rgba(6, 8, 10, 0.12);
   }
 
   .appTabButton--active {
-    border-color: rgba(142, 169, 153, 0.48);
-    background: linear-gradient(135deg, rgba(66, 82, 73, 0.94), rgba(90, 107, 97, 0.94));
-    color: #eff5f1;
-    box-shadow: 0 10px 20px rgba(8, 10, 12, 0.14);
+    border-color: rgba(145, 180, 169, 0.56);
+    background: linear-gradient(135deg, rgba(74, 95, 87, 0.98), rgba(103, 124, 116, 0.98));
+    color: #f5fbf7;
+    box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
   }
 
   .appTabButton--active:hover:enabled {
@@ -67,7 +67,7 @@
     align-items: stretch;
     justify-content: flex-end;
     padding: 1rem;
-    background: rgba(9, 11, 14, 0.48);
+    background: rgba(6, 8, 10, 0.6);
     backdrop-filter: blur(8px);
     animation: fadeIn 180ms ease-out;
   }

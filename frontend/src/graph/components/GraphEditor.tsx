@@ -21,6 +21,7 @@ import SequenceNode from './nodes/SequenceNode'
 import ContextMenu from './ContextMenu'
 import GlobalVariablesWidget from './GlobalVariablesWidget'
 import styles from './GraphEditor.module.scss'
+import { useI18n } from '../../i18n/I18nProvider'
 
 const nodeTypes: NodeTypes = {
     [NODE_TYPES.COMMAND]: CommandNode,
@@ -36,6 +37,7 @@ const defaultEdgeOptions = {
 }
 
 export default function GraphEditor() {
+    const { messages } = useI18n()
     const nodes = useGraphStore((s) => s.nodes)
     const edges = useGraphStore((s) => s.edges)
     const onNodesChange = useGraphStore((s) => s.onNodesChange)
@@ -233,9 +235,9 @@ export default function GraphEditor() {
 
             {isEmpty && (
                 <div className={styles.emptyHint}>
-                    Right-click to add nodes
+                    {messages.graph.emptyHint}
                     <br />
-                    <span className={styles.emptyHintKey}>Right Click</span> → Add Command / Variable / Terminal / SSH Terminal
+                    <span className={styles.emptyHintKey}>Right Click</span> → {messages.graph.emptyHintAction}
                 </div>
             )}
         </div>

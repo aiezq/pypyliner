@@ -3,11 +3,11 @@
   top: 1rem;
   right: 1rem;
   z-index: 100;
-  width: 252px;
-  border: 1px solid rgba(151, 161, 167, 0.24);
+  width: 290px;
+  border: 1px solid rgba(188, 198, 204, 0.28);
   border-radius: 12px;
   background:
-    linear-gradient(180deg, rgba(28, 34, 39, 0.94), rgba(20, 24, 28, 0.98));
+    linear-gradient(180deg, rgba(34, 41, 47, 0.96), rgba(23, 28, 33, 0.99));
   backdrop-filter: blur(16px);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   transition: width 0.3s cubic-bezier(0.2, 0, 0, 1);
@@ -17,17 +17,18 @@
 }
 
 .widget--open {
-  width: 336px;
+  width: 360px;
 }
 
 /* ── Header ── */
 
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.6rem 0.8rem;
+  padding: 0.6rem 0.75rem;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -47,12 +48,14 @@
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 700;
-  background: linear-gradient(135deg, rgba(126, 151, 140, 0.24), rgba(144, 167, 156, 0.18));
-  border: 1px solid rgba(142, 169, 153, 0.34);
-  color: #c7d9d0;
+  background: linear-gradient(135deg, rgba(129, 160, 147, 0.3), rgba(153, 181, 169, 0.22));
+  border: 1px solid rgba(145, 180, 169, 0.42);
+  color: #def0e8;
+  flex-shrink: 0;
 }
 
 .headerTitle {
+  min-width: 0;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -60,10 +63,9 @@
 }
 
 .headerBadge {
-  margin-left: auto;
   flex-shrink: 0;
-  background: rgba(142, 169, 153, 0.16);
-  color: #c7d9d0;
+  background: rgba(58, 71, 64, 0.72);
+  color: #def0e8;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 0.15rem 0.4rem;
@@ -82,7 +84,7 @@
 /* ── Content ── */
 
 .content {
-  border-top: 1px solid rgba(151, 161, 167, 0.14);
+  border-top: 1px solid rgba(188, 198, 204, 0.16);
   display: flex;
   flex-direction: column;
   max-height: 520px;
@@ -95,7 +97,7 @@
 }
 
 .section + .section {
-  border-top: 1px solid rgba(151, 161, 167, 0.14);
+  border-top: 1px solid rgba(188, 198, 204, 0.16);
 }
 
 .sectionHeader {
@@ -115,8 +117,8 @@
 
 .sectionBadge {
   margin-left: auto;
-  background: rgba(151, 161, 167, 0.12);
-  color: #c9d2d6;
+  background: rgba(49, 58, 65, 0.82);
+  color: #dbe3e6;
   font-size: 0.62rem;
   font-weight: 700;
   padding: 0.12rem 0.38rem;
@@ -147,15 +149,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.6rem;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(151, 161, 167, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(188, 198, 204, 0.16);
   border-radius: 8px;
   gap: 0.5rem;
 }
 
 .variableItem:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(151, 161, 167, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(216, 223, 227, 0.22);
 }
 
 .variableInfo {
@@ -167,7 +169,7 @@
 
 .variableKey {
   font-size: 0.7rem;
-  color: #c7d9d0;
+  color: #def0e8;
   font-family: monospace;
   font-weight: 600;
 }
@@ -201,8 +203,8 @@
 
 .addForm {
   padding: 0.6rem;
-  background: rgba(14, 17, 20, 0.34);
-  border-top: 1px solid rgba(151, 161, 167, 0.14);
+  background: rgba(12, 15, 18, 0.46);
+  border-top: 1px solid rgba(188, 198, 204, 0.16);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -223,8 +225,8 @@
   min-width: 0;
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
-  border: 1px solid rgba(151, 161, 167, 0.24);
-  background: rgba(18, 22, 26, 0.94);
+  border: 1px solid rgba(188, 198, 204, 0.26);
+  background: rgba(15, 19, 23, 0.98);
   color: var(--text);
   font-size: 0.75rem;
   transition: border-color 0.2s ease;
@@ -243,8 +245,8 @@
 
 .passwordToggle {
   border-radius: 6px;
-  border: 1px solid rgba(151, 161, 167, 0.24);
-  background: rgba(18, 22, 26, 0.94);
+  border: 1px solid rgba(188, 198, 204, 0.26);
+  background: rgba(15, 19, 23, 0.98);
   color: var(--text);
   padding: 0 0.65rem;
   cursor: pointer;

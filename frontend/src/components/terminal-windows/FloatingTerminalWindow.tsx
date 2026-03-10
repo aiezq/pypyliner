@@ -6,6 +6,7 @@ import {
   type TerminalWindowDescriptor,
   type TerminalWindowFrame,
 } from '../../hooks/useFloatingTerminalWindowsController'
+import { useI18n } from '../../i18n/I18nProvider'
 
 interface FloatingTerminalWindowProps {
   windowItem: TerminalWindowDescriptor
@@ -67,7 +68,7 @@ function FloatingTerminalWindow({
   onClearManualTerminal,
   onRemoveManualTerminal,
 }: FloatingTerminalWindowProps) {
-
+  const { messages } = useI18n()
 
   const terminal = windowItem.terminal
   const isEditingTitle = editingManualTitleId === terminal.id
@@ -89,7 +90,7 @@ function FloatingTerminalWindow({
         kind="manual"
         terminal={terminal}
         isEditingTitle={isEditingTitle}
-        titleHint={terminal.terminalType === 'ssh' ? 'SSH terminal' : 'Manual terminal'}
+        titleHint={terminal.terminalType === 'ssh' ? messages.terminal.sshTerminal : messages.terminal.manualTerminal}
         onHeaderMouseDown={onBeginDrag}
         onUpdateTitleDraft={(title) => onUpdateManualTitle(terminal.id, title)}
         onStartTitleEdit={() =>
@@ -117,7 +118,7 @@ function FloatingTerminalWindow({
               className="terminalWindowControl"
               onMouseDown={(event) => event.stopPropagation()}
               onClick={onMinimize}
-              title="Minimize"
+              title={messages.terminal.minimize}
             >
               -
             </button>
@@ -126,7 +127,7 @@ function FloatingTerminalWindow({
               className="terminalWindowControl terminalWindowControl--warning"
               onMouseDown={(event) => event.stopPropagation()}
               onClick={() => onStopManualTerminal(terminal.id)}
-              title="Stop terminal"
+              title={messages.terminal.stopTerminal}
               disabled={terminal.status !== 'running'}
             >
               ‖
@@ -136,11 +137,21 @@ function FloatingTerminalWindow({
               className="terminalWindowControl terminalWindowControl--danger"
               onMouseDown={(event) => event.stopPropagation()}
               onClick={() => onRemoveManualTerminal(terminal.id)}
-              title="Close terminal"
+              title={messages.terminal.closeTerminal}
             >
               ×
             </button>
-            <span className={`status status--${terminal.status}`}>{terminal.status}</span>
+            <span className={`status status--${terminal.status}`}>
+              {terminal.status === 'running'
+                ? messages.terminal.statusRunning
+                : terminal.status === 'success'
+                  ? messages.terminal.statusSuccess
+                  : terminal.status === 'failed'
+                    ? messages.terminal.statusFailed
+                    : terminal.status === 'stopped'
+                      ? messages.terminal.statusStopped
+                      : messages.terminal.statusIdle}
+            </span>
           </>
         }
       />

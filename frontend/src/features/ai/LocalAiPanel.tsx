@@ -19,6 +19,7 @@ import {
 } from './api'
 import { detectDraftRiskFlags } from './riskFlags'
 import styles from './LocalAiPanel.module.scss'
+import { useI18n } from '../../i18n/I18nProvider'
 
 interface LocalAiPanelProps {
   onImportComplete: () => void
@@ -50,6 +51,7 @@ function mergeModel(models: AIModel[], nextModel: AIModel): AIModel[] {
 }
 
 export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanelProps) {
+  const { messages } = useI18n()
   const importPipelineDraft = useGraphStore((state) => state.importPipelineDraft)
 
   const [runtimeAvailable, setRuntimeAvailable] = useState(false)
@@ -86,7 +88,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
         if (!isMounted) {
           return
         }
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load Local AI models.')
+        setErrorMessage(error instanceof Error ? error.message : messages.localAi.loadFailed)
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -128,7 +130,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
           }
         })
         .catch((error) => {
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to refresh install status.')
+          setErrorMessage(error instanceof Error ? error.message : messages.localAi.refreshInstallStatusFailed)
         })
     }, 1200)
 
@@ -147,7 +149,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
       setModels(response.models)
       setSelectedModelId((current) => current ?? response.models[0]?.model_id ?? null)
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to load Local AI models.')
+      setErrorMessage(error instanceof Error ? error.message : messages.localAi.loadFailed)
     } finally {
       setIsLoading(false)
     }
@@ -165,7 +167,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
       setRuntimeName(response.runtime_name)
       setModels((current) => mergeModel(current, response.model))
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Local AI action failed.')
+      setErrorMessage(error instanceof Error ? error.message : messages.localAi.actionFailed)
     } finally {
       setActiveActionModelId(null)
     }
@@ -193,7 +195,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
       })
     } catch (error) {
       setClarificationResponse(null)
-      setErrorMessage(error instanceof Error ? error.message : 'Documentation analysis failed.')
+      setErrorMessage(error instanceof Error ? error.message : messages.localAi.analysisFailed)
     } finally {
       setIsAnalyzing(false)
     }
@@ -217,7 +219,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
       setDraftResponse(response)
     } catch (error) {
       setDraftResponse(null)
-      setErrorMessage(error instanceof Error ? error.message : 'Draft generation failed.')
+      setErrorMessage(error instanceof Error ? error.message : messages.localAi.draftFailed)
     } finally {
       setIsGenerating(false)
     }
@@ -254,16 +256,14 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
     <section className={`${styles.panel}${onClose ? ` ${styles.panelOverlay}` : ''}`}>
       <div className={styles.header}>
         <div>
-          <p className={styles.kicker}>Local AI</p>
-          <h2>Local pipeline draft generator</h2>
-          <p className={styles.subtitle}>
-            Install a local model, paste operator documentation, answer clarification questions, review the draft, then import it into the graph.
-          </p>
+          <p className={styles.kicker}>{messages.localAi.kicker}</p>
+          <h2>{messages.localAi.title}</h2>
+          <p className={styles.subtitle}>{messages.localAi.subtitle}</p>
         </div>
         <div className={styles.headerActions}>
           {onClose ? (
             <button type="button" className="buttonGhost" onClick={onClose}>
-              Close
+              {messages.localAi.close}
             </button>
           ) : null}
         </div>
@@ -273,12 +273,12 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
 
       {!runtimeAvailable ? (
         <div className={styles.notice}>
-          Runtime is missing. `Install` will first attempt to install Ollama, then pull the selected model.
+          {messages.localAi.runtimeMissing}
         </div>
       ) : null}
 
       {isLoading ? (
-        <div className="empty">Loading Local AI models...</div>
+        <div className="empty">{messages.localAi.loadingModels}</div>
       ) : (
         <div className={styles.modelGrid}>
           {models.map((model) => {
@@ -297,37 +297,37 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     <p>{model.provider}</p>
                   </div>
                   {isSelected ? (
-                    <span className={styles.selectedBadge}>Selected</span>
+                    <span className={styles.selectedBadge}>{messages.localAi.selected}</span>
                   ) : (
                     <button
                       type="button"
                       className="buttonGhost"
                       onClick={() => setSelectedModelId(model.model_id)}
                     >
-                      Select
+                      {messages.localAi.select}
                     </button>
                   )}
                 </div>
 
                 <dl className={styles.metaList}>
                   <div>
-                    <dt>Size</dt>
+                    <dt>{messages.localAi.size}</dt>
                     <dd>{formatBytesToGb(model.download_size_bytes)}</dd>
                   </div>
                   <div>
-                    <dt>RAM</dt>
+                    <dt>{messages.localAi.ram}</dt>
                     <dd>
                       {model.min_ram_gb} GB min / {model.recommended_ram_gb} GB recommended
                     </dd>
                   </div>
                   <div>
-                    <dt>State</dt>
+                    <dt>{messages.localAi.state}</dt>
                     <dd>
                       {model.install_state} / {model.model_state}
                     </dd>
                   </div>
                   <div>
-                    <dt>License</dt>
+                    <dt>{messages.localAi.license}</dt>
                     <dd>{model.license}</dd>
                   </div>
                 </dl>
@@ -337,7 +337,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                 {model.install_state === 'installing' || model.progress_percent !== null ? (
                   <div className={styles.progressBlock}>
                     <div className={styles.progressHeader}>
-                      <strong>{model.progress_status ?? 'Installing model...'}</strong>
+                      <strong>{model.progress_status ?? messages.localAi.progressInstalling}</strong>
                       <span>{model.progress_percent !== null ? `${model.progress_percent.toFixed(1)}%` : '...'}</span>
                     </div>
                     <div
@@ -354,14 +354,18 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     </div>
                     <div className={styles.progressMeta}>
                       <span>
-                        Downloaded {formatBytes(model.progress_completed_bytes)}
-                        {model.progress_total_bytes !== null ? ` of ${formatBytes(model.progress_total_bytes)}` : ''}
+                        {model.progress_total_bytes !== null
+                          ? messages.localAi.downloadedOf(
+                            formatBytes(model.progress_completed_bytes),
+                            formatBytes(model.progress_total_bytes),
+                          )
+                          : messages.localAi.downloaded(formatBytes(model.progress_completed_bytes))}
                       </span>
                       <span>
-                        Remaining{' '}
+                        {messages.localAi.remaining}{' '}
                         {model.progress_total_bytes !== null && model.progress_completed_bytes !== null
                           ? formatBytes(Math.max(model.progress_total_bytes - model.progress_completed_bytes, 0))
-                          : 'Unknown'}
+                          : messages.localAi.unknown}
                       </span>
                     </div>
                   </div>
@@ -374,7 +378,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     disabled={isBusy || model.install_state === 'installing'}
                     onClick={() => void runModelAction(model.model_id, installAiModel)}
                   >
-                    {model.install_state === 'installing' ? 'Installing...' : isBusy && model.install_state !== 'installed' ? 'Installing...' : 'Install'}
+                    {model.install_state === 'installing' ? messages.localAi.installing : isBusy && model.install_state !== 'installed' ? messages.localAi.installing : messages.localAi.install}
                   </button>
                   <button
                     type="button"
@@ -382,7 +386,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     disabled={isBusy || model.install_state !== 'installing'}
                     onClick={() => void runModelAction(model.model_id, cancelAiModelInstall)}
                   >
-                    Cancel
+                    {messages.localAi.cancel}
                   </button>
                   <button
                     type="button"
@@ -390,7 +394,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     disabled={isBusy || model.install_state !== 'installed' || model.model_state === 'ready'}
                     onClick={() => void runModelAction(model.model_id, loadAiModel)}
                   >
-                    Load
+                    {messages.localAi.load}
                   </button>
                   <button
                     type="button"
@@ -398,7 +402,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     disabled={isBusy || model.model_state !== 'ready'}
                     onClick={() => void runModelAction(model.model_id, unloadAiModel)}
                   >
-                    Unload
+                    {messages.localAi.unload}
                   </button>
                   <button
                     type="button"
@@ -406,7 +410,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     disabled={isBusy || model.install_state === 'not_installed'}
                     onClick={() => void runModelAction(model.model_id, removeAiModel)}
                   >
-                    Remove
+                    {messages.localAi.remove}
                   </button>
                 </div>
 
@@ -420,7 +424,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     setIsModalOpen(true)
                   }}
                 >
-                  Generate from docs
+                  {messages.localAi.generateFromDocs}
                 </button>
               </article>
             )
@@ -433,10 +437,8 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
           <div className={`modalCard modalCard--flowSettings ${styles.modalCard}`}>
             <div className="modalHead">
               <div>
-                <h2>Generate draft with {selectedModel.display_name}</h2>
-                <p className="modalHint">
-                  The model first extracts clarification questions, then generates the final draft from your answers.
-                </p>
+                <h2>{messages.localAi.generateDraftWith(selectedModel.display_name)}</h2>
+                <p className="modalHint">{messages.localAi.modalHint}</p>
               </div>
               <button
                 type="button"
@@ -446,16 +448,16 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                   resetDraftModalState()
                 }}
               >
-                Close
+                {messages.localAi.close}
               </button>
             </div>
 
             <label className={styles.inputBlock}>
-              <span>Documentation</span>
+              <span>{messages.localAi.documentation}</span>
               <textarea
                 value={documentationText}
                 onChange={(event) => setDocumentationText(event.target.value)}
-                placeholder="Paste operator documentation here."
+                placeholder={messages.localAi.documentationPlaceholder}
                 rows={10}
               />
             </label>
@@ -467,7 +469,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                 disabled={isAnalyzing || selectedModel.model_state !== 'ready' || !documentationText.trim()}
                 onClick={() => void handleAnalyze()}
               >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze docs'}
+                {isAnalyzing ? messages.localAi.analyzing : messages.localAi.analyzeDocs}
               </button>
               <button
                 type="button"
@@ -477,7 +479,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                   setDocumentationText('')
                 }}
               >
-                Reset
+                {messages.localAi.reset}
               </button>
             </div>
 
@@ -485,16 +487,14 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
               <div className={styles.preview}>
                 <div className={styles.previewHeader}>
                   <div>
-                    <p className={styles.previewKicker}>Clarifications</p>
-                    <h3>Answer missing operator choices first</h3>
-                    <p>
-                      The model extracted decision points like region, mode, item set, app IP, or operator login before building commands.
-                    </p>
+                    <p className={styles.previewKicker}>{messages.localAi.clarifications}</p>
+                    <h3>{messages.localAi.answerChoicesFirst}</h3>
+                    <p>{messages.localAi.clarificationsDescription}</p>
                   </div>
                 </div>
 
                 {clarificationQuestions.length === 0 ? (
-                  <div className={styles.emptyState}>No clarification questions were required for this documentation.</div>
+                  <div className={styles.emptyState}>{messages.localAi.noClarificationQuestions}</div>
                 ) : (
                   <div className={styles.questionsList}>
                     {clarificationQuestions.map((question) => (
@@ -521,7 +521,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                             className={styles.questionInput}
                             value={clarificationAnswers[question.id] ?? ''}
                             onChange={(event) => updateClarificationAnswer(question, event.target.value)}
-                            placeholder="Type operator answer"
+                            placeholder={messages.localAi.typeOperatorAnswer}
                           />
                         )}
                       </label>
@@ -541,7 +541,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                     }
                     onClick={() => void handleGenerate()}
                   >
-                    {isGenerating ? 'Generating...' : 'Generate final draft'}
+                    {isGenerating ? messages.localAi.generating : messages.localAi.generateFinalDraft}
                   </button>
                 </div>
               </div>
@@ -551,31 +551,31 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
               <div className={styles.preview}>
                 <div className={styles.previewHeader}>
                   <div>
-                    <p className={styles.previewKicker}>Preview</p>
+                    <p className={styles.previewKicker}>{messages.localAi.preview}</p>
                     <h3>{draftResponse.draft.flow_name}</h3>
                     <p>{draftResponse.draft.summary}</p>
                   </div>
                   <div className={styles.confidence}>
-                    Confidence {(draftResponse.draft.confidence * 100).toFixed(0)}%
+                    {messages.localAi.confidence((draftResponse.draft.confidence * 100).toFixed(0))}
                   </div>
                 </div>
 
                 {riskFlags.length > 0 ? (
                   <div className={styles.blockingWarning}>
-                    Blocking warning: risk flags detected ({riskFlags.join(', ')}). Import is disabled until the draft is edited or regenerated.
+                    {messages.localAi.blockingWarning(riskFlags.join(', '))}
                   </div>
                 ) : null}
 
                 <div className={styles.previewGrid}>
                   <section>
-                    <h4>Variables</h4>
+                    <h4>{messages.localAi.variables}</h4>
                     {draftResponse.draft.variables.length === 0 ? (
-                      <p className={styles.emptyState}>No variables.</p>
+                      <p className={styles.emptyState}>{messages.localAi.noVariables}</p>
                     ) : (
                       <ul className={styles.simpleList}>
                         {draftResponse.draft.variables.map((variable) => (
                           <li key={variable.name}>
-                            <strong>{variable.name}</strong> {variable.required ? '(required)' : '(optional)'} {variable.description}
+                            <strong>{variable.name}</strong> {variable.required ? `(${messages.localAi.required})` : `(${messages.localAi.optional})`} {variable.description}
                           </li>
                         ))}
                       </ul>
@@ -583,7 +583,7 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                   </section>
 
                   <section>
-                    <h4>Steps</h4>
+                    <h4>{messages.localAi.steps}</h4>
                     <ol className={styles.simpleList}>
                       {draftResponse.draft.steps.map((step) => (
                         <li key={step.id}>
@@ -595,9 +595,9 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                   </section>
 
                   <section>
-                    <h4>Warnings</h4>
+                    <h4>{messages.localAi.warnings}</h4>
                     {previewWarnings.length === 0 ? (
-                      <p className={styles.emptyState}>No warnings.</p>
+                      <p className={styles.emptyState}>{messages.localAi.noWarnings}</p>
                     ) : (
                       <ul className={styles.simpleList}>
                         {previewWarnings.map((warning) => (
@@ -608,9 +608,9 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                   </section>
 
                   <section>
-                    <h4>Assumptions</h4>
+                    <h4>{messages.localAi.assumptions}</h4>
                     {draftResponse.draft.assumptions.length === 0 ? (
-                      <p className={styles.emptyState}>No assumptions.</p>
+                      <p className={styles.emptyState}>{messages.localAi.noAssumptions}</p>
                     ) : (
                       <ul className={styles.simpleList}>
                         {draftResponse.draft.assumptions.map((assumption) => (
@@ -633,14 +633,14 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
                       onImportComplete()
                     }}
                   >
-                    Import to graph
+                    {messages.localAi.importToGraph}
                   </button>
                   <button
                     type="button"
                     className="buttonGhost"
                     onClick={() => setIsModalOpen(false)}
                   >
-                    Cancel
+                    {messages.localAi.cancel}
                   </button>
                 </div>
               </div>
@@ -652,10 +652,10 @@ export default function LocalAiPanel({ onImportComplete, onClose }: LocalAiPanel
       <div className={styles.footerBar}>
         <div className={styles.runtimeCard}>
           <span className={runtimeAvailable ? styles.runtimeOk : styles.runtimeWarn}>
-            {runtimeName} {runtimeAvailable ? 'available' : 'not installed'}
+            {runtimeAvailable ? messages.localAi.runtimeAvailable(runtimeName) : messages.localAi.runtimeNotInstalled(runtimeName)}
           </span>
           <button type="button" className="buttonGhost" onClick={() => void refreshModels()}>
-            Refresh
+            {messages.localAi.refresh}
           </button>
         </div>
       </div>

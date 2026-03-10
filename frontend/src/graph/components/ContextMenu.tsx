@@ -12,6 +12,7 @@ import type {
 } from '../types'
 import { NODE_TYPES } from '../types'
 import styles from './ContextMenu.module.scss'
+import { useI18n } from '../../i18n/I18nProvider'
 
 interface ContextMenuProps {
     menu: ContextMenuState
@@ -19,6 +20,7 @@ interface ContextMenuProps {
 }
 
 export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
+    const { messages } = useI18n()
     const addCommandNode = useGraphStore((s) => s.addCommandNode)
     const addVariableNode = useGraphStore((s) => s.addVariableNode)
     const addTerminalNode = useGraphStore((s) => s.addTerminalNode)
@@ -165,7 +167,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
 
             addPreset({
                 nodeType: NODE_TYPES.GROUP,
-                label: saveName.trim() || `Group of ${selectedNodes.length} nodes`,
+                label: saveName.trim() || messages.graph.groupOfNodes(selectedNodes.length),
                 data: {
                     nodes: selectedNodes,
                     edges: internalEdges
@@ -226,12 +228,12 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
             <div className={styles.saveDialog}>
                 {requireName && (
                     <>
-                        <span className={styles.saveDialogLabel}>Preset Name (optional)</span>
+                        <span className={styles.saveDialogLabel}>{messages.graph.presetNameOptional}</span>
                         <input
                             className={styles.saveDialogInput}
                             value={saveName}
                             onChange={(e) => setSaveName(e.target.value)}
-                            placeholder={`Group of ${menu.selectedNodeIds.length} nodes`}
+                            placeholder={messages.graph.groupOfNodes(menu.selectedNodeIds.length)}
                             autoFocus
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') onSubmit()
@@ -240,7 +242,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                     </>
                 )}
 
-                <span className={styles.saveDialogLabel}>Collection (optional)</span>
+                <span className={styles.saveDialogLabel}>{messages.graph.collectionOptional}</span>
                 <input
                     className={styles.saveDialogInput}
                     value={saveCollection}
@@ -278,7 +280,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                         className={styles.menuItem}
                         onClick={onCancel}
                     >
-                        Cancel
+                        {messages.graph.cancel}
                     </button>
                 </div>
             </div>
@@ -289,9 +291,9 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     if (menu.mode === 'node' && targetNode) {
         return (
             <div ref={ref} className={styles.contextMenu} style={{ left: menu.x, top: menu.y }}>
-                <div className={styles.menuTitle}>Node: {(targetNode.data as { label: string }).label}</div>
+                <div className={styles.menuTitle}>{messages.graph.nodeTitle((targetNode.data as { label: string }).label)}</div>
 
-                {saveDialogOpen ? renderSaveDialog('Save', 'e.g. My Commands', handleSavePreset, () => setSaveDialogOpen(false)) : (
+                {saveDialogOpen ? renderSaveDialog(messages.graph.save, messages.graph.commandsPlaceholder, handleSavePreset, () => setSaveDialogOpen(false)) : (
                     <>
                         <button
                             type="button"
@@ -299,7 +301,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                             onClick={() => setSaveDialogOpen(true)}
                         >
                             <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--save']}`}>💾</span>
-                            Save as Preset
+                            {messages.graph.saveAsPreset}
                         </button>
 
                         {canSwitchTerminalType && (
@@ -314,7 +316,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                                 <span className={`${styles.menuItemIcon} ${styles[targetNode.type === NODE_TYPES.TERMINAL ? 'menuItemIcon--ssh-terminal' : 'menuItemIcon--terminal']}`}>
                                     {targetNode.type === NODE_TYPES.TERMINAL ? '⇄' : '▶'}
                                 </span>
-                                {targetNode.type === NODE_TYPES.TERMINAL ? 'Switch to SSH Terminal' : 'Switch to Default Terminal'}
+                                {targetNode.type === NODE_TYPES.TERMINAL ? messages.graph.switchToSshTerminal : messages.graph.switchToDefaultTerminal}
                             </button>
                         )}
 
@@ -329,7 +331,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                             }}
                         >
                             <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
-                            Delete Node
+                            {messages.graph.deleteNode}
                         </button>
                     </>
                 )}
@@ -350,7 +352,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                     }}
                 >
                     <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
-                    Delete Connection
+                    {messages.graph.deleteConnection}
                 </button>
             </div>
         )
@@ -360,10 +362,10 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     if (menu.mode === 'selection' && menu.selectedNodeIds.length > 0) {
         return (
             <div ref={ref} className={styles.contextMenu} style={{ left: menu.x, top: menu.y }}>
-                <div className={styles.menuTitle}>{menu.selectedNodeIds.length} Nodes Selected</div>
+                <div className={styles.menuTitle}>{messages.graph.nodesSelected(menu.selectedNodeIds.length)}</div>
 
-                {saveDialogOpen ? renderSaveDialog('Save Group', 'e.g. My Group Presets', handleSavePreset, () => setSaveDialogOpen(false), true) :
-                    saveIndividualDialogOpen ? renderSaveDialog('Save All', 'e.g. My Commands', handleSaveIndividualPresets, () => setSaveIndividualDialogOpen(false)) : (
+                {saveDialogOpen ? renderSaveDialog(messages.graph.saveGroup, messages.graph.groupPresetsPlaceholder, handleSavePreset, () => setSaveDialogOpen(false), true) :
+                    saveIndividualDialogOpen ? renderSaveDialog(messages.graph.saveAll, messages.graph.commandsPlaceholder, handleSaveIndividualPresets, () => setSaveIndividualDialogOpen(false)) : (
                         <>
                             <button
                                 type="button"
@@ -371,7 +373,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                                 onClick={() => setSaveDialogOpen(true)}
                             >
                                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--save']}`}>💾</span>
-                                Save Selection as Group Preset
+                                {messages.graph.saveGroupPreset}
                             </button>
 
                             <button
@@ -380,7 +382,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                                 onClick={() => setSaveIndividualDialogOpen(true)}
                             >
                                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--save']}`}>⚄</span>
-                                Save Selection as Individual Presets
+                                {messages.graph.saveIndividualPresets}
                             </button>
 
                             <div className={styles.menuDivider} />
@@ -394,7 +396,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                                 }}
                             >
                                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--delete']}`}>✕</span>
-                                Delete Selected
+                                {messages.graph.deleteSelected}
                             </button>
                         </>
                     )}
@@ -405,7 +407,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
     // ── CANVAS CONTEXT MENU ──
     return (
         <div ref={ref} className={styles.contextMenu} style={{ left: menu.x, top: menu.y }}>
-            <div className={styles.menuTitle}>Add Node</div>
+            <div className={styles.menuTitle}>{messages.graph.addNode}</div>
 
             <button
                 type="button"
@@ -413,7 +415,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 onClick={() => { addCommandNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--command']}`}>⌘</span>
-                Command
+                {messages.graph.command}
             </button>
 
             <button
@@ -422,7 +424,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 onClick={() => { addVariableNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--variable']}`}>x</span>
-                Variable
+                {messages.graph.variable}
             </button>
 
             <button
@@ -431,7 +433,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 onClick={() => { addTerminalNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--terminal']}`}>▶</span>
-                Terminal
+                {messages.graph.terminal}
             </button>
 
             <button
@@ -440,7 +442,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 onClick={() => { addSshTerminalNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--ssh-terminal']}`}>⇄</span>
-                SSH Terminal
+                {messages.graph.sshTerminal}
             </button>
 
             <button
@@ -449,7 +451,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                 onClick={() => { addSequenceNode(pos); closeMenu() }}
             >
                 <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--sequence']}`}>⇶</span>
-                Sequence
+                {messages.graph.sequence}
             </button>
 
             {/* ── Presets section ── */}
@@ -463,7 +465,7 @@ export default function ContextMenu({ menu, onClose }: ContextMenuProps) {
                         onClick={() => setPresetsExpanded(!presetsExpanded)}
                     >
                         <span className={`${styles.menuItemIcon} ${styles['menuItemIcon--preset']}`}>★</span>
-                        Preset Collections
+                        {messages.graph.presetCollections}
                         <span className={styles.menuChevron}>{presetsExpanded ? '▾' : '▸'}</span>
                     </button>
 
@@ -503,6 +505,7 @@ function PresetItem({
     preset: NodePreset
     onSpawn: (p: NodePreset) => void
 }) {
+    const { messages } = useI18n()
     const removePreset = usePresetsStore((s) => s.removePreset)
     const typeIcon =
         preset.nodeType === 'command'
@@ -534,7 +537,7 @@ function PresetItem({
                 type="button"
                 className={styles.presetItemDelete}
                 onClick={() => removePreset(preset.id)}
-                title="Remove preset"
+                title={messages.graph.removePreset}
             >
                 ✕
             </button>

@@ -5,29 +5,28 @@ import { HANDLE_IDS, type CommandNodeData } from '../../types'
 import { useGraphStore } from '../../store/graphStore'
 import { tokenizeCommandTemplate } from '../../utils/variableParser'
 import styles from './BaseNode.module.scss'
+import { useI18n } from '../../../i18n/I18nProvider'
 
 type Props = NodeProps & { data: CommandNodeData }
 
-const DEFAULT_COMMAND_LABEL = 'New Command'
-
-function buildCommandLabel(command: string): string {
+function buildCommandLabel(command: string, defaultLabel: string): string {
     const trimmed = command.trim()
     if (!trimmed) {
-        return DEFAULT_COMMAND_LABEL
+        return defaultLabel
     }
 
     const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? trimmed
     return firstLine.length > 32 ? `${firstLine.slice(0, 29)}...` : firstLine
 }
 
-function shouldSyncLabel(label: string, previousCommand: string): boolean {
+function shouldSyncLabel(label: string, previousCommand: string, defaultLabel: string): boolean {
     const trimmedLabel = label.trim()
-    if (!trimmedLabel || trimmedLabel === DEFAULT_COMMAND_LABEL) {
+    if (!trimmedLabel || trimmedLabel === defaultLabel) {
         return true
     }
 
     const trimmedCommand = previousCommand.trim()
-    return trimmedLabel === trimmedCommand || trimmedLabel === buildCommandLabel(previousCommand)
+    return trimmedLabel === trimmedCommand || trimmedLabel === buildCommandLabel(previousCommand, defaultLabel)
 }
 
 function renderCommandPreview(command: string) {
@@ -43,6 +42,8 @@ function renderCommandPreview(command: string) {
 }
 
 export default function CommandNode({ id, data, selected }: Props) {
+    const { messages } = useI18n()
+    const defaultCommandLabel = messages.nodes.newCommand
     const updateNodeData = useGraphStore((s) => s.updateNodeData)
     const [isEditing, setIsEditing] = useState(false)
     const [draftCommand, setDraftCommand] = useState(data.command)
@@ -72,8 +73,8 @@ export default function CommandNode({ id, data, selected }: Props) {
 
     const saveCommand = (nextCommand: string) => {
         const nextData: Partial<CommandNodeData> = { command: nextCommand }
-        if (shouldSyncLabel(data.label, data.command)) {
-            nextData.label = buildCommandLabel(nextCommand)
+        if (shouldSyncLabel(data.label, data.command, defaultCommandLabel)) {
+            nextData.label = buildCommandLabel(nextCommand, defaultCommandLabel)
         }
 
         updateNodeData<CommandNodeData>(id, nextData)
@@ -99,7 +100,7 @@ export default function CommandNode({ id, data, selected }: Props) {
                 footer={
                     data.variableNames.length > 0 ? (
                         <div className={styles.varHandles}>
-                            <span className={styles.varHandlesTitle}>Variables</span>
+                            <span className={styles.varHandlesTitle}>{messages.nodes.variables}</span>
                             {data.variableNames.map((varName) => (
                                 <div key={varName} className={styles.varHandleRow}>
                                     <Handle
@@ -124,7 +125,7 @@ export default function CommandNode({ id, data, selected }: Props) {
                 }
             >
                 <div className={styles.nodeField}>
-                    <span className={styles.nodeFieldLabel}>Command</span>
+                    <span className={styles.nodeFieldLabel}>{messages.nodes.command}</span>
                     {isEditing ? (
                         <textarea
                             ref={editorRef}
@@ -143,7 +144,7 @@ export default function CommandNode({ id, data, selected }: Props) {
                                 }
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
-                            aria-label="Command editor"
+                            aria-label={messages.nodes.commandEditor}
                             rows={Math.max(1, draftCommand.split(/\r?\n/).length || 1)}
                         />
                     ) : (
@@ -159,7 +160,7 @@ export default function CommandNode({ id, data, selected }: Props) {
                             }}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                            {data.command ? renderCommandPreview(data.command) : 'Click to enter command'}
+                            {data.command ? renderCommandPreview(data.command) : messages.nodes.clickToEnterCommand}
                         </button>
                     )}
                 </div>

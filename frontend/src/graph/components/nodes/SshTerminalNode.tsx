@@ -5,10 +5,12 @@ import { HANDLE_IDS, type SshTerminalNodeData } from '../../types'
 import { useGraphStore } from '../../store/graphStore'
 import { useGraphExecution } from '../../hooks/useGraphExecution'
 import styles from './BaseNode.module.scss'
+import { useI18n } from '../../../i18n/I18nProvider'
 
 type Props = NodeProps & { data: SshTerminalNodeData }
 
 export default function SshTerminalNode({ id, data, selected }: Props) {
+  const { messages } = useI18n()
   const updateNodeData = useGraphStore((s) => s.updateNodeData)
   const activeTerminalIds = useGraphStore((s) => s.activeTerminalIds)
   const sshConnections = useGraphStore((s) => s.sshConnections)
@@ -30,15 +32,15 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
     ? `${selectedConnection.username}@${selectedConnection.host}`
     : data.sshUsername && data.sshHost
       ? `${data.sshUsername}@${data.sshHost}`
-      : 'SSH target not configured'
+      : messages.nodes.sshTargetNotConfigured
 
   const statusVariant = error ? 'error' : isConnected ? 'connected' : isClosed ? 'closed' : 'idle'
   const statusLabel = error
     ? error
     : isConnected
-      ? `SSH: ${connectionSummary}`
+      ? messages.nodes.sshConnected(connectionSummary)
       : isClosed
-        ? 'SSH Terminal Closed'
+        ? messages.nodes.sshClosed
         : connectionSummary
 
   const updateSshNodeData = (nextData: Partial<SshTerminalNodeData>): void => {
@@ -54,7 +56,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
     try {
       await executeTerminalNode(id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Execution failed')
+      setError(err instanceof Error ? err.message : messages.nodes.executionFailed)
     } finally {
       setIsRunning(false)
     }
@@ -90,7 +92,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
         }
       >
         <div className={styles.nodeField}>
-          <span className={styles.nodeFieldLabel}>SSH Variable</span>
+          <span className={styles.nodeFieldLabel}>{messages.nodes.sshVariable}</span>
           <select
             className={styles.nodeInput}
             value={data.connectionId ?? ''}
@@ -101,7 +103,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
             }
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <option value="">Manual credentials</option>
+            <option value="">{messages.nodes.manualCredentials}</option>
             {sshConnections.map((connection) => (
               <option key={connection.id} value={connection.id}>
                 {connection.username}@{connection.host}
@@ -115,29 +117,29 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
         ) : (
           <>
             <div className={styles.nodeField}>
-              <span className={styles.nodeFieldLabel}>Username</span>
+              <span className={styles.nodeFieldLabel}>{messages.nodes.username}</span>
               <input
                 className={styles.nodeInput}
                 value={data.sshUsername}
                 onChange={(e) => updateSshNodeData({ sshUsername: e.target.value })}
                 onPointerDown={(e) => e.stopPropagation()}
-                placeholder="operator"
+                placeholder={messages.nodes.usernamePlaceholder}
               />
             </div>
 
             <div className={styles.nodeField}>
-              <span className={styles.nodeFieldLabel}>Host</span>
+              <span className={styles.nodeFieldLabel}>{messages.nodes.host}</span>
               <input
                 className={styles.nodeInput}
                 value={data.sshHost}
                 onChange={(e) => updateSshNodeData({ sshHost: e.target.value })}
                 onPointerDown={(e) => e.stopPropagation()}
-                placeholder="10.0.0.12"
+                placeholder={messages.nodes.hostPlaceholder}
               />
             </div>
 
             <div className={styles.nodeField}>
-              <span className={styles.nodeFieldLabel}>Password</span>
+              <span className={styles.nodeFieldLabel}>{messages.nodes.password}</span>
               <div className={styles.nodeInputRow}>
                 <input
                   className={styles.nodeInput}
@@ -145,14 +147,14 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
                   value={data.sshPassword}
                   onChange={(e) => updateSshNodeData({ sshPassword: e.target.value })}
                   onPointerDown={(e) => e.stopPropagation()}
-                  placeholder="Password"
+                  placeholder={messages.nodes.password}
                 />
                 <button
                   type="button"
                   className={styles.nodeInputToggle}
                   onClick={() => setShowPassword((value) => !value)}
                   onPointerDown={(e) => e.stopPropagation()}
-                  aria-label={showPassword ? 'Hide SSH password' : 'Show SSH password'}
+                  aria-label={showPassword ? messages.nodes.hideSshPassword : messages.nodes.showSshPassword}
                 >
                   {showPassword ? '🙈' : '👁'}
                 </button>
@@ -162,7 +164,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
         )}
 
         {sshConnections.length === 0 ? (
-          <div className={styles.nodeHint}>No saved SSH variables yet. Fill credentials here or add one in Global Variables.</div>
+          <div className={styles.nodeHint}>{messages.nodes.noSavedSshVariables}</div>
         ) : null}
 
         <button
@@ -172,7 +174,7 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
           onClick={handleRun}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {isRunning ? '⏳ Connecting…' : '⇄ Run via SSH'}
+          {isRunning ? `⏳ ${messages.nodes.connecting}` : `⇄ ${messages.nodes.runViaSsh}`}
         </button>
       </BaseNode>
     </>

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useGraphStore } from '../store/graphStore'
 import styles from './GlobalVariablesWidget.module.scss'
+import { useI18n } from '../../i18n/I18nProvider'
 
 export default function GlobalVariablesWidget() {
+  const { messages } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
@@ -62,7 +64,7 @@ export default function GlobalVariablesWidget() {
         aria-expanded={isOpen}
       >
         <span className={styles.headerIcon}>x</span>
-        <span className={styles.headerTitle}>Global Variables</span>
+        <span className={styles.headerTitle}>{messages.globalVariables.title}</span>
         <span className={styles.headerBadge}>{totalCount}</span>
         <span className={styles.headerChevron}>{isOpen ? '▾' : '▸'}</span>
       </button>
@@ -71,13 +73,13 @@ export default function GlobalVariablesWidget() {
         <div className={styles.content}>
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
-              <span className={styles.sectionTitle}>Variables</span>
+              <span className={styles.sectionTitle}>{messages.globalVariables.variables}</span>
               <span className={styles.sectionBadge}>{variableEntries.length}</span>
             </div>
 
             <div className={styles.list}>
               {variableEntries.length === 0 ? (
-                <div className={styles.empty}>No global variables set</div>
+                <div className={styles.empty}>{messages.globalVariables.noVariables}</div>
               ) : (
                 variableEntries.map(([key, val]) => (
                   <div key={key} className={styles.variableItem}>
@@ -89,7 +91,7 @@ export default function GlobalVariablesWidget() {
                       type="button"
                       className={styles.deleteButton}
                       onClick={() => deleteGlobalVariable(key)}
-                      title="Delete variable"
+                      title={messages.globalVariables.deleteVariable}
                     >
                       ✕
                     </button>
@@ -102,34 +104,34 @@ export default function GlobalVariablesWidget() {
               <div className={styles.inputGroup}>
                 <input
                   type="text"
-                  placeholder="Key (e.g. login)"
+                  placeholder={messages.globalVariables.keyPlaceholder}
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
                   className={styles.input}
                 />
                 <input
                   type="text"
-                  placeholder="Value"
+                  placeholder={messages.globalVariables.valuePlaceholder}
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   className={styles.input}
                 />
               </div>
               <button type="submit" className={styles.addButton} disabled={!newKey.trim()}>
-                Add Variable
+                {messages.globalVariables.addVariable}
               </button>
             </form>
           </section>
 
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
-              <span className={styles.sectionTitle}>SSH Variables</span>
+              <span className={styles.sectionTitle}>{messages.globalVariables.sshVariables}</span>
               <span className={styles.sectionBadge}>{sshConnections.length}</span>
             </div>
 
             <div className={styles.list}>
               {sshConnections.length === 0 ? (
-                <div className={styles.empty}>No SSH variables saved</div>
+                <div className={styles.empty}>{messages.globalVariables.noSshVariables}</div>
               ) : (
                 sshConnections.map((connection) => (
                   <div key={connection.id} className={styles.variableItem}>
@@ -141,7 +143,7 @@ export default function GlobalVariablesWidget() {
                       type="button"
                       className={styles.deleteButton}
                       onClick={() => deleteSshConnection(connection.id)}
-                      title="Delete SSH variable"
+                      title={messages.globalVariables.deleteSshVariable}
                     >
                       ✕
                     </button>
@@ -154,14 +156,14 @@ export default function GlobalVariablesWidget() {
               <div className={styles.inputStack}>
                 <input
                   type="text"
-                  placeholder="Account name"
+                  placeholder={messages.globalVariables.accountNamePlaceholder}
                   value={sshUsername}
                   onChange={(e) => setSshUsername(e.target.value)}
                   className={styles.input}
                 />
                 <input
                   type="text"
-                  placeholder="IP / host"
+                  placeholder={messages.globalVariables.hostPlaceholder}
                   value={sshHost}
                   onChange={(e) => setSshHost(e.target.value)}
                   className={styles.input}
@@ -169,7 +171,7 @@ export default function GlobalVariablesWidget() {
                 <div className={styles.passwordRow}>
                   <input
                     type={showSshPassword ? 'text' : 'password'}
-                    placeholder="Password"
+                    placeholder={messages.globalVariables.passwordPlaceholder}
                     value={sshPassword}
                     onChange={(e) => setSshPassword(e.target.value)}
                     className={styles.input}
@@ -178,7 +180,7 @@ export default function GlobalVariablesWidget() {
                     type="button"
                     className={styles.passwordToggle}
                     onClick={() => setShowSshPassword((value) => !value)}
-                    aria-label={showSshPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showSshPassword ? messages.globalVariables.hidePassword : messages.globalVariables.showPassword}
                   >
                     {showSshPassword ? '🙈' : '👁'}
                   </button>
@@ -189,7 +191,7 @@ export default function GlobalVariablesWidget() {
                 className={styles.addButton}
                 disabled={!sshUsername.trim() || !sshHost.trim() || !sshPassword.trim()}
               >
-                Add SSH Variable
+                {messages.globalVariables.addSshVariable}
               </button>
             </form>
           </section>

@@ -1,4 +1,5 @@
 import type { TerminalWindowDescriptor } from '../../hooks/useFloatingTerminalWindowsController'
+import { useI18n } from '../../i18n/I18nProvider'
 
 interface TerminalWindowsDockProps {
   windows: TerminalWindowDescriptor[]
@@ -6,15 +7,16 @@ interface TerminalWindowsDockProps {
 }
 
 function TerminalWindowsDock({ windows, onRestoreWindow }: TerminalWindowsDockProps) {
+  const { messages } = useI18n()
   if (windows.length === 0) {
     return null
   }
 
   return (
-    <aside className="terminalDock" aria-label="Minimized terminals dock">
+    <aside className="terminalDock" aria-label={messages.terminal.dockLabel}>
       <div className="terminalDock__list">
         {windows.map((windowItem) => {
-          const title = windowItem.terminal.title || 'Manual terminal'
+          const title = windowItem.terminal.title || messages.terminal.manualTerminal
           const badge = windowItem.terminal.isSequence ? 'S' : 'M'
           return (
             <button
@@ -22,7 +24,7 @@ function TerminalWindowsDock({ windows, onRestoreWindow }: TerminalWindowsDockPr
               type="button"
               className="terminalDock__item"
               onClick={() => onRestoreWindow(windowItem.windowId)}
-              title={`Restore: ${title}`}
+              title={messages.terminal.restore(title)}
             >
               <span className="terminalDock__icon">{badge}</span>
               <span className="terminalDock__label">{title}</span>
