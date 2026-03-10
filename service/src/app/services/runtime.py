@@ -140,6 +140,8 @@ class ManualTerminalState:
     ssh_password_sent: bool = False
     ssh_host_confirmation_sent: bool = False
     ssh_prompt_ready: bool = False
+    ssh_awaiting_auth_input: bool = False
+    ssh_probe_pending: bool = False
 
 
 class EventHub:
@@ -945,6 +947,8 @@ class RuntimeManager:
         terminal.ssh_password_sent = False
         terminal.ssh_host_confirmation_sent = False
         terminal.ssh_prompt_ready = False
+        terminal.ssh_awaiting_auth_input = False
+        terminal.ssh_probe_pending = False
         terminal.prompt_user = self._describe_ssh_target(terminal)
         terminal.prompt_cwd = "~"
 
@@ -1003,19 +1007,29 @@ class RuntimeManager:
         if (
             not terminal.ssh_password_sent
             and terminal.ssh_password is not None
-            and "password:" in lowered
+            and ("password:" in lowered or "passphrase for key" in lowered)
         ):
             terminal.ssh_password_sent = True
+            terminal.ssh_awaiting_auth_input = False
+            terminal.ssh_probe_pending = True
             await self._append_manual_line(
                 terminal,
                 "meta",
                 "[auth] sending SSH password",
             )
             await self._write_terminal_input(terminal, terminal.ssh_password + "\n")
-            self._create_background_task(
-                self._probe_ssh_terminal_until_ready(terminal.id),
-                label=f"manual_terminal_probe_ssh:{terminal.id}",
-                on_error=lambda error: self._handle_manual_terminal_task_error(terminal.id, error),
+            return
+
+        if (
+            terminal.ssh_password is None
+            and ("password:" in lowered or "passphrase for key" in lowered)
+            and not terminal.ssh_awaiting_auth_input
+        ):
+            terminal.ssh_awaiting_auth_input = True
+            await self._append_manual_line(
+                terminal,
+                "meta",
+                "[auth] SSH password requested; enter it below",
             )
 
     async def _probe_ssh_terminal_until_ready(self, terminal_id: str) -> None:
@@ -1079,6 +1093,8 @@ class RuntimeManager:
                             terminal.status = "idle"
                             changed = True
                         terminal.ssh_prompt_ready = True
+                        terminal.ssh_awaiting_auth_input = False
+                        terminal.ssh_probe_pending = False
                         if changed:
                             payload: TerminalUpdatedEventData = {
                                 "terminal": self._serialize_terminal(terminal)
@@ -1086,6 +1102,9 @@ class RuntimeManager:
                             await self.events.broadcast("terminal_updated", payload)
                         continue
                     await self._append_manual_line(terminal, "out", stripped)
+                    if terminal.terminal_type == "ssh" and terminal.ssh_probe_pending:
+                        terminal.ssh_probe_pending = False
+                        await self._request_manual_prompt_probe(terminal)
         except Exception:
             await self._append_manual_line(
                 terminal,
@@ -1402,23 +1421,38 @@ class RuntimeManager:
         process = terminal.current_process
         if process is None:
             raise ServiceError(status_code=500, detail="Terminal shell is not available")
-        if terminal.terminal_type == "ssh" and not terminal.ssh_prompt_ready:
-            raise ServiceError(status_code=409, detail="SSH terminal is still connecting")
 
         terminal.draft_command = ""
         terminal.status = "running"
         terminal.exit_code = None
         terminal.stop_requested = False
-        if self.history_db is not None:
-            self.history_db.append_manual_terminal_command(
-                terminal_id=terminal.id,
-                command=command,
-                created_at=now_iso(),
-            )
-        await self._append_manual_line(terminal, "meta", f"[input] {command}")
         try:
-            await self._write_terminal_input(terminal, command + "\n")
-            await self._write_terminal_input(terminal, self._prompt_probe_command() + "\n")
+            if terminal.terminal_type == "ssh" and not terminal.ssh_prompt_ready:
+                if terminal.ssh_awaiting_auth_input:
+                    terminal.ssh_awaiting_auth_input = False
+                    terminal.ssh_probe_pending = True
+                    await self._append_manual_line(terminal, "meta", "[auth] sent SSH response")
+                    await self._write_terminal_input(terminal, command + "\n")
+                else:
+                    if self.history_db is not None:
+                        self.history_db.append_manual_terminal_command(
+                            terminal_id=terminal.id,
+                            command=command,
+                            created_at=now_iso(),
+                        )
+                    await self._append_manual_line(terminal, "meta", f"[input] {command}")
+                    await self._write_terminal_input(terminal, command + "\n")
+                    await self._write_terminal_input(terminal, self._prompt_probe_command() + "\n")
+            else:
+                if self.history_db is not None:
+                    self.history_db.append_manual_terminal_command(
+                        terminal_id=terminal.id,
+                        command=command,
+                        created_at=now_iso(),
+                    )
+                await self._append_manual_line(terminal, "meta", f"[input] {command}")
+                await self._write_terminal_input(terminal, command + "\n")
+                await self._write_terminal_input(terminal, self._prompt_probe_command() + "\n")
         except ServiceError:
             raise
         await self._emit_terminal_status(terminal)

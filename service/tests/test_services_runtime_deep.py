@@ -365,6 +365,40 @@ async def test_runtime_pipeline_run_paths(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_runtime_ssh_auth_input_is_not_logged_as_command() -> None:
+    history_db = SimpleNamespace(append_manual_terminal_command=MagicMock())
+    runtime = RuntimeManager(history_db=cast(Any, history_db))
+    setattr(runtime, "_emit_terminal_status", AsyncMock())
+    setattr(runtime, "_append_manual_line", AsyncMock())
+    setattr(runtime, "_write_terminal_input", AsyncMock())
+
+    terminal = _make_terminal("terminal_auth")
+    terminal.terminal_type = "ssh"
+    terminal.current_process = cast(Any, FakeProcess(returncode=None))
+    terminal.ssh_awaiting_auth_input = True
+    runtime.manual_terminals[terminal.id] = terminal
+
+    result = await runtime.run_manual_terminal_command(
+        terminal.id,
+        ManualTerminalCommandPayload(command="super-secret-password"),
+    )
+
+    assert result["status"] == "running"
+    history_db.append_manual_terminal_command.assert_not_called()
+    append_manual_line = cast(AsyncMock, getattr(runtime, "_append_manual_line"))
+    assert append_manual_line.await_args_list[0].args == (
+        terminal,
+        "meta",
+        "[auth] sent SSH response",
+    )
+    write_terminal_input = cast(AsyncMock, getattr(runtime, "_write_terminal_input"))
+    assert write_terminal_input.await_args_list[0].args == (
+        terminal,
+        "super-secret-password\n",
+    )
+
+
+@pytest.mark.asyncio
 async def test_runtime_marks_run_failed_when_background_pipeline_task_crashes() -> None:
     runtime = RuntimeManager()
     runtime.events.broadcast = AsyncMock()
