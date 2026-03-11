@@ -133,6 +133,10 @@ Frontend только:
 - clear очищает buffer, но не убивает shell;
 - stop завершает shell и переводит session в `stopped`.
 - close terminal window удаляет session из backend snapshot; если shell ещё жив, backend сначала останавливает его, а затем убирает session.
+- для top-level local interactive shell команды `exit` и `logout` не должны завершать backend terminal session; закрытие local terminal делается через UI close/stop actions.
+- это ограничение не должно ломать выход из вложенных shell/REPL/container sessions внутри того же terminal, где `exit/logout` должны продолжать работать нормально.
+- practically это означает prompt-aware blocking на backend input path, а не blanket override builtin-команд внутри любого вложенного shell.
+- после выхода из вложенного local shell/container session host prompt должен быть восстановлен в той же terminal session без ручного redraw со стороны пользователя.
 
 ## Архитектура
 
@@ -401,6 +405,21 @@ SSH terminal не должен реализовываться как серия 
 Недопустимый вариант:
 
 - делать псевдо-поддержку SSH через отдельный новый процесс на каждую команду.
+
+Текущий выбранный вариант:
+
+- используется вариант `2`;
+- backend SSH runtime реализован через `paramiko`;
+- на один `ssh-terminal` создаётся один `SSHClient` + один `invoke_shell()` channel;
+- queue commands, manual stdin и post-queue interactive mode работают в этой же живой SSH shell session.
+
+Текущие ограничения первой SSH-итерации:
+
+- transport использует `sshHost`, `sshUsername`, `sshPassword` как основной источник подключения;
+- `sshCommand` пока остаётся UI/config полем graph node и не является источником transport-опций backend runtime;
+- при отсутствии `sshPassword` backend разрешает key/agent auth через `paramiko`;
+- host key policy первой итерации: auto-accept (`AutoAddPolicy`) ради рабочего local operator UX.
+- если interactive SSH terminal после завершения backend queue получает `exit` или `logout`, backend закрывает remote SSH channel и переводит ту же terminal session в локальный shell, чтобы пользователь возвращался на свою машину, а не в мёртвую session.
 
 ### SSH и sequence
 

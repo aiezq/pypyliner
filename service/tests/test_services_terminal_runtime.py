@@ -1,6 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import getpass
+import os
+import queue
+import re
+import shlex
+import socket
+import time
 from pathlib import Path
 
 import pytest
@@ -13,7 +20,191 @@ from src.app.schemas.terminal import (
     TerminalExecutionPayload,
 )
 from src.app.services.runtime import ServiceError
-from src.app.services.terminal_runtime import MARKER_PREFIX, TerminalRuntimeManager
+from src.app.services.terminal_runtime import (
+    BOOTSTRAP_PREFIX,
+    INPUT_READY_PREFIX,
+    LOCAL_EXIT_BLOCK_MESSAGE,
+    LocalShellHandle,
+    MARKER_PREFIX,
+    TerminalRuntimeManager,
+)
+
+
+class FakeSshChannel:
+    def __init__(self) -> None:
+        self.closed = False
+        self._chunks: queue.Queue[bytes] = queue.Queue()
+        self.cwd = str(Path.home())
+        self.width = 120
+        self.height = 40
+
+    def settimeout(self, _timeout: float) -> None:
+        return None
+
+    def sendall(self, data: str) -> None:
+        if self.closed:
+            return
+
+        bootstrap_match = re.search(rf"{BOOTSTRAP_PREFIX}:([a-z0-9]+)", data)
+        if bootstrap_match:
+            self._chunks.put(f"{BOOTSTRAP_PREFIX}:{bootstrap_match.group(1)}\n".encode())
+            return
+
+        input_ready_match = re.search(rf"{INPUT_READY_PREFIX}:([a-z0-9]+)", data)
+        if input_ready_match:
+            self._chunks.put(f"{INPUT_READY_PREFIX}:{input_ready_match.group(1)}\n".encode())
+            return
+
+        marker_match = re.search(rf"{MARKER_PREFIX}:([a-z0-9]+):%s", data)
+        if marker_match:
+            command = data.split("\n", 1)[0].strip()
+            output, exit_code = self._run_command(command)
+            payload = "".join(f"{line}\n" for line in output)
+            payload += f"{MARKER_PREFIX}:{marker_match.group(1)}:{exit_code}\n"
+            self._chunks.put(payload.encode())
+            return
+
+        for command in [line.strip() for line in data.splitlines() if line.strip()]:
+            output, _ = self._run_command(command)
+            if output:
+                self._chunks.put("".join(f"{line}\n" for line in output).encode())
+
+    def recv(self, _size: int) -> bytes:
+        if self.closed:
+            return b""
+        try:
+            return self._chunks.get(timeout=0.2)
+        except queue.Empty as error:
+            raise socket.timeout() from error
+
+    def resize_pty(self, width: int, height: int) -> None:
+        self.width = width
+        self.height = height
+
+    def close(self) -> None:
+        self.closed = True
+        self._chunks.put(b"")
+
+    def _run_command(self, command: str) -> tuple[list[str], int]:
+        if command in {"stty echo 2>/dev/null || true", "stty -echo 2>/dev/null || true"}:
+            return [], 0
+        if command.startswith("cd "):
+            self.cwd = command[3:].strip()
+            return [], 0
+        if command == "pwd":
+            return [self.cwd], 0
+        if command.startswith("echo "):
+            parts = shlex.split(command)
+            return [" ".join(parts[1:])], 0
+        if command.startswith("sleep "):
+            try:
+                delay = float(command.split(" ", 1)[1].strip())
+            except ValueError:
+                delay = 0
+            time.sleep(min(delay, 0.05))
+            return [], 0
+        if command == "false":
+            return [], 1
+        return [command], 0
+
+
+class FakeSshClient:
+    def __init__(self) -> None:
+        self.closed = False
+        self.channel = FakeSshChannel()
+        self.connection_args: dict[str, object] = {}
+
+    def set_missing_host_key_policy(self, _policy: object) -> None:
+        return None
+
+    def connect(self, **kwargs: object) -> None:
+        self.connection_args = kwargs
+
+    def invoke_shell(self, *, term: str, width: int, height: int) -> FakeSshChannel:
+        self.channel.width = width
+        self.channel.height = height
+        self.connection_args["term"] = term
+        return self.channel
+
+    def close(self) -> None:
+        self.closed = True
+        self.channel.close()
+
+
+class FakeParamikoModule:
+    class SSHException(Exception):
+        pass
+
+    class AuthenticationException(SSHException):
+        pass
+
+    class BadHostKeyException(SSHException):
+        pass
+
+    class AutoAddPolicy:
+        pass
+
+    def __init__(self) -> None:
+        self.clients: list[FakeSshClient] = []
+
+    def SSHClient(self) -> FakeSshClient:
+        client = FakeSshClient()
+        self.clients.append(client)
+        return client
+
+
+def test_local_shell_bootstrap_for_switched_ssh_terminal_uses_local_prompt_setup(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    runtime = TerminalRuntimeManager()
+    payload = TerminalExecutionPayload(
+        terminal_node_id="node_ssh_prompt",
+        title="SSH Prompt Terminal",
+        terminal_type="ssh",
+        ssh_host="example.com",
+        ssh_username="operator",
+        ssh_password="secret",
+        commands=[],
+    )
+    terminal = runtime._build_terminal_state(
+        payload=payload,
+        sequence_id=None,
+        keep_alive=True,
+        stdin_enabled=True,
+        retain_completion_status=True,
+    )
+    monkeypatch.setenv("VIRTUAL_ENV", str(Path("/tmp/fake-venv")))
+    monkeypatch.setenv("PATH", f"/tmp/fake-venv/bin{os.pathsep}/usr/bin")
+
+    shell_env = runtime._build_local_shell_env(terminal)
+    bootstrap_script = runtime._build_shell_bootstrap_script(terminal, LocalShellHandle(reader_task=None), "token")
+
+    assert shell_env.get("VIRTUAL_ENV") is None
+    assert shell_env["VIRTUAL_ENV_DISABLE_PROMPT"] == "1"
+    assert "/tmp/fake-venv/bin" not in shell_env["PATH"]
+    assert any(command in bootstrap_script for command in runtime._build_prompt_setup_commands(interactive=True))
+
+
+def test_local_exit_blocking_depends_on_top_level_prompt():
+    runtime = TerminalRuntimeManager()
+    terminal = runtime._build_terminal_state(
+        payload=TerminalExecutionPayload(
+            terminal_node_id="node_local_prompt",
+            title="Local Prompt Terminal",
+            terminal_type="local",
+            commands=[],
+        ),
+        sequence_id=None,
+        keep_alive=True,
+        stdin_enabled=True,
+        retain_completion_status=False,
+    )
+
+    runtime._terminal_screen_buffers[terminal.id] = "aiezq:~ % "
+    assert runtime._should_block_local_exit(terminal) is True
+
+    runtime._terminal_screen_buffers[terminal.id] = "/ # "
+    assert runtime._should_block_local_exit(terminal) is False
 
 
 async def _wait_for_terminal(
@@ -180,6 +371,160 @@ async def test_manual_terminal_starts_in_user_home_directory():
 
 
 @pytest.mark.asyncio
+async def test_manual_local_terminal_blocks_exit_and_keeps_shell_alive():
+    runtime = TerminalRuntimeManager()
+    terminal = await runtime.create_terminal(TerminalCreatePayload(title="Guarded Terminal"))
+
+    await runtime.write_terminal_input(terminal["id"], "exit\n")
+    with_block_message = await _wait_for_terminal_output(runtime, terminal["id"], LOCAL_EXIT_BLOCK_MESSAGE)
+    assert any(line["text"] == LOCAL_EXIT_BLOCK_MESSAGE for line in with_block_message["lines"])
+
+    await runtime.write_terminal_input(terminal["id"], 'echo "still here"\n')
+    with_follow_up = await _wait_for_terminal_output(runtime, terminal["id"], "still here")
+    assert any(line["text"] == "still here" for line in with_follow_up["lines"])
+    assert runtime.get_terminal(terminal["id"])["status"] == "idle"
+    assert runtime.get_terminal(terminal["id"])["shell_pid"] is not None
+
+    stopped = await runtime.stop_terminal(terminal["id"])
+    assert stopped["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_local_nested_shell_exit_restores_host_prompt():
+    runtime = TerminalRuntimeManager()
+    terminal = await runtime.create_terminal(TerminalCreatePayload(title="Nested Prompt Terminal"))
+
+    await runtime.write_terminal_input(terminal["id"], "sh\n")
+    await _wait_for_screen_buffer_text(runtime, terminal["id"], "sh-")
+
+    await runtime.write_terminal_input(terminal["id"], "exit\n")
+    await _wait_for_screen_buffer_text(runtime, terminal["id"], f"{getpass.getuser()}:~ % ")
+
+    stopped = await runtime.stop_terminal(terminal["id"])
+    assert stopped["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_execute_ssh_terminal_reuses_single_remote_shell_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    runtime = TerminalRuntimeManager()
+    fake_paramiko = FakeParamikoModule()
+    monkeypatch.setattr(runtime, "_load_paramiko", lambda: fake_paramiko)
+
+    payload = TerminalExecutionPayload(
+        terminal_node_id="node_ssh_terminal_1",
+        title="SSH Terminal",
+        terminal_type="ssh",
+        ssh_host="example.com:2222",
+        ssh_username="operator",
+        ssh_password="secret",
+        commands=[
+            TerminalCommandPayload(
+                node_id="node_cmd_1",
+                label="Change directory",
+                original_command=f"cd {tmp_path}",
+                resolved_command=f"cd {tmp_path}",
+            ),
+            TerminalCommandPayload(
+                node_id="node_cmd_2",
+                label="Print working directory",
+                original_command="pwd",
+                resolved_command="pwd",
+            ),
+        ],
+    )
+
+    terminal = await runtime.execute_terminal(payload)
+    completed = await _wait_for_terminal(runtime, terminal["id"])
+
+    assert completed["status"] == "success"
+    assert completed["stdin_enabled"] is True
+    assert completed["shell_pid"] is None
+    assert [item["status"] for item in completed["queue"]] == ["success", "success"]
+    assert any(line["text"] == str(tmp_path) for line in completed["lines"])
+
+    client = fake_paramiko.clients[0]
+    assert client.connection_args["hostname"] == "example.com"
+    assert client.connection_args["port"] == 2222
+    assert client.connection_args["username"] == "operator"
+    assert client.connection_args["password"] == "secret"
+    assert client.connection_args["term"] == "xterm-256color"
+
+    await runtime.write_terminal_input(terminal["id"], 'echo "native ssh"\n')
+    with_native_input = await _wait_for_terminal_output(runtime, terminal["id"], "native ssh")
+    assert any(line["text"] == "native ssh" for line in with_native_input["lines"])
+
+    stopped = await runtime.stop_terminal(terminal["id"])
+    assert stopped["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_create_ssh_terminal_requires_host_and_username(monkeypatch: pytest.MonkeyPatch):
+    runtime = TerminalRuntimeManager()
+    monkeypatch.setattr(runtime, "_load_paramiko", lambda: FakeParamikoModule())
+
+    with pytest.raises(ServiceError) as error_info:
+        await runtime.create_terminal(
+            TerminalCreatePayload(
+                title="SSH Manual Terminal",
+                terminal_type="ssh",
+                ssh_host="",
+                ssh_username="",
+            )
+        )
+
+    assert error_info.value.status_code == 400
+    assert error_info.value.detail == "SSH host and username are required"
+
+
+@pytest.mark.asyncio
+async def test_ssh_terminal_exit_switches_back_to_local_shell(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    runtime = TerminalRuntimeManager()
+    monkeypatch.setattr(runtime, "_load_paramiko", lambda: FakeParamikoModule())
+
+    terminal = await runtime.execute_terminal(
+        TerminalExecutionPayload(
+            terminal_node_id="node_ssh_terminal_exit",
+            title="SSH Terminal Exit",
+            terminal_type="ssh",
+            ssh_host="example.com",
+            ssh_username="operator",
+            ssh_password="secret",
+            commands=[
+                TerminalCommandPayload(
+                    node_id="node_cmd_1",
+                    label="Change remote directory",
+                    original_command=f"cd {tmp_path}",
+                    resolved_command=f"cd {tmp_path}",
+                ),
+            ],
+        )
+    )
+    completed = await _wait_for_terminal(runtime, terminal["id"])
+
+    assert completed["stdin_enabled"] is True
+    assert runtime._shells[terminal["id"]].transport == "ssh"
+
+    await runtime.write_terminal_input(terminal["id"], "exit\n")
+    await _wait_for_shell_transport(runtime, terminal["id"], "local")
+
+    after_switch = runtime.get_terminal(terminal["id"])
+    assert after_switch["stdin_enabled"] is True
+    assert after_switch["shell_pid"] is not None
+
+    await runtime.write_terminal_input(terminal["id"], "pwd\n")
+    with_local_input = await _wait_for_terminal_output(runtime, terminal["id"], str(Path.home()))
+
+    assert any(line["text"] == str(Path.home()) for line in with_local_input["lines"])
+    assert not any(line["text"] == str(tmp_path) for line in with_local_input["lines"][-3:])
+
+    stopped = await runtime.stop_terminal(terminal["id"])
+    assert stopped["status"] == "stopped"
+
+
+@pytest.mark.asyncio
 async def test_execute_terminal_filters_shell_noise_and_preserves_output_order():
     runtime = TerminalRuntimeManager()
     payload = TerminalExecutionPayload(
@@ -268,6 +613,40 @@ async def _wait_for_terminal_output(
             terminal = runtime.get_terminal(terminal_id)
             if any(line["text"] == expected_text for line in terminal["lines"]):
                 return terminal
+            await asyncio.sleep(0.05)
+
+    return await asyncio.wait_for(_poll(), timeout=timeout)
+
+
+async def _wait_for_shell_transport(
+    runtime: TerminalRuntimeManager,
+    terminal_id: str,
+    transport: str,
+    *,
+    timeout: float = 5.0,
+):
+    async def _poll():
+        while True:
+            shell = runtime._shells.get(terminal_id)
+            if shell is not None and shell.transport == transport:
+                return shell
+            await asyncio.sleep(0.05)
+
+    return await asyncio.wait_for(_poll(), timeout=timeout)
+
+
+async def _wait_for_screen_buffer_text(
+    runtime: TerminalRuntimeManager,
+    terminal_id: str,
+    expected_text: str,
+    *,
+    timeout: float = 5.0,
+):
+    async def _poll():
+        while True:
+            buffer = runtime._terminal_screen_buffers.get(terminal_id, "")
+            if expected_text in buffer:
+                return buffer
             await asyncio.sleep(0.05)
 
     return await asyncio.wait_for(_poll(), timeout=timeout)

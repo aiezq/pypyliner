@@ -8,3 +8,4 @@ pydantic-settings==2.13.1
 rq==2.7.0
 redis==7.2.1
 structlog==25.5.0
+paramiko==3.5.1

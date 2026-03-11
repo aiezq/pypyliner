@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import fcntl
+import importlib
 import logging
 import os
 import pty
 import re
 import signal
+import socket
 import struct
 import subprocess
 import termios
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Coroutine, Literal
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Coroutine, Literal
 
 from fastapi import WebSocket
 
@@ -56,10 +58,15 @@ BOOTSTRAP_PREFIX = "__OPH_SHELL_READY__"
 BOOTSTRAP_PATTERN = re.compile(rf"^{BOOTSTRAP_PREFIX}:([a-z0-9]+)$")
 INPUT_READY_PREFIX = "__OPH_INPUT_READY__"
 INPUT_READY_PATTERN = re.compile(rf"^{INPUT_READY_PREFIX}:([a-z0-9]+)$")
+LOCAL_EXIT_BLOCK_MESSAGE = "Use terminal close button instead of exit/logout"
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 PROMPT_ONLY_PATTERN = re.compile(r"^(?:[\w.@:/~ -]+)?[%#$]\s*$")
 PROMPT_PREFIX_PATTERN = re.compile(r"^[\w.@:/~ -]+[%#$>]\s+")
+LOCAL_PROMPT_BUFFER_PATTERN = re.compile(r"[\w.@-]+:[\w./~ -]*[%#$>]\s$")
+
+if TYPE_CHECKING:
+    import paramiko
 
 
 @dataclass(slots=True)
@@ -94,6 +101,7 @@ class TerminalSessionState:
     ssh_connection_name: str | None
     ssh_host: str | None
     ssh_username: str | None
+    ssh_password: str | None
     status: TerminalStatus
     created_at: str
     started_at: str | None
@@ -109,6 +117,7 @@ class TerminalSessionState:
     lines: list[TerminalLine] = field(default_factory=list)
     stop_requested: bool = False
     close_requested: bool = False
+    interactive_input_buffer: str = ""
 
 
 @dataclass(slots=True)
@@ -125,9 +134,7 @@ class SequenceExecutionState:
 
 
 @dataclass(slots=True)
-class LocalShellHandle:
-    process: subprocess.Popen[bytes]
-    master_fd: int
+class ShellHandleBase:
     reader_task: asyncio.Task[None] | None
     current_marker_token: str | None = None
     current_marker_future: asyncio.Future[int] | None = None
@@ -138,6 +145,21 @@ class LocalShellHandle:
     raw_stream_enabled: bool = False
     input_ready_token: str | None = None
     input_ready_future: asyncio.Future[None] | None = None
+    transport: Literal["local", "ssh"] = "local"
+
+
+@dataclass(slots=True)
+class LocalShellHandle(ShellHandleBase):
+    process: subprocess.Popen[bytes] | None = None
+    master_fd: int = -1
+    transport: Literal["local", "ssh"] = "local"
+
+
+@dataclass(slots=True)
+class SshShellHandle(ShellHandleBase):
+    client: "paramiko.SSHClient" | None = None
+    channel: "paramiko.Channel" | None = None
+    transport: Literal["local", "ssh"] = "ssh"
 
 
 class TerminalRuntimeManager:
@@ -145,7 +167,7 @@ class TerminalRuntimeManager:
         self.events = events or EventHub()
         self.terminals: dict[str, TerminalSessionState] = {}
         self.sequences: dict[str, SequenceExecutionState] = {}
-        self._shells: dict[str, LocalShellHandle] = {}
+        self._shells: dict[str, LocalShellHandle | SshShellHandle] = {}
         self._terminal_stream_clients: dict[str, set[WebSocket]] = {}
         self._terminal_screen_buffers: dict[str, str] = {}
         self._terminal_run_tasks: dict[str, asyncio.Task[Any]] = {}
@@ -153,6 +175,30 @@ class TerminalRuntimeManager:
 
     async def ensure_ready(self) -> None:
         return None
+
+    @staticmethod
+    def _load_paramiko() -> Any:
+        try:
+            return importlib.import_module("paramiko")
+        except ModuleNotFoundError as error:
+            raise ServiceError(
+                status_code=503,
+                detail="SSH runtime dependency 'paramiko' is not installed",
+            ) from error
+
+    @staticmethod
+    def _parse_ssh_target(host: str) -> tuple[str, int]:
+        trimmed = host.strip()
+        if not trimmed:
+            raise ServiceError(status_code=400, detail="SSH host is required")
+        if trimmed.startswith("[") and "]:" in trimmed:
+            hostname, _, port_raw = trimmed[1:].partition("]:")
+            return hostname, int(port_raw)
+        if trimmed.count(":") == 1:
+            hostname, _, port_raw = trimmed.partition(":")
+            if port_raw.isdigit():
+                return hostname, int(port_raw)
+        return trimmed, 22
 
     def _serialize_line(self, line: TerminalLine) -> TerminalLineData:
         return {
@@ -246,9 +292,6 @@ class TerminalRuntimeManager:
         }
 
     async def execute_terminal(self, payload: TerminalExecutionPayload) -> TerminalSessionData:
-        if payload.terminal_type != "local":
-            raise ServiceError(status_code=501, detail="SSH terminal runtime is not implemented yet")
-
         terminal = self._build_terminal_state(
             payload=payload,
             sequence_id=None,
@@ -263,9 +306,6 @@ class TerminalRuntimeManager:
         return self._serialize_terminal(terminal)
 
     async def create_terminal(self, payload: TerminalCreatePayload) -> TerminalSessionData:
-        if payload.terminal_type != "local":
-            raise ServiceError(status_code=501, detail="SSH terminal runtime is not implemented yet")
-
         terminal = self._build_terminal_state(
             payload=TerminalExecutionPayload(
                 terminal_node_id=make_id("manual_terminal"),
@@ -300,8 +340,6 @@ class TerminalRuntimeManager:
             raise ServiceError(status_code=404, detail="Terminal session not found")
         if terminal.status == "stopped":
             raise ServiceError(status_code=409, detail="Terminal session has been stopped")
-        if terminal.terminal_type != "local":
-            raise ServiceError(status_code=501, detail="SSH terminal runtime is not implemented yet")
 
         resolved_command = payload.command.strip()
         command = TerminalCommandState(
@@ -359,7 +397,7 @@ class TerminalRuntimeManager:
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal session not found")
         shell = self._shells.get(terminal.id)
-        shell_is_alive = shell is not None and shell.process.poll() is None
+        shell_is_alive = shell is not None and self._is_shell_alive(shell)
         if terminal.status in {"success", "failed", "stopped"} and not shell_is_alive:
             return self._serialize_terminal(terminal)
 
@@ -441,24 +479,41 @@ class TerminalRuntimeManager:
         if not terminal.stdin_enabled:
             return
         shell = self._shells.get(terminal_session_id)
-        if shell is None or shell.process.poll() is not None:
+        if shell is None or not self._is_shell_alive(shell):
             return
-        await asyncio.to_thread(os.write, shell.master_fd, data.encode())
+        if terminal.terminal_type == "ssh" and shell.transport == "ssh":
+            passthrough, should_switch = self._split_ssh_interactive_input(terminal, data)
+            if passthrough:
+                await self._write_shell_data(shell, passthrough.encode())
+            if should_switch:
+                await self._broadcast_terminal_stream_text(terminal.id, "\r\n")
+                await self._switch_ssh_terminal_to_local_shell(terminal)
+            return
+        if shell.transport == "local":
+            passthrough, should_block, should_refresh_prompt = self._split_local_interactive_input(terminal, data)
+            if should_block:
+                await self._write_shell_data(shell, b"\x15")
+                await self._broadcast_terminal_stream_text(terminal.id, "^U\r\n")
+                await self._append_terminal_line(terminal, "out", LOCAL_EXIT_BLOCK_MESSAGE)
+                return
+            if passthrough:
+                await self._write_shell_data(shell, passthrough.encode())
+            if should_refresh_prompt:
+                self._create_background_task(
+                    self._refresh_local_prompt_after_nested_exit(terminal.id),
+                    label=f"terminal_prompt_refresh:{terminal.id}",
+                )
+            return
+        await self._write_shell_data(shell, data.encode())
 
     async def resize_terminal(self, terminal_session_id: str, cols: int, rows: int) -> None:
         terminal = self.terminals.get(terminal_session_id)
         if terminal is None:
             raise ServiceError(status_code=404, detail="Terminal session not found")
         shell = self._shells.get(terminal_session_id)
-        if shell is None or shell.process.poll() is not None:
+        if shell is None or not self._is_shell_alive(shell):
             return
-
-        winsize = struct.pack("HHHH", rows, cols, 0, 0)
-        await asyncio.to_thread(fcntl.ioctl, shell.master_fd, termios.TIOCSWINSZ, winsize)
-        try:
-            os.kill(shell.process.pid, signal.SIGWINCH)
-        except ProcessLookupError:
-            return
+        await self._resize_shell(shell, cols=cols, rows=rows)
 
     def _build_terminal_state(
         self,
@@ -492,6 +547,7 @@ class TerminalRuntimeManager:
             ssh_connection_name=payload.ssh_connection_name,
             ssh_host=payload.ssh_host,
             ssh_username=payload.ssh_username,
+            ssh_password=payload.ssh_password,
             status="idle",
             created_at=now_iso(),
             started_at=None,
@@ -750,15 +806,6 @@ class TerminalRuntimeManager:
         await self._emit_sequence_status(sequence)
 
     async def _process_terminal_queue(self, terminal: TerminalSessionState) -> None:
-        if terminal.terminal_type != "local":
-            await self._append_terminal_line(terminal, "meta", "[error] SSH terminal runtime is not implemented yet")
-            for command in terminal.queue:
-                if command.status == "pending":
-                    command.status = "skipped"
-                    command.finished_at = now_iso()
-            await self._finalize_terminal(terminal, status="failed", exit_code=-1)
-            return
-
         if not any(command.status == "pending" for command in terminal.queue):
             if not terminal.keep_alive:
                 await self._append_terminal_line(terminal, "meta", "[finish] terminal queue is empty")
@@ -890,8 +937,8 @@ class TerminalRuntimeManager:
     async def _ensure_shell_started(self, terminal: TerminalSessionState) -> None:
         if terminal.id in self._shells:
             shell = self._shells[terminal.id]
-            if shell.process.poll() is None:
-                terminal.shell_pid = shell.process.pid
+            if self._is_shell_alive(shell):
+                terminal.shell_pid = self._get_shell_pid(shell)
                 if terminal.started_at is None:
                     terminal.started_at = now_iso()
                 return
@@ -901,11 +948,11 @@ class TerminalRuntimeManager:
             terminal.started_at = now_iso()
         await self._emit_terminal_status(terminal)
 
-        shell = await self._start_local_shell(terminal)
+        shell = await (self._start_local_shell(terminal) if terminal.terminal_type == "local" else self._start_ssh_shell(terminal))
         self._shells[terminal.id] = shell
         shell.reader_task = asyncio.create_task(self._pump_terminal_output(terminal.id))
         await self._bootstrap_shell(terminal, shell)
-        terminal.shell_pid = shell.process.pid
+        terminal.shell_pid = self._get_shell_pid(shell)
         await self._emit_terminal_status(terminal)
 
     async def _start_local_shell(self, terminal: TerminalSessionState) -> LocalShellHandle:
@@ -914,10 +961,7 @@ class TerminalRuntimeManager:
             self._disable_echo(slave_fd)
         shell_command = self._build_local_shell_command(terminal)
         shell_cwd = str(Path.home())
-        shell_env = {
-            **os.environ,
-            "TERM": "xterm-256color" if terminal.keep_alive else "dumb",
-        }
+        shell_env = self._build_local_shell_env(terminal)
 
         process = subprocess.Popen(
             shell_command,
@@ -933,6 +977,220 @@ class TerminalRuntimeManager:
 
         return LocalShellHandle(process=process, master_fd=master_fd, reader_task=None)
 
+    async def _start_ssh_shell(self, terminal: TerminalSessionState) -> SshShellHandle:
+        if not terminal.ssh_host or not terminal.ssh_username:
+            raise ServiceError(status_code=400, detail="SSH host and username are required")
+
+        try:
+            hostname, port = self._parse_ssh_target(terminal.ssh_host)
+        except ValueError as error:
+            raise ServiceError(status_code=400, detail=f"Invalid SSH target: {terminal.ssh_host}") from error
+
+        paramiko = self._load_paramiko()
+        term_type = "xterm-256color" if terminal.keep_alive else "dumb"
+
+        def _connect() -> tuple[Any, Any]:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(
+                hostname=hostname,
+                port=port,
+                username=terminal.ssh_username,
+                password=terminal.ssh_password or None,
+                look_for_keys=not bool(terminal.ssh_password),
+                allow_agent=not bool(terminal.ssh_password),
+                timeout=10,
+                banner_timeout=10,
+                auth_timeout=10,
+            )
+            channel = client.invoke_shell(term=term_type, width=120, height=40)
+            channel.settimeout(1.0)
+            return client, channel
+
+        try:
+            client, channel = await asyncio.to_thread(_connect)
+        except (paramiko.AuthenticationException, paramiko.BadHostKeyException) as error:
+            raise ServiceError(status_code=401, detail=f"SSH authentication failed: {error}") from error
+        except (paramiko.SSHException, socket.timeout, TimeoutError, OSError) as error:
+            raise ServiceError(status_code=502, detail=f"SSH connection failed: {error}") from error
+
+        return SshShellHandle(client=client, channel=channel, reader_task=None)
+
+    @staticmethod
+    def _is_shell_alive(shell: LocalShellHandle | SshShellHandle) -> bool:
+        if shell.transport == "local":
+            return shell.process is not None and shell.process.poll() is None
+        return shell.channel is not None and not shell.channel.closed
+
+    @staticmethod
+    def _get_shell_pid(shell: LocalShellHandle | SshShellHandle) -> int | None:
+        if shell.transport == "local":
+            return shell.process.pid if shell.process is not None else None
+        return None
+
+    async def _write_shell_data(self, shell: LocalShellHandle | SshShellHandle, data: bytes) -> None:
+        if shell.transport == "local":
+            await asyncio.to_thread(os.write, shell.master_fd, data)
+            return
+        if shell.channel is None:
+            raise ServiceError(status_code=500, detail="SSH shell channel is not available")
+        await asyncio.to_thread(shell.channel.sendall, data.decode(errors="replace"))
+
+    async def _read_shell_data(self, shell: LocalShellHandle | SshShellHandle, size: int) -> bytes:
+        if shell.transport == "local":
+            return await asyncio.to_thread(os.read, shell.master_fd, size)
+        if shell.channel is None:
+            return b""
+        try:
+            return await asyncio.to_thread(shell.channel.recv, size)
+        except socket.timeout:
+            return b""
+
+    async def _resize_shell(self, shell: LocalShellHandle | SshShellHandle, *, cols: int, rows: int) -> None:
+        if shell.transport == "local":
+            winsize = struct.pack("HHHH", rows, cols, 0, 0)
+            await asyncio.to_thread(fcntl.ioctl, shell.master_fd, termios.TIOCSWINSZ, winsize)
+            try:
+                if shell.process is not None:
+                    os.kill(shell.process.pid, signal.SIGWINCH)
+            except ProcessLookupError:
+                return
+            return
+        if shell.channel is None:
+            return
+        await asyncio.to_thread(shell.channel.resize_pty, width=cols, height=rows)
+
+    @staticmethod
+    def _split_ssh_interactive_input(terminal: TerminalSessionState, data: str) -> tuple[str, bool]:
+        passthrough_parts: list[str] = []
+        should_switch = False
+
+        for char in data:
+            if char in {"\r", "\n"}:
+                command = terminal.interactive_input_buffer.strip()
+                terminal.interactive_input_buffer = ""
+                if command in {"exit", "logout"}:
+                    should_switch = True
+                    continue
+                passthrough_parts.append(char)
+                continue
+
+            if char == "\x7f":
+                terminal.interactive_input_buffer = terminal.interactive_input_buffer[:-1]
+                passthrough_parts.append(char)
+                continue
+
+            if char == "\x03":
+                terminal.interactive_input_buffer = ""
+                passthrough_parts.append(char)
+                continue
+
+            if char == "\x1b":
+                passthrough_parts.append(char)
+                continue
+
+            if char.isprintable():
+                terminal.interactive_input_buffer += char
+            passthrough_parts.append(char)
+
+        return ("".join(passthrough_parts), should_switch)
+
+    def _split_local_interactive_input(self, terminal: TerminalSessionState, data: str) -> tuple[str, bool, bool]:
+        passthrough_parts: list[str] = []
+        should_block = False
+        should_refresh_prompt = False
+
+        for char in data:
+            if char in {"\r", "\n"}:
+                command = terminal.interactive_input_buffer.strip()
+                terminal.interactive_input_buffer = ""
+                if command in {"exit", "logout"} and self._should_block_local_exit(terminal):
+                    should_block = True
+                    continue
+                if command in {"exit", "logout"}:
+                    should_refresh_prompt = True
+                passthrough_parts.append(char)
+                continue
+
+            if char == "\x7f":
+                terminal.interactive_input_buffer = terminal.interactive_input_buffer[:-1]
+                passthrough_parts.append(char)
+                continue
+
+            if char == "\x03":
+                terminal.interactive_input_buffer = ""
+                passthrough_parts.append(char)
+                continue
+
+            if char.isprintable():
+                terminal.interactive_input_buffer += char
+            passthrough_parts.append(char)
+
+        return ("".join(passthrough_parts), should_block, should_refresh_prompt)
+
+    def _should_block_local_exit(self, terminal: TerminalSessionState) -> bool:
+        buffer = self._terminal_screen_buffers.get(terminal.id, "")
+        normalized = ANSI_ESCAPE_PATTERN.sub("", buffer).replace("\r", "")
+        tail = normalized.split("\n")[-1]
+        return bool(LOCAL_PROMPT_BUFFER_PATTERN.search(tail))
+
+    async def _refresh_local_prompt_after_nested_exit(self, terminal_id: str) -> None:
+        await asyncio.sleep(0.25)
+        terminal = self.terminals.get(terminal_id)
+        shell = self._shells.get(terminal_id)
+        if terminal is None or shell is None:
+            return
+        if shell.transport != "local" or not terminal.stdin_enabled or not self._is_shell_alive(shell):
+            return
+        if self._should_block_local_exit(terminal):
+            return
+        await self._set_terminal_input_enabled(terminal, enabled=True)
+
+    async def _switch_ssh_terminal_to_local_shell(self, terminal: TerminalSessionState) -> None:
+        shell = self._shells.get(terminal.id)
+        if shell is not None:
+            await self._close_shell_transport(shell)
+            try:
+                if shell.reader_task is not None:
+                    await shell.reader_task
+            except Exception:
+                LOGGER.debug("SSH reader task ended with error during local shell switch", exc_info=True)
+            self._shells.pop(terminal.id, None)
+
+        terminal.interactive_input_buffer = ""
+        terminal.stdin_enabled = True
+        terminal.shell_pid = None
+
+        local_shell = await self._start_local_shell(terminal)
+        self._shells[terminal.id] = local_shell
+        local_shell.reader_task = asyncio.create_task(self._pump_terminal_output(terminal.id))
+        await self._bootstrap_shell(terminal, local_shell)
+        terminal.shell_pid = self._get_shell_pid(local_shell)
+        await self._emit_terminal_status(terminal)
+
+    async def _wait_for_shell_exit(self, shell: LocalShellHandle | SshShellHandle) -> None:
+        if shell.transport == "local":
+            if shell.process is not None:
+                await asyncio.to_thread(shell.process.wait)
+            return
+        if shell.channel is None:
+            return
+        while self._is_shell_alive(shell):
+            await asyncio.sleep(0.05)
+
+    async def _close_shell_transport(self, shell: LocalShellHandle | SshShellHandle) -> None:
+        if shell.transport == "local":
+            try:
+                os.close(shell.master_fd)
+            except OSError:
+                pass
+            return
+
+        if shell.channel is not None:
+            await asyncio.to_thread(shell.channel.close)
+        if shell.client is not None:
+            await asyncio.to_thread(shell.client.close)
+
     @staticmethod
     def _build_local_shell_command(terminal: TerminalSessionState) -> list[str]:
         shell_name = os.path.basename(SHELL_EXECUTABLE)
@@ -943,6 +1201,25 @@ class TerminalRuntimeManager:
         if shell_name == "fish":
             return [SHELL_EXECUTABLE, "--no-config"]
         return [SHELL_EXECUTABLE]
+
+    @staticmethod
+    def _build_local_shell_env(terminal: TerminalSessionState) -> dict[str, str]:
+        shell_env = dict(os.environ)
+        shell_env["TERM"] = "xterm-256color" if terminal.keep_alive else "dumb"
+        shell_env["VIRTUAL_ENV_DISABLE_PROMPT"] = "1"
+        venv_path = shell_env.pop("VIRTUAL_ENV", None)
+        shell_env.pop("PYTHONHOME", None)
+
+        if venv_path:
+            venv_bin = str(Path(venv_path) / ("Scripts" if os.name == "nt" else "bin"))
+            path_entries = shell_env.get("PATH", "").split(os.pathsep)
+            shell_env["PATH"] = os.pathsep.join(
+                entry
+                for entry in path_entries
+                if entry and Path(entry).resolve() != Path(venv_bin).resolve()
+            )
+
+        return shell_env
 
     @staticmethod
     def _build_prompt_setup_commands(*, interactive: bool) -> list[str]:
@@ -976,13 +1253,26 @@ class TerminalRuntimeManager:
                 )
         return commands
 
+    @staticmethod
+    def _should_apply_local_prompt_setup(shell: LocalShellHandle | SshShellHandle) -> bool:
+        return shell.transport == "local"
+
     @classmethod
-    def _build_shell_bootstrap_script(cls, terminal: TerminalSessionState, token: str) -> str:
-        commands = cls._build_prompt_setup_commands(interactive=terminal.stdin_enabled)
+    def _build_shell_bootstrap_script(
+        cls,
+        terminal: TerminalSessionState,
+        shell: LocalShellHandle | SshShellHandle,
+        token: str,
+    ) -> str:
+        commands = (
+            cls._build_prompt_setup_commands(interactive=terminal.stdin_enabled)
+            if cls._should_apply_local_prompt_setup(shell)
+            else []
+        )
 
         commands.extend(
             [
-                "stty echo" if terminal.stdin_enabled else "stty -echo",
+                "stty echo 2>/dev/null || true" if terminal.stdin_enabled else "stty -echo 2>/dev/null || true",
                 f"printf '\\n{BOOTSTRAP_PREFIX}:{token}\\n'",
             ]
         )
@@ -996,7 +1286,7 @@ class TerminalRuntimeManager:
 
     async def _write_and_wait_for_command(
         self,
-        shell: LocalShellHandle,
+        shell: LocalShellHandle | SshShellHandle,
         command: TerminalCommandState,
     ) -> int:
         marker_token = make_id("marker").replace("marker_", "")
@@ -1009,10 +1299,14 @@ class TerminalRuntimeManager:
             f"{command.resolved_command}\n"
             f"printf '\\n{MARKER_PREFIX}:{marker_token}:%s\\n' \"$?\"\n"
         )
-        await asyncio.to_thread(os.write, shell.master_fd, marker_command.encode())
+        await self._write_shell_data(shell, marker_command.encode())
         return await future
 
-    async def _bootstrap_shell(self, terminal: TerminalSessionState, shell: LocalShellHandle) -> None:
+    async def _bootstrap_shell(
+        self,
+        terminal: TerminalSessionState,
+        shell: LocalShellHandle | SshShellHandle,
+    ) -> None:
         if shell.bootstrapped:
             return
 
@@ -1021,26 +1315,30 @@ class TerminalRuntimeManager:
         future: asyncio.Future[None] = loop.create_future()
         shell.bootstrap_token = token
         shell.bootstrap_future = future
-        bootstrap_script = self._build_shell_bootstrap_script(terminal, token)
-        await asyncio.to_thread(os.write, shell.master_fd, bootstrap_script.encode())
+        bootstrap_script = self._build_shell_bootstrap_script(terminal, shell, token)
+        await self._write_shell_data(shell, bootstrap_script.encode())
         await future
         if terminal.keep_alive:
             shell.raw_stream_enabled = terminal.stdin_enabled
-            await asyncio.to_thread(os.write, shell.master_fd, b"\n")
+            await self._write_shell_data(shell, b"\n")
 
     async def _set_terminal_input_enabled(self, terminal: TerminalSessionState, *, enabled: bool) -> None:
         shell = self._shells.get(terminal.id)
-        if shell is None or shell.process.poll() is not None or not shell.bootstrapped:
+        if shell is None or not self._is_shell_alive(shell) or not shell.bootstrapped:
             terminal.stdin_enabled = enabled
             return
 
-        prompt_setup = "\n".join(self._build_prompt_setup_commands(interactive=enabled))
-        script = f"{prompt_setup}\n"
+        prompt_setup = (
+            "\n".join(self._build_prompt_setup_commands(interactive=enabled))
+            if self._should_apply_local_prompt_setup(shell)
+            else ""
+        )
+        script = f"{prompt_setup}\n" if prompt_setup else ""
         if not enabled:
             terminal.stdin_enabled = False
             shell.raw_stream_enabled = False
-            script += "stty -echo\n"
-            await asyncio.to_thread(os.write, shell.master_fd, script.encode())
+            script += "stty -echo 2>/dev/null || true\n"
+            await self._write_shell_data(shell, script.encode())
             return
 
         token = make_id("input").replace("input_", "")
@@ -1049,12 +1347,12 @@ class TerminalRuntimeManager:
         shell.input_ready_token = token
         shell.input_ready_future = future
         shell.raw_stream_enabled = False
-        script += f"stty echo\nprintf '\\n{INPUT_READY_PREFIX}:{token}\\n'\n"
-        await asyncio.to_thread(os.write, shell.master_fd, script.encode())
+        script += f"stty echo 2>/dev/null || true\nprintf '\\n{INPUT_READY_PREFIX}:{token}\\n'\n"
+        await self._write_shell_data(shell, script.encode())
         await future
         terminal.stdin_enabled = True
         shell.raw_stream_enabled = True
-        await asyncio.to_thread(os.write, shell.master_fd, b"\n")
+        await self._write_shell_data(shell, b"\n")
 
     async def _pump_terminal_output(self, terminal_id: str) -> None:
         terminal = self.terminals.get(terminal_id)
@@ -1066,12 +1364,15 @@ class TerminalRuntimeManager:
 
         while True:
             try:
-                chunk = await asyncio.to_thread(os.read, shell.master_fd, 4096)
-            except OSError:
+                chunk = await self._read_shell_data(shell, 4096)
+            except Exception:
                 break
 
             if not chunk:
-                break
+                if not self._is_shell_alive(shell):
+                    break
+                await asyncio.sleep(0.05)
+                continue
 
             decoded_chunk = chunk.decode(errors="replace")
             if shell.bootstrapped and terminal.keep_alive and shell.raw_stream_enabled:
@@ -1190,20 +1491,17 @@ class TerminalRuntimeManager:
             return
 
         try:
-            if shell.process.poll() is None:
+            if self._is_shell_alive(shell):
                 try:
-                    await asyncio.to_thread(os.write, shell.master_fd, b"exit\n")
-                except OSError:
+                    await self._write_shell_data(shell, b"exit\n")
+                except (OSError, ServiceError):
                     pass
                 try:
-                    await asyncio.wait_for(asyncio.to_thread(shell.process.wait), timeout=1.5)
+                    await asyncio.wait_for(self._wait_for_shell_exit(shell), timeout=1.5)
                 except asyncio.TimeoutError:
                     await self._terminate_shell(shell)
         finally:
-            try:
-                os.close(shell.master_fd)
-            except OSError:
-                pass
+            await self._close_shell_transport(shell)
             try:
                 if shell.reader_task is not None:
                     await shell.reader_task
@@ -1221,18 +1519,22 @@ class TerminalRuntimeManager:
             return
         await self._emit_terminal_deleted(terminal_id)
 
-    async def _terminate_shell(self, shell: LocalShellHandle) -> None:
-        if shell.process.poll() is not None:
-            return
-        try:
-            os.killpg(shell.process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
-        try:
-            await asyncio.wait_for(asyncio.to_thread(shell.process.wait), timeout=2.0)
-        except asyncio.TimeoutError:
+    async def _terminate_shell(self, shell: LocalShellHandle | SshShellHandle) -> None:
+        if shell.transport == "local":
+            if shell.process is None or shell.process.poll() is not None:
+                return
             try:
-                os.killpg(shell.process.pid, signal.SIGKILL)
+                os.killpg(shell.process.pid, signal.SIGTERM)
             except ProcessLookupError:
                 return
-            await asyncio.to_thread(shell.process.wait)
+            try:
+                await asyncio.wait_for(asyncio.to_thread(shell.process.wait), timeout=2.0)
+            except asyncio.TimeoutError:
+                try:
+                    os.killpg(shell.process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    return
+                await asyncio.to_thread(shell.process.wait)
+            return
+
+        await self._close_shell_transport(shell)
