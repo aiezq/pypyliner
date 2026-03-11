@@ -34,8 +34,63 @@ class HistoryData(TypedDict):
     runs: list[PipelineRunData]
 
 
+class TerminalCommandData(TypedDict):
+    id: str
+    node_id: str
+    label: str
+    original_command: str
+    resolved_command: str
+    status: str
+    started_at: str | None
+    finished_at: str | None
+    exit_code: int | None
+
+
+class TerminalSessionData(TypedDict):
+    id: str
+    terminal_node_id: str
+    sequence_id: str | None
+    title: str
+    terminal_type: str
+    ssh_connection_name: str | None
+    ssh_host: str | None
+    ssh_username: str | None
+    status: str
+    created_at: str
+    started_at: str | None
+    finished_at: str | None
+    exit_code: int | None
+    current_command_index: int | None
+    current_command_id: str | None
+    shell_pid: int | None
+    stdin_enabled: bool
+    queue: list[TerminalCommandData]
+    lines: list[TerminalLineData]
+
+
+class SequenceTerminalJobData(TypedDict):
+    terminal_node_id: str
+    terminal_session_id: str | None
+    title: str
+    terminal_type: str
+    status: str
+
+
+class SequenceExecutionData(TypedDict):
+    id: str
+    sequence_node_id: str
+    status: str
+    current_terminal_index: int | None
+    created_at: str
+    started_at: str | None
+    finished_at: str | None
+    terminal_jobs: list[SequenceTerminalJobData]
+
+
 class StateSnapshotData(TypedDict):
     runs: list[PipelineRunData]
+    terminals: list[TerminalSessionData]
+    sequences: list[SequenceExecutionData]
 
 
 class CommandTemplateData(TypedDict):

@@ -34,12 +34,75 @@ class RunsListResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
 
 
+class TerminalCommandResponse(BaseModel):
+    id: str
+    node_id: str
+    label: str
+    original_command: str
+    resolved_command: str
+    status: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    exit_code: int | None = None
+
+
+class TerminalSessionResponse(BaseModel):
+    id: str
+    terminal_node_id: str
+    sequence_id: str | None = None
+    title: str
+    terminal_type: str
+    ssh_connection_name: str | None = None
+    ssh_host: str | None = None
+    ssh_username: str | None = None
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    exit_code: int | None = None
+    current_command_index: int | None = None
+    current_command_id: str | None = None
+    shell_pid: int | None = None
+    stdin_enabled: bool = False
+    queue: list[TerminalCommandResponse] = Field(default_factory=list)
+    lines: list[TerminalLineResponse] = Field(default_factory=list)
+
+
+class TerminalsListResponse(BaseModel):
+    terminals: list[TerminalSessionResponse] = Field(default_factory=list)
+
+
+class SequenceTerminalJobResponse(BaseModel):
+    terminal_node_id: str
+    terminal_session_id: str | None = None
+    title: str
+    terminal_type: str
+    status: str
+
+
+class SequenceExecutionResponse(BaseModel):
+    id: str
+    sequence_node_id: str
+    status: str
+    current_terminal_index: int | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    terminal_jobs: list[SequenceTerminalJobResponse] = Field(default_factory=list)
+
+
+class SequencesListResponse(BaseModel):
+    sequences: list[SequenceExecutionResponse] = Field(default_factory=list)
+
+
 class HistoryResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
 
 
 class StateSnapshotResponse(BaseModel):
     runs: list[PipelineRunResponse] = Field(default_factory=list)
+    terminals: list[TerminalSessionResponse] = Field(default_factory=list)
+    sequences: list[SequenceExecutionResponse] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):

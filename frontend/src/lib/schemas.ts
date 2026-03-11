@@ -4,8 +4,10 @@ export const StreamTypeSchema = z.enum(['out', 'err', 'meta'])
 export const TerminalTypeSchema = z.enum(['local', 'ssh'])
 export const SessionStatusSchema = z.enum([
   'idle',
+  'starting',
   'pending',
   'running',
+  'draining',
   'success',
   'failed',
   'stopped',
@@ -16,6 +18,66 @@ export const BackendLineSchema = z.object({
   stream: StreamTypeSchema,
   text: z.string(),
   created_at: z.string(),
+})
+
+export const BackendTerminalCommandSchema = z.object({
+  id: z.string(),
+  node_id: z.string(),
+  label: z.string(),
+  original_command: z.string(),
+  resolved_command: z.string(),
+  status: z.enum([
+    'pending',
+    'running',
+    'success',
+    'failed',
+    'skipped',
+    'stopped',
+  ]),
+  started_at: z.string().nullable(),
+  finished_at: z.string().nullable(),
+  exit_code: z.number().int().nullable(),
+})
+
+export const BackendTerminalSchema = z.object({
+  id: z.string(),
+  terminal_node_id: z.string(),
+  sequence_id: z.string().nullable(),
+  title: z.string(),
+  terminal_type: TerminalTypeSchema,
+  ssh_connection_name: z.string().nullable(),
+  ssh_host: z.string().nullable(),
+  ssh_username: z.string().nullable(),
+  status: SessionStatusSchema,
+  created_at: z.string(),
+  started_at: z.string().nullable(),
+  finished_at: z.string().nullable(),
+  exit_code: z.number().int().nullable(),
+  current_command_index: z.number().int().nullable(),
+  current_command_id: z.string().nullable(),
+  shell_pid: z.number().int().nullable(),
+  stdin_enabled: z.boolean().default(false),
+  queue: z.array(BackendTerminalCommandSchema),
+  lines: z.array(BackendLineSchema),
+})
+
+export const BackendSequenceJobSchema = z.object({
+  terminal_node_id: z.string(),
+  terminal_session_id: z.string().nullable(),
+  title: z.string(),
+  terminal_type: TerminalTypeSchema,
+  status: z.string(),
+})
+
+export const BackendSequenceSchema = z.object({
+  id: z.string(),
+  sequence_node_id: z.string(),
+  status: z.string(),
+  current_terminal_index: z.number().int().nullable(),
+  created_at: z.string(),
+  started_at: z.string().nullable(),
+  finished_at: z.string().nullable(),
+  terminal_jobs: z.array(BackendSequenceJobSchema),
 })
 
 export const BackendSnapshotSchema = z.object({
@@ -40,6 +102,8 @@ export const BackendSnapshotSchema = z.object({
       ),
     }),
   ),
+  terminals: z.array(BackendTerminalSchema).default([]),
+  sequences: z.array(BackendSequenceSchema).default([]),
 })
 
 export const BackendHistorySchema = z.object({
@@ -157,12 +221,107 @@ export const SocketEventSchema = z.discriminatedUnion('type', [
     type: z.literal('snapshot'),
     data: BackendSnapshotSchema,
   }),
+  z.object({
+    type: z.literal('terminal_created'),
+    data: z.object({
+      terminal: BackendTerminalSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_status'),
+    data: z.object({
+      terminal_session_id: z.string(),
+      terminal_node_id: z.string(),
+      sequence_id: z.string().nullable(),
+      status: SessionStatusSchema,
+      current_command_index: z.number().int().nullable(),
+      current_command_id: z.string().nullable(),
+      exit_code: z.number().int().nullable(),
+      started_at: z.string().nullable(),
+      finished_at: z.string().nullable(),
+      shell_pid: z.number().int().nullable(),
+      stdin_enabled: z.boolean().default(false),
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_line'),
+    data: z.object({
+      terminal_session_id: z.string(),
+      line: BackendLineSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_queue_changed'),
+    data: z.object({
+      terminal_session_id: z.string(),
+      queue: z.array(BackendTerminalCommandSchema),
+      current_command_index: z.number().int().nullable(),
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_deleted'),
+    data: z.object({
+      terminal_session_id: z.string(),
+    }),
+  }),
+  z.object({
+    type: z.literal('terminal_command_status'),
+    data: z.object({
+      terminal_session_id: z.string(),
+      command: BackendTerminalCommandSchema,
+      current_command_index: z.number().int().nullable(),
+    }),
+  }),
+  z.object({
+    type: z.literal('sequence_created'),
+    data: z.object({
+      sequence: BackendSequenceSchema,
+    }),
+  }),
+  z.object({
+    type: z.literal('sequence_status'),
+    data: z.object({
+      sequence_id: z.string(),
+      sequence_node_id: z.string(),
+      status: z.string(),
+      current_terminal_index: z.number().int().nullable(),
+      finished_at: z.string().nullable(),
+    }),
+  }),
 ])
 
 export const RuntimeSocketEventSchema = SocketEventSchema
 
+export const TerminalSocketMessageSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('snapshot'),
+    data: z.object({
+      buffer: z.string(),
+      read_only: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('data'),
+    data: z.string(),
+  }),
+  z.object({
+    type: z.literal('mode'),
+    data: z.object({
+      read_only: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('reset'),
+  }),
+])
+
 export type SocketEvent = z.infer<typeof SocketEventSchema>
 export type RuntimeSocketEvent = SocketEvent
+export type TerminalSocketMessage = z.infer<typeof TerminalSocketMessageSchema>
+export type BackendLine = z.infer<typeof BackendLineSchema>
+export type BackendTerminal = z.infer<typeof BackendTerminalSchema>
+export type BackendTerminalCommand = z.infer<typeof BackendTerminalCommandSchema>
+export type BackendSequence = z.infer<typeof BackendSequenceSchema>
 export type AIModel = z.infer<typeof AIModelSchema>
 export type AIModelsResponse = z.infer<typeof AIModelsResponseSchema>
 export type AIModelStatusResponse = z.infer<typeof AIModelStatusResponseSchema>

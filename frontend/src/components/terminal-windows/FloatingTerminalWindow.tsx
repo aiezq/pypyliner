@@ -21,11 +21,20 @@ interface FloatingTerminalWindowProps {
   ) => void
 
   onMinimize: () => void
+  getCopyTailLineCount: (terminalId: string) => number
+  isCopyTailRecentlyCopied: (terminalId: string) => boolean
+  onUpdateCopyTailLineCount: (terminalId: string, rawValue: string) => void
+  onCopyManualTerminalTail: (terminalId: string) => void
   onUpdateManualTitle: (terminalId: string, title: string) => void
   onStartManualTitleEdit: (terminalId: string, currentTitle: string) => void
   onCancelManualTitleEdit: (terminalId: string, originalTitle: string) => void
   onSaveManualTitleEdit: (terminalId: string) => void
+  onUpdateManualCommand: (terminalId: string, command: string) => void
+  onNavigateManualHistory: (terminalId: string, direction: 'up' | 'down', currentDraft: string) => void
+  onRunManualCommand: (terminalId: string) => void
+  onAutocompleteManualCommand: (terminalId: string) => void
   onStopManualTerminal: (terminalId: string) => void
+  onClearManualTerminal: (terminalId: string) => void
   onRemoveManualTerminal: (terminalId: string) => void
 }
 
@@ -39,17 +48,35 @@ function FloatingTerminalWindow({
   onBeginResize,
 
   onMinimize,
+  getCopyTailLineCount,
+  isCopyTailRecentlyCopied,
+  onUpdateCopyTailLineCount,
+  onCopyManualTerminalTail,
   onUpdateManualTitle,
   onStartManualTitleEdit,
   onCancelManualTitleEdit,
   onSaveManualTitleEdit,
+  onUpdateManualCommand,
+  onNavigateManualHistory,
+  onRunManualCommand,
+  onAutocompleteManualCommand,
   onStopManualTerminal,
+  onClearManualTerminal,
   onRemoveManualTerminal,
 }: FloatingTerminalWindowProps) {
   const { messages } = useI18n()
 
   const terminal = windowItem.terminal
   const isEditingTitle = editingManualTitleId === terminal.id
+  const canStopTerminal =
+    terminal.status === 'running' ||
+    terminal.status === 'starting' ||
+    terminal.status === 'draining' ||
+    terminal.stdinEnabled === true ||
+    (terminal.isBackendSession === true &&
+      terminal.status !== 'success' &&
+      terminal.status !== 'failed' &&
+      terminal.status !== 'stopped')
 
   return (
     <article
@@ -76,6 +103,17 @@ function FloatingTerminalWindow({
         }
         onCancelTitleEdit={() => onCancelManualTitleEdit(terminal.id, terminal.title)}
         onSaveTitleEdit={() => onSaveManualTitleEdit(terminal.id)}
+        copyTailLineCount={getCopyTailLineCount(terminal.id)}
+        isCopyTailRecentlyCopied={isCopyTailRecentlyCopied(terminal.id)}
+        onUpdateCopyTailLineCount={(rawValue) => onUpdateCopyTailLineCount(terminal.id, rawValue)}
+        onCopyTail={() => onCopyManualTerminalTail(terminal.id)}
+        onUpdateCommandDraft={(command) => onUpdateManualCommand(terminal.id, command)}
+        onNavigateCommandHistory={(direction) =>
+          onNavigateManualHistory(terminal.id, direction, terminal.draftCommand)
+        }
+        onRunCommand={() => onRunManualCommand(terminal.id)}
+        onAutocompleteCommand={() => onAutocompleteManualCommand(terminal.id)}
+        onClearOutput={() => onClearManualTerminal(terminal.id)}
         controls={
           <>
             <button
@@ -93,7 +131,7 @@ function FloatingTerminalWindow({
               onMouseDown={(event) => event.stopPropagation()}
               onClick={() => onStopManualTerminal(terminal.id)}
               title={messages.terminal.stopTerminal}
-              disabled={terminal.status !== 'running'}
+              disabled={!canStopTerminal}
             >
               ‖
             </button>
@@ -109,6 +147,10 @@ function FloatingTerminalWindow({
             <span className={`status status--${terminal.status}`}>
               {terminal.status === 'running'
                 ? messages.terminal.statusRunning
+                : terminal.status === 'starting'
+                  ? messages.terminal.statusRunning
+                  : terminal.status === 'draining'
+                    ? messages.terminal.statusRunning
                 : terminal.status === 'success'
                   ? messages.terminal.statusSuccess
                   : terminal.status === 'failed'

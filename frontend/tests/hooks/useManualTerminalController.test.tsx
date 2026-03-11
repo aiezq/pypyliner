@@ -3,17 +3,137 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useManualTerminalController } from '../../src/hooks/useManualTerminalController'
 
 describe('useManualTerminalController', () => {
+  const fetchMock = vi.fn()
+
   beforeEach(() => {
     vi.useRealTimers()
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockReset()
+    window.localStorage.clear()
   })
 
-  it('manages placeholder terminal UI state locally', async () => {
+  it('creates backend manual terminals and appends commands', async () => {
     const setBackendError = vi.fn()
     const writeText = vi.fn(async () => {})
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText },
     })
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => ({
+          id: 'term_1',
+          terminal_node_id: 'manual_terminal_1',
+          sequence_id: null,
+          title: 'Terminal #1',
+          terminal_type: 'local',
+          ssh_connection_name: null,
+          ssh_host: null,
+          ssh_username: null,
+          status: 'idle',
+          created_at: '2026-03-11T09:00:00Z',
+          started_at: '2026-03-11T09:00:00Z',
+          finished_at: null,
+          exit_code: null,
+          current_command_index: null,
+          current_command_id: null,
+          shell_pid: 42,
+          queue: [],
+          lines: [],
+        })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => ({
+          id: 'term_1',
+          terminal_node_id: 'manual_terminal_1',
+          sequence_id: null,
+          title: 'Renamed terminal',
+          terminal_type: 'local',
+          ssh_connection_name: null,
+          ssh_host: null,
+          ssh_username: null,
+          status: 'running',
+          created_at: '2026-03-11T09:00:00Z',
+          started_at: '2026-03-11T09:00:00Z',
+          finished_at: null,
+          exit_code: null,
+          current_command_index: 0,
+          current_command_id: 'cmd_1',
+          shell_pid: 42,
+          queue: [
+            {
+              id: 'cmd_1',
+              node_id: 'manual_cmd_1',
+              label: 'echo one',
+              original_command: 'echo one',
+              resolved_command: 'echo one',
+              status: 'pending',
+              started_at: null,
+              finished_at: null,
+              exit_code: null,
+            },
+          ],
+          lines: [],
+        })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => ({
+          id: 'term_1',
+          terminal_node_id: 'manual_terminal_1',
+          sequence_id: null,
+          title: 'Renamed terminal',
+          terminal_type: 'local',
+          ssh_connection_name: null,
+          ssh_host: null,
+          ssh_username: null,
+          status: 'idle',
+          created_at: '2026-03-11T09:00:00Z',
+          started_at: '2026-03-11T09:00:00Z',
+          finished_at: null,
+          exit_code: null,
+          current_command_index: null,
+          current_command_id: null,
+          shell_pid: 42,
+          queue: [],
+          lines: [],
+        })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn(async () => ({
+          id: 'term_1',
+          terminal_node_id: 'manual_terminal_1',
+          sequence_id: null,
+          title: 'Renamed terminal',
+          terminal_type: 'local',
+          ssh_connection_name: null,
+          ssh_host: null,
+          ssh_username: null,
+          status: 'idle',
+          created_at: '2026-03-11T09:00:00Z',
+          started_at: '2026-03-11T09:00:00Z',
+          finished_at: null,
+          exit_code: null,
+          current_command_index: null,
+          current_command_id: null,
+          shell_pid: 42,
+          queue: [],
+          lines: [],
+        })),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: vi.fn(async () => undefined),
+        text: vi.fn(async () => ''),
+      })
 
     const { result } = renderHook(() =>
       useManualTerminalController({
@@ -26,6 +146,7 @@ describe('useManualTerminalController', () => {
     })
     expect(result.current.manualTerminals).toHaveLength(1)
     const terminalId = result.current.manualTerminals[0]?.id ?? ''
+    expect(terminalId).toBe('term_1')
 
     act(() => {
       result.current.updateManualTitle(terminalId, 'Renamed terminal')
@@ -56,12 +177,43 @@ describe('useManualTerminalController', () => {
 
     await act(async () => {
       await result.current.runManualCommand(terminalId)
-      await result.current.autocompleteManualCommand(terminalId)
+    })
+    expect(result.current.manualTerminals[0]?.draftCommand).toBe('')
+
+    await act(async () => {
       await result.current.stopManualTerminal(terminalId)
+    })
+
+    await act(async () => {
       await result.current.clearManualTerminal(terminalId)
     })
     expect(result.current.manualTerminals[0]?.status).toBe('idle')
     expect(setBackendError).toHaveBeenLastCalledWith(null)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/terminals/term_1/commands'),
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    )
+
+    act(() => {
+      result.current.updateManualCommand(terminalId, 'echo draft')
+      result.current.navigateManualCommandHistory(terminalId, 'up', 'echo draft')
+    })
+    expect(result.current.manualTerminals[0]?.draftCommand).toBe('echo one')
+
+    act(() => {
+      result.current.navigateManualCommandHistory(terminalId, 'down', 'echo one')
+    })
+    expect(result.current.manualTerminals[0]?.draftCommand).toBe('echo draft')
+
+    act(() => {
+      result.current.updateManualCommand(terminalId, 'ec')
+    })
+    await act(async () => {
+      await result.current.autocompleteManualCommand(terminalId)
+    })
+    expect(result.current.manualTerminals[0]?.draftCommand).toBe('echo one')
 
     act(() => {
       result.current.setManualTerminals((prev) =>
@@ -90,6 +242,12 @@ describe('useManualTerminalController', () => {
       await result.current.removeManualTerminal(terminalId)
     })
     expect(result.current.manualTerminals).toEqual([])
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/terminals/term_1'),
+      expect.objectContaining({
+        method: 'DELETE',
+      }),
+    )
 
     const context = result.current.getSocketEventContext()
     expect(typeof context.pruneAndPersistStoredHistory).toBe('function')
@@ -112,6 +270,7 @@ describe('useManualTerminalController', () => {
     await act(async () => {
       await result.current.renameManualTerminal('missing')
       await result.current.copyManualTerminalTail('missing')
+      await result.current.runManualCommand('missing')
     })
     expect(setBackendError).not.toHaveBeenCalledWith(
       'Failed to copy terminal output to clipboard',

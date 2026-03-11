@@ -150,4 +150,38 @@ describe('FloatingTerminalWindow', () => {
 
     expect(screen.getByTitle('Stop terminal')).toBeDisabled()
   })
+
+  it('keeps stop button enabled for backend terminals with live stdin after queue completion', () => {
+    const props = baseProps()
+    const windowItem: TerminalWindowDescriptor = {
+      windowId: 'manual:3',
+      kind: 'manual',
+      terminal: {
+        id: 'terminal_3',
+        title: 'Graph Terminal',
+        titleDraft: 'Graph Terminal',
+        terminalType: 'local',
+        promptUser: 'local',
+        promptCwd: '~',
+        isSequence: false,
+        status: 'success',
+        exitCode: 0,
+        draftCommand: '',
+        sshConnectionName: null,
+        sshHost: null,
+        sshUsername: null,
+        lines: [],
+        isBackendSession: true,
+        stdinEnabled: true,
+      },
+    }
+
+    render(
+      <I18nProvider>
+        <FloatingTerminalWindow {...props} windowItem={windowItem} />
+      </I18nProvider>,
+    )
+
+    expect(screen.getByTitle('Stop terminal')).not.toBeDisabled()
+  })
 })

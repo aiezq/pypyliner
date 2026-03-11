@@ -2,8 +2,10 @@ export type StreamType = 'out' | 'err' | 'meta'
 export type TerminalType = 'local' | 'ssh'
 export type SessionStatus =
   | 'idle'
+  | 'starting'
   | 'pending'
   | 'running'
+  | 'draining'
   | 'success'
   | 'failed'
   | 'stopped'
@@ -13,6 +15,18 @@ export interface TerminalLine {
   stream: StreamType
   text: string
   createdAt: string
+}
+
+export interface TerminalQueueCommand {
+  id: string
+  nodeId: string
+  label: string
+  originalCommand: string
+  resolvedCommand: string
+  status: SessionStatus | 'skipped'
+  startedAt: string | null
+  finishedAt: string | null
+  exitCode: number | null
 }
 
 export interface ManualTerminal {
@@ -30,6 +44,17 @@ export interface ManualTerminal {
   sshHost: string | null
   sshUsername: string | null
   lines: TerminalLine[]
+  isBackendSession?: boolean
+  terminalNodeId?: string | null
+  sequenceId?: string | null
+  createdAt?: string | null
+  startedAt?: string | null
+  finishedAt?: string | null
+  currentCommandIndex?: number | null
+  currentCommandId?: string | null
+  currentCommandLabel?: string | null
+  queue?: TerminalQueueCommand[]
+  stdinEnabled?: boolean
 }
 
 export interface SshConnectionVariable {

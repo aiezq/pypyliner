@@ -14,6 +14,7 @@ from src.app.deps import (
     get_history_database,
     get_pipeline_flow_manager,
     get_runtime,
+    get_terminal_runtime,
 )
 from src.app.services.runtime import ServiceError
 
@@ -27,6 +28,7 @@ async def lifespan(_: FastAPI):
     run_migrations()
     LOGGER.info("Startup: database migrations complete")
     runtime = get_runtime()
+    terminal_runtime = get_terminal_runtime()
     command_packs = get_command_pack_manager()
     pipeline_flows = get_pipeline_flow_manager()
     history_db = get_history_database()
@@ -37,6 +39,9 @@ async def lifespan(_: FastAPI):
     LOGGER.info("Startup: ensuring runtime directories")
     await runtime.ensure_dirs()
     LOGGER.info("Startup: runtime directories ready")
+    LOGGER.info("Startup: preparing terminal runtime")
+    await terminal_runtime.ensure_ready()
+    LOGGER.info("Startup: terminal runtime ready")
     LOGGER.info("Startup: loading command packs")
     await command_packs.ensure_ready()
     LOGGER.info("Startup: command packs ready")

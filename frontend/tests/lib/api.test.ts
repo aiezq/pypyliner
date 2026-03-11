@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { apiRequest } from '../../src/lib/api'
+import { apiRequest, getWebSocketUrl } from '../../src/lib/api'
 
 describe('apiRequest', () => {
   const fetchMock = vi.fn()
@@ -101,5 +101,12 @@ describe('apiRequest', () => {
     })
 
     await expect(apiRequest('/api/error')).rejects.toThrow('404 Not Found')
+  })
+
+  it('builds websocket url for runtime events', () => {
+    const url = getWebSocketUrl('/ws/events')
+
+    expect(url).toContain('/ws/events')
+    expect(url.startsWith('ws://') || url.startsWith('wss://')).toBe(true)
   })
 })

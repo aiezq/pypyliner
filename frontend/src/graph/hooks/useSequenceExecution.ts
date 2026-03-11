@@ -1,42 +1,83 @@
 import { useCallback } from 'react'
+import { apiRequest } from '../../lib/api'
 import { useGraphStore } from '../store/graphStore'
 import { EDGE_TYPES, NODE_TYPES } from '../types'
-import { useGraphExecution } from './useGraphExecution'
+import { resolveChain } from '../utils/graphResolver'
+
+interface SequenceExecutionResponse {
+  terminal_jobs: Array<{
+    terminal_node_id: string
+    terminal_session_id: string | null
+  }>
+}
 
 export function useSequenceExecution() {
-  const { executeTerminalNode } = useGraphExecution()
+  const updateNodeData = useGraphStore((state) => state.updateNodeData)
 
   const executeSequenceNode = useCallback(async (sequenceNodeId: string) => {
-    const { edges, nodes } = useGraphStore.getState()
-    
-    // Find all sequence edges going into this Sequence node
+    const { edges, nodes, globalVariables, sshConnections } = useGraphStore.getState()
+
     const sequenceEdges = edges.filter(
-      (e) => e.target === sequenceNodeId && e.type === EDGE_TYPES.SEQUENCE
+      (edge) => edge.target === sequenceNodeId && edge.type === EDGE_TYPES.SEQUENCE,
     )
 
-    // Sort edges by their targetHandle index (seq-in-0, seq-in-1, etc.)
-    // This perfectly matches the top-to-bottom visual order in the node.
     const sortedEdges = [...sequenceEdges].sort((a, b) => {
       const indexA = parseInt(a.targetHandle?.replace('seq-in-', '') || '0', 10)
       const indexB = parseInt(b.targetHandle?.replace('seq-in-', '') || '0', 10)
       return indexA - indexB
     })
 
-    // Execute each source terminal in order, waiting for the previous to finish
-    for (const edge of sortedEdges) {
-      const targetNode = nodes.find(n => n.id === edge.source)
+    const terminals = sortedEdges.flatMap((edge) => {
+      const targetNode = nodes.find((node) => node.id === edge.source)
       if (
         targetNode?.type === NODE_TYPES.TERMINAL ||
         targetNode?.type === NODE_TYPES.SSH_TERMINAL
       ) {
-        // executeTerminalNode handles creating the terminal if it doesn't exist
-        // and iterating through its own command chain sequentially.
-        // Awaiting this means the next terminal in the sequence only starts
-        // a boolean flag `true` indicates this terminal is part of a Sequence execution.
-        await executeTerminalNode(targetNode.id, true)
+        return [
+          resolveChain(
+            targetNode.id,
+            nodes,
+            edges,
+            globalVariables,
+            sshConnections,
+          ),
+        ]
       }
-    }
-  }, [executeTerminalNode])
+      return []
+    })
+
+    const response = await apiRequest<SequenceExecutionResponse>('/api/sequences/execute', {
+      method: 'POST',
+      body: JSON.stringify({
+        sequence_node_id: sequenceNodeId,
+        terminals: terminals.map((terminal) => ({
+          terminal_node_id: terminal.terminalNodeId,
+          title: terminal.terminalLabel,
+          terminal_type: terminal.terminalType,
+          ssh_connection_name: terminal.sshConnectionName,
+          ssh_host: terminal.sshHost,
+          ssh_username: terminal.sshUsername,
+          ssh_password: terminal.sshPassword,
+          ssh_command: terminal.sshCommand,
+          commands: terminal.commands.map((command) => ({
+            node_id: command.nodeId,
+            label: command.label,
+            original_command: command.originalCommand,
+            resolved_command: command.resolvedCommand,
+          })),
+        })),
+      }),
+    })
+
+    response.terminal_jobs.forEach((job) => {
+      if (!job.terminal_session_id) {
+        return
+      }
+      updateNodeData<{ terminalId: string | null }>(job.terminal_node_id, {
+        terminalId: job.terminal_session_id,
+      })
+    })
+  }, [updateNodeData])
 
   return { executeSequenceNode }
 }

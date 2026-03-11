@@ -23,7 +23,18 @@ from src.app.api.routes.pipeline_flows import (
     update_pipeline_flow,
 )
 from src.app.api.routes.runs import create_run, get_run, get_run_log, get_runs, stop_run
+from src.app.api.routes.terminals import (
+    append_terminal_command,
+    clear_terminal,
+    create_terminal,
+    delete_terminal,
+    execute_terminal,
+    get_terminal,
+    get_terminals,
+    stop_terminal,
+)
 from src.app.api.routes.state import get_state
+from src.app.api.routes.sequences import execute_sequence, get_sequence, get_sequences
 from src.app.schemas.command_pack import (
     CommandPackImportPayload,
     CommandTemplateCreatePayload,
@@ -32,6 +43,13 @@ from src.app.schemas.command_pack import (
 )
 from src.app.schemas.pipeline import PipelineRunCreatePayload, PipelineStepPayload
 from src.app.schemas.pipeline_flow import PipelineFlowCreatePayload, PipelineFlowStepPayload
+from src.app.schemas.terminal import (
+    SequenceExecutionPayload,
+    TerminalAppendCommandPayload,
+    TerminalCommandPayload,
+    TerminalCreatePayload,
+    TerminalExecutionPayload,
+)
 from src.app.schemas.service_types import (
     CommandPackImportData,
     CommandPackListData,
@@ -43,8 +61,10 @@ from src.app.schemas.service_types import (
     PipelineFlowDeleteData,
     PipelineFlowListData,
     PipelineRunData,
+    SequenceExecutionData,
     StateSnapshotData,
     TerminalLineData,
+    TerminalSessionData,
 )
 from src.app.services.command_packs import CommandPackManager
 from src.app.services.pipeline_flows import PipelineFlowManager
@@ -113,6 +133,62 @@ def _template() -> CommandTemplateData:
   }
 
 
+def _terminal() -> TerminalSessionData:
+  return {
+    "id": "term_1",
+    "terminal_node_id": "node_terminal_1",
+    "sequence_id": None,
+    "title": "Terminal",
+    "terminal_type": "local",
+    "ssh_connection_name": None,
+    "ssh_host": None,
+    "ssh_username": None,
+    "status": "running",
+    "created_at": "2026-03-05T00:00:00Z",
+    "started_at": "2026-03-05T00:00:01Z",
+    "finished_at": None,
+    "exit_code": None,
+    "current_command_index": 0,
+    "current_command_id": "cmd_1",
+    "shell_pid": 123,
+    "queue": [
+      {
+        "id": "cmd_1",
+        "node_id": "node_cmd_1",
+        "label": "Run",
+        "original_command": "echo 1",
+        "resolved_command": "echo 1",
+        "status": "running",
+        "started_at": "2026-03-05T00:00:01Z",
+        "finished_at": None,
+        "exit_code": None,
+      }
+    ],
+    "lines": [_line()],
+  }
+
+
+def _sequence() -> SequenceExecutionData:
+  return {
+    "id": "sequence_1",
+    "sequence_node_id": "node_sequence_1",
+    "status": "running",
+    "current_terminal_index": 0,
+    "created_at": "2026-03-05T00:00:00Z",
+    "started_at": "2026-03-05T00:00:01Z",
+    "finished_at": None,
+    "terminal_jobs": [
+      {
+        "terminal_node_id": "node_terminal_1",
+        "terminal_session_id": "term_1",
+        "title": "Terminal",
+        "terminal_type": "local",
+        "status": "running",
+      }
+    ],
+  }
+
+
 class RuntimeStub:
   def list_runs(self) -> list[PipelineRunData]:
     return [_run()]
@@ -139,7 +215,59 @@ class RuntimeStub:
     return {"runs": [_run()]}
 
   def snapshot(self) -> StateSnapshotData:
-    return {"runs": [_run()]}
+    return {"runs": [_run()], "terminals": [_terminal()], "sequences": [_sequence()]}
+
+
+class TerminalRuntimeStub:
+  def list_terminals(self) -> list[TerminalSessionData]:
+    return [_terminal()]
+
+  def list_sequences(self) -> list[SequenceExecutionData]:
+    return [_sequence()]
+
+  def get_terminal(self, terminal_session_id: str) -> TerminalSessionData:
+    assert terminal_session_id == "term_1"
+    return _terminal()
+
+  async def create_terminal(self, payload: TerminalCreatePayload) -> TerminalSessionData:
+    assert payload.title == "Terminal"
+    return _terminal()
+
+  async def execute_terminal(self, payload: TerminalExecutionPayload) -> TerminalSessionData:
+    assert payload.terminal_node_id == "node_terminal_1"
+    return _terminal()
+
+  async def append_terminal_command(
+    self,
+    terminal_session_id: str,
+    payload: TerminalAppendCommandPayload,
+  ) -> TerminalSessionData:
+    assert terminal_session_id == "term_1"
+    assert payload.command == "pwd"
+    return _terminal()
+
+  async def stop_terminal(self, terminal_session_id: str) -> TerminalSessionData:
+    assert terminal_session_id == "term_1"
+    data = _terminal()
+    data["status"] = "stopped"
+    return data
+
+  async def clear_terminal(self, terminal_session_id: str) -> TerminalSessionData:
+    assert terminal_session_id == "term_1"
+    data = _terminal()
+    data["lines"] = []
+    return data
+
+  async def delete_terminal(self, terminal_session_id: str) -> None:
+    assert terminal_session_id == "term_1"
+
+  def get_sequence(self, sequence_id: str) -> SequenceExecutionData:
+    assert sequence_id == "sequence_1"
+    return _sequence()
+
+  async def execute_sequence(self, payload: SequenceExecutionPayload) -> SequenceExecutionData:
+    assert payload.sequence_node_id == "node_sequence_1"
+    return _sequence()
 
 
 class FlowManagerStub:
@@ -245,12 +373,18 @@ class CommandPackManagerStub:
 @pytest.mark.asyncio
 async def test_health_state_history_routes():
   runtime = RuntimeStub()
+  terminal_runtime = TerminalRuntimeStub()
   health_res = await health()
-  state_res = await get_state(runtime=cast(RuntimeManager, runtime))
+  state_res = await get_state(
+    runtime=cast(RuntimeManager, runtime),
+    terminal_runtime=cast("TerminalRuntimeManager", terminal_runtime),
+  )
   history_res = await get_history(runtime=cast(RuntimeManager, runtime))
 
   assert health_res.status == "ok"
   assert state_res.runs[0].id == "run_1"
+  assert state_res.terminals[0].id == "term_1"
+  assert state_res.sequences[0].id == "sequence_1"
   assert history_res.runs[0].pipeline_name == "Pipeline"
 
 
@@ -279,6 +413,68 @@ async def test_runs_routes(tmp_path: Path):
   assert create_res.id == "run_1"
   assert stop_res.status == "stopped"
   assert log_text == "run-log"
+
+
+@pytest.mark.asyncio
+async def test_terminal_and_sequence_routes():
+  runtime = TerminalRuntimeStub()
+
+  terminals_res = await get_terminals(runtime=cast("TerminalRuntimeManager", runtime))
+  terminal_res = await get_terminal("term_1", runtime=cast("TerminalRuntimeManager", runtime))
+  create_terminal_res = await create_terminal(
+    payload=TerminalCreatePayload(title="Terminal"),
+    runtime=cast("TerminalRuntimeManager", runtime),
+  )
+  execute_terminal_res = await execute_terminal(
+    payload=TerminalExecutionPayload(
+      terminal_node_id="node_terminal_1",
+      title="Terminal",
+      commands=[
+        TerminalCommandPayload(
+          node_id="node_cmd_1",
+          label="Run",
+          original_command="echo 1",
+          resolved_command="echo 1",
+        )
+      ],
+    ),
+    runtime=cast("TerminalRuntimeManager", runtime),
+  )
+  append_command_res = await append_terminal_command(
+    "term_1",
+    payload=TerminalAppendCommandPayload(command="pwd"),
+    runtime=cast("TerminalRuntimeManager", runtime),
+  )
+  stop_terminal_res = await stop_terminal("term_1", runtime=cast("TerminalRuntimeManager", runtime))
+  clear_terminal_res = await clear_terminal("term_1", runtime=cast("TerminalRuntimeManager", runtime))
+  delete_terminal_res = await delete_terminal("term_1", runtime=cast("TerminalRuntimeManager", runtime))
+  sequences_res = await get_sequences(runtime=cast("TerminalRuntimeManager", runtime))
+  sequence_res = await get_sequence("sequence_1", runtime=cast("TerminalRuntimeManager", runtime))
+  execute_sequence_res = await execute_sequence(
+    payload=SequenceExecutionPayload(
+      sequence_node_id="node_sequence_1",
+      terminals=[
+        TerminalExecutionPayload(
+          terminal_node_id="node_terminal_1",
+          title="Terminal",
+          commands=[],
+        )
+      ],
+    ),
+    runtime=cast("TerminalRuntimeManager", runtime),
+  )
+
+  assert terminals_res.terminals[0].id == "term_1"
+  assert terminal_res.id == "term_1"
+  assert create_terminal_res.id == "term_1"
+  assert execute_terminal_res.id == "term_1"
+  assert append_command_res.id == "term_1"
+  assert stop_terminal_res.status == "stopped"
+  assert clear_terminal_res.lines == []
+  assert delete_terminal_res.status_code == 204
+  assert sequences_res.sequences[0].id == "sequence_1"
+  assert sequence_res.id == "sequence_1"
+  assert execute_sequence_res.id == "sequence_1"
 
 
 @pytest.mark.asyncio

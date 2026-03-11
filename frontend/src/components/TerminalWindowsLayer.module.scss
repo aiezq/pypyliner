@@ -179,7 +179,7 @@
 
   .terminalEmulator {
     position: relative;
-    overflow: hidden;
+    overflow: auto;
     border: 1px solid rgba(104, 124, 146, 0.2);
     border-radius: 12px;
     background:
@@ -208,8 +208,54 @@
     color: rgba(201, 214, 227, 0.66);
   }
 
+  .terminalConsole {
+    display: grid;
+    align-content: start;
+    gap: 0.08rem;
+    min-height: 100%;
+    padding: 0.4rem 0.45rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .terminalConsole__line {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.55rem;
+    align-items: start;
+    color: rgba(221, 229, 237, 0.92);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .terminalConsole__line--err {
+    color: #ffbeb8;
+  }
+
+  .terminalConsole__line--meta {
+    color: #8bc7ff;
+  }
+
+  .terminalConsole__timestamp {
+    color: rgba(140, 155, 172, 0.78);
+    font-size: 0.7rem;
+    padding-top: 0.08rem;
+  }
+
+  .terminalConsole__text {
+    min-width: 0;
+  }
+
   .terminalEmulator :global(.xterm) {
     height: 100%;
+  }
+
+  .terminalEmulator__viewport {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0.3rem 0.15rem 0.15rem;
   }
 
   .terminalEmulator :global(.xterm-viewport) {

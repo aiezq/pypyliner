@@ -11,6 +11,9 @@ def test_create_app_registers_routes_and_service_error_handler():
     assert "/health" in paths
     assert "/api/ai/models" in paths
     assert "/api/state" in paths
+    assert "/api/terminals" in paths
+    assert "/api/terminals/execute" in paths
+    assert "/api/sequences/execute" in paths
     assert "/ws/events" in paths
 
     handler = app.exception_handlers.get(ServiceError)

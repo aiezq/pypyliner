@@ -29,12 +29,29 @@ export const useWorkbenchFeature = (): WorkbenchFeatureState => {
 
   const terminalWindowsLayerProps: TerminalWindowsLayerProps = {
     ...layoutFeature.terminalWindowsBaseProps,
+    getCopyTailLineCount: terminalFeature.manual.getCopyTailLineCount,
+    isCopyTailRecentlyCopied: terminalFeature.manual.isCopyTailRecentlyCopied,
+    onUpdateCopyTailLineCount: terminalFeature.manual.updateCopyTailLineCount,
+    onCopyManualTerminalTail: (terminalId) => {
+      void terminalFeature.manual.copyManualTerminalTail(terminalId)
+    },
     onUpdateManualTitle: terminalFeature.manual.updateManualTitle,
     onRenameManualTerminal: (terminalId) => {
       void terminalFeature.manual.renameManualTerminal(terminalId)
     },
+    onUpdateManualCommand: terminalFeature.manual.updateManualCommand,
+    onNavigateManualHistory: terminalFeature.manual.navigateManualCommandHistory,
+    onRunManualCommand: (terminalId) => {
+      void terminalFeature.manual.runManualCommand(terminalId)
+    },
+    onAutocompleteManualCommand: (terminalId) => {
+      void terminalFeature.manual.autocompleteManualCommand(terminalId)
+    },
     onStopManualTerminal: (terminalId) => {
       void terminalFeature.manual.stopManualTerminal(terminalId)
+    },
+    onClearManualTerminal: (terminalId) => {
+      void terminalFeature.manual.clearManualTerminal(terminalId)
     },
     onRemoveManualTerminal: (terminalId) => {
       void terminalFeature.manual.removeManualTerminal(terminalId)
@@ -42,7 +59,7 @@ export const useWorkbenchFeature = (): WorkbenchFeatureState => {
   }
 
   return {
-    isSocketConnected: true,
+    isSocketConnected: terminalFeature.isSocketConnected,
     terminalInstancesCount: layoutFeature.terminalInstancesCount,
     createManualTerminal: terminalFeature.manual.createManualTerminal,
     errorBannerMessage: backendError,

@@ -27,8 +27,16 @@ class FakeRuntime:
     def __init__(self) -> None:
         self.events = FakeEventsHub()
 
-    def snapshot_event(self) -> SnapshotEventMessage:
-        return {"type": "snapshot", "data": {"runs": []}}
+    def list_runs(self) -> list[dict[str, object]]:
+        return []
+
+
+class FakeTerminalRuntime:
+    def list_terminals(self) -> list[dict[str, object]]:
+        return []
+
+    def list_sequences(self) -> list[dict[str, object]]:
+        return []
 
 
 class FakeWebSocket:
@@ -46,11 +54,13 @@ class FakeWebSocket:
 @pytest.mark.asyncio
 async def test_events_socket_handles_disconnect():
     runtime = FakeRuntime()
+    terminal_runtime = FakeTerminalRuntime()
     websocket = FakeWebSocket(WebSocketDisconnect(code=1000))
 
     await events_socket(
         websocket=cast(WebSocket, websocket),
         runtime=cast(RuntimeManager, runtime),
+        terminal_runtime=cast("TerminalRuntimeManager", terminal_runtime),
     )
 
     assert runtime.events.connected is True
@@ -61,12 +71,14 @@ async def test_events_socket_handles_disconnect():
 @pytest.mark.asyncio
 async def test_events_socket_handles_unexpected_error():
     runtime = FakeRuntime()
+    terminal_runtime = FakeTerminalRuntime()
     websocket = FakeWebSocket(RuntimeError("boom"))
 
     with pytest.raises(RuntimeError, match="boom"):
         await events_socket(
             websocket=cast(WebSocket, websocket),
             runtime=cast(RuntimeManager, runtime),
+            terminal_runtime=cast("TerminalRuntimeManager", terminal_runtime),
         )
 
     assert runtime.events.connected is True
