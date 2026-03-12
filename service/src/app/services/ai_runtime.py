@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, cast
 
 from src.app.core.settings import get_settings
 from src.app.services.runtime import ServiceError
@@ -179,7 +179,7 @@ class OllamaRuntimeClient:
         )
 
     async def unload_model(self, install_ref: str, timeout_sec: int) -> None:
-        payload = {
+        payload: dict[str, Any] = {
             "model": install_ref,
             "messages": [
                 {"role": "system", "content": "Return compact JSON."},
@@ -204,7 +204,7 @@ class OllamaRuntimeClient:
         schema: dict[str, Any],
         timeout_sec: int,
     ) -> str:
-        payload = {
+        payload: dict[str, Any] = {
             "model": install_ref,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -316,6 +316,8 @@ class OllamaRuntimeClient:
                 status_code=504,
                 detail=f"Runtime command timed out after {timeout_sec} seconds: {' '.join(args)}",
             ) from error
+        if process.returncode is None:
+            raise ServiceError(status_code=502, detail="Runtime command finished without an exit code.")
 
         result = RuntimeCommandResult(
             returncode=process.returncode,
@@ -349,6 +351,8 @@ class OllamaRuntimeClient:
                 status_code=504,
                 detail=f"Runtime command timed out after {timeout_sec} seconds.",
             ) from error
+        if process.returncode is None:
+            raise ServiceError(status_code=502, detail="Runtime command finished without an exit code.")
 
         result = RuntimeCommandResult(
             returncode=process.returncode,
@@ -424,11 +428,16 @@ class OllamaRuntimeClient:
                         except json.JSONDecodeError:
                             continue
                         if progress_callback is not None and isinstance(item, dict):
+                            item_dict = cast(dict[str, Any], item)
                             progress_callback(
                                 RuntimePullProgress(
-                                    status=str(item.get("status", "")),
-                                    completed=item.get("completed") if isinstance(item.get("completed"), int) else None,
-                                    total=item.get("total") if isinstance(item.get("total"), int) else None,
+                                    status=str(item_dict.get("status", "")),
+                                    completed=item_dict.get("completed")
+                                    if isinstance(item_dict.get("completed"), int)
+                                    else None,
+                                    total=item_dict.get("total")
+                                    if isinstance(item_dict.get("total"), int)
+                                    else None,
                                 )
                             )
                     if cancel_event.is_set():

@@ -2,12 +2,14 @@ import { useState } from 'react'
 import type { TerminalWindowsLayerProps } from '../../components/TerminalWindowsLayer'
 import { useTerminalFeature } from '../terminal/useTerminalFeature'
 import { useWorkbenchLayoutFeature } from './useWorkbenchLayoutFeature'
+import type { SequenceExecutionViewModel } from '../../types'
 
 interface WorkbenchFeatureState {
   isSocketConnected: boolean
   terminalInstancesCount: number
   createManualTerminal: () => Promise<void>
   errorBannerMessage: string | null
+  sequenceExecutions: SequenceExecutionViewModel[]
   shouldRenderTerminalWindowsLayer: boolean
   terminalWindowsLayerProps: TerminalWindowsLayerProps
 }
@@ -63,6 +65,7 @@ export const useWorkbenchFeature = (): WorkbenchFeatureState => {
     terminalInstancesCount: layoutFeature.terminalInstancesCount,
     createManualTerminal: terminalFeature.manual.createManualTerminal,
     errorBannerMessage: backendError,
+    sequenceExecutions: terminalFeature.sequenceExecutions,
     shouldRenderTerminalWindowsLayer: layoutFeature.shouldRenderTerminalWindowsLayer,
     terminalWindowsLayerProps,
   }

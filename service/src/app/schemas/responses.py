@@ -3,6 +3,50 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+def _new_terminal_lines() -> list["TerminalLineResponse"]:
+    return []
+
+
+def _new_pipeline_sessions() -> list["PipelineSessionResponse"]:
+    return []
+
+
+def _new_pipeline_runs() -> list["PipelineRunResponse"]:
+    return []
+
+
+def _new_terminal_commands() -> list["TerminalCommandResponse"]:
+    return []
+
+
+def _new_terminal_sessions() -> list["TerminalSessionResponse"]:
+    return []
+
+
+def _new_sequence_terminal_jobs() -> list["SequenceTerminalJobResponse"]:
+    return []
+
+
+def _new_sequence_executions() -> list["SequenceExecutionResponse"]:
+    return []
+
+
+def _new_command_templates() -> list["CommandTemplateResponse"]:
+    return []
+
+
+def _new_command_packs() -> list["CommandPackResponse"]:
+    return []
+
+
+def _new_pipeline_flow_steps() -> list["PipelineFlowStepResponse"]:
+    return []
+
+
+def _new_pipeline_flows() -> list["PipelineFlowResponse"]:
+    return []
+
+
 class TerminalLineResponse(BaseModel):
     id: str
     stream: str
@@ -17,7 +61,7 @@ class PipelineSessionResponse(BaseModel):
     command: str
     status: str
     exit_code: int | None = None
-    lines: list[TerminalLineResponse] = Field(default_factory=list)
+    lines: list[TerminalLineResponse] = Field(default_factory=_new_terminal_lines)
 
 
 class PipelineRunResponse(BaseModel):
@@ -27,11 +71,11 @@ class PipelineRunResponse(BaseModel):
     started_at: str
     finished_at: str | None = None
     log_file_path: str
-    sessions: list[PipelineSessionResponse] = Field(default_factory=list)
+    sessions: list[PipelineSessionResponse] = Field(default_factory=_new_pipeline_sessions)
 
 
 class RunsListResponse(BaseModel):
-    runs: list[PipelineRunResponse] = Field(default_factory=list)
+    runs: list[PipelineRunResponse] = Field(default_factory=_new_pipeline_runs)
 
 
 class TerminalCommandResponse(BaseModel):
@@ -64,12 +108,12 @@ class TerminalSessionResponse(BaseModel):
     current_command_id: str | None = None
     shell_pid: int | None = None
     stdin_enabled: bool = False
-    queue: list[TerminalCommandResponse] = Field(default_factory=list)
-    lines: list[TerminalLineResponse] = Field(default_factory=list)
+    queue: list[TerminalCommandResponse] = Field(default_factory=_new_terminal_commands)
+    lines: list[TerminalLineResponse] = Field(default_factory=_new_terminal_lines)
 
 
 class TerminalsListResponse(BaseModel):
-    terminals: list[TerminalSessionResponse] = Field(default_factory=list)
+    terminals: list[TerminalSessionResponse] = Field(default_factory=_new_terminal_sessions)
 
 
 class SequenceTerminalJobResponse(BaseModel):
@@ -88,21 +132,21 @@ class SequenceExecutionResponse(BaseModel):
     created_at: str
     started_at: str | None = None
     finished_at: str | None = None
-    terminal_jobs: list[SequenceTerminalJobResponse] = Field(default_factory=list)
+    terminal_jobs: list[SequenceTerminalJobResponse] = Field(default_factory=_new_sequence_terminal_jobs)
 
 
 class SequencesListResponse(BaseModel):
-    sequences: list[SequenceExecutionResponse] = Field(default_factory=list)
+    sequences: list[SequenceExecutionResponse] = Field(default_factory=_new_sequence_executions)
 
 
 class HistoryResponse(BaseModel):
-    runs: list[PipelineRunResponse] = Field(default_factory=list)
+    runs: list[PipelineRunResponse] = Field(default_factory=_new_pipeline_runs)
 
 
 class StateSnapshotResponse(BaseModel):
-    runs: list[PipelineRunResponse] = Field(default_factory=list)
-    terminals: list[TerminalSessionResponse] = Field(default_factory=list)
-    sequences: list[SequenceExecutionResponse] = Field(default_factory=list)
+    runs: list[PipelineRunResponse] = Field(default_factory=_new_pipeline_runs)
+    terminals: list[TerminalSessionResponse] = Field(default_factory=_new_terminal_sessions)
+    sequences: list[SequenceExecutionResponse] = Field(default_factory=_new_sequence_executions)
 
 
 class HealthResponse(BaseModel):
@@ -122,12 +166,12 @@ class CommandPackResponse(BaseModel):
     pack_name: str
     description: str
     file_name: str
-    templates: list[CommandTemplateResponse] = Field(default_factory=list)
+    templates: list[CommandTemplateResponse] = Field(default_factory=_new_command_templates)
 
 
 class CommandPackListResponse(BaseModel):
-    packs: list[CommandPackResponse] = Field(default_factory=list)
-    templates: list[CommandTemplateResponse] = Field(default_factory=list)
+    packs: list[CommandPackResponse] = Field(default_factory=_new_command_packs)
+    templates: list[CommandTemplateResponse] = Field(default_factory=_new_command_templates)
     errors: list[str] = Field(default_factory=list)
 
 
@@ -168,11 +212,11 @@ class PipelineFlowResponse(BaseModel):
     created_at: str
     updated_at: str
     file_name: str
-    steps: list[PipelineFlowStepResponse] = Field(default_factory=list)
+    steps: list[PipelineFlowStepResponse] = Field(default_factory=_new_pipeline_flow_steps)
 
 
 class PipelineFlowListResponse(BaseModel):
-    flows: list[PipelineFlowResponse] = Field(default_factory=list)
+    flows: list[PipelineFlowResponse] = Field(default_factory=_new_pipeline_flows)
     errors: list[str] = Field(default_factory=list)
 
 

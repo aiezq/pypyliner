@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
@@ -49,17 +51,18 @@ async def terminal_socket(
             payload = await websocket.receive_json()
             if not isinstance(payload, dict):
                 continue
-            message_type = payload.get("type")
+            payload_dict = cast(dict[str, object], payload)
+            message_type = payload_dict.get("type")
             if message_type == "input":
                 try:
-                    parsed = TerminalInputPayload.model_validate(payload)
+                    parsed = TerminalInputPayload.model_validate(payload_dict)
                 except ValidationError:
                     continue
                 await terminal_runtime.write_terminal_input(terminal_session_id, parsed.data)
                 continue
             if message_type == "resize":
                 try:
-                    parsed = TerminalResizePayload.model_validate(payload)
+                    parsed = TerminalResizePayload.model_validate(payload_dict)
                 except ValidationError:
                     continue
                 await terminal_runtime.resize_terminal(

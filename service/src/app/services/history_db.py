@@ -8,7 +8,7 @@ from sqlmodel import select
 
 from src.app.core.database import init_db, session_scope
 from src.app.models.db import RunRecord, RunSessionRecord
-from src.app.schemas.service_types import HistoryData, PipelineRunData, PipelineSessionData
+from src.app.schemas.service_types import HistoryData, PipelineSessionData
 
 RUN_STARTED_AT_COLUMN: Any = cast(Any, RunRecord).started_at
 RUN_SESSION_RUN_ID_COLUMN: Any = cast(Any, RunSessionRecord).run_id

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { apiRequest, getWebSocketUrl } from '../../src/lib/api'
+import { apiRequest, buildWebSocketUrl, getWebSocketUrl } from '../../src/lib/api'
 
 describe('apiRequest', () => {
   const fetchMock = vi.fn()
@@ -108,5 +108,30 @@ describe('apiRequest', () => {
 
     expect(url).toContain('/ws/events')
     expect(url.startsWith('ws://') || url.startsWith('wss://')).toBe(true)
+  })
+
+  it.each([
+    {
+      apiBaseUrl: '',
+      expected: 'ws://localhost:5173/ws/events',
+    },
+    {
+      apiBaseUrl: 'http://127.0.0.1:8000',
+      expected: 'ws://127.0.0.1:8000/ws/events',
+    },
+    {
+      apiBaseUrl: 'https://host/app/api',
+      expected: 'wss://host/app/api/ws/events',
+    },
+  ])('preserves base path when building websocket urls for $apiBaseUrl', ({ apiBaseUrl, expected }) => {
+    const url = buildWebSocketUrl(
+      apiBaseUrl,
+      '/ws/events',
+      'http://localhost:5173',
+      'http:',
+      'localhost:5173',
+    )
+
+    expect(url).toBe(expected)
   })
 })

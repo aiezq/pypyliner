@@ -84,3 +84,20 @@ async def test_command_packs_full_crud_flow(tmp_path: Path, isolated_db: Engine)
 
     deleted = manager.delete_template("custom:imp_1")
     assert deleted["deleted"] is True
+
+
+@pytest.mark.asyncio
+async def test_command_packs_expose_bootstrap_errors(tmp_path: Path, isolated_db: Engine) -> None:
+    _ = isolated_db
+    _clear_command_tables()
+
+    manager = CommandPackManager()
+    legacy_packs_dir = tmp_path / "command_packs"
+    setattr(manager, "_legacy_packs_dir", legacy_packs_dir)
+    legacy_packs_dir.mkdir(parents=True, exist_ok=True)
+    (legacy_packs_dir / "broken.json").write_text("{", encoding="utf-8")
+
+    await manager.ensure_ready()
+
+    listed = manager.list_command_packs()
+    assert any("broken.json" in error for error in listed["errors"])

@@ -276,4 +276,28 @@ describe('useManualTerminalController', () => {
       'Failed to copy terminal output to clipboard',
     )
   })
+
+  it('does not create a local placeholder when backend terminal creation fails', async () => {
+    const setBackendError = vi.fn()
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      json: vi.fn(async () => ({ detail: 'shell bootstrap failed' })),
+      text: vi.fn(async () => 'shell bootstrap failed'),
+    })
+
+    const { result } = renderHook(() =>
+      useManualTerminalController({
+        setBackendError,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.createManualTerminal()
+    })
+
+    expect(result.current.manualTerminals).toEqual([])
+    expect(setBackendError).toHaveBeenLastCalledWith('shell bootstrap failed')
+  })
 })

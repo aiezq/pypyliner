@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 from typing import Any, TypeAlias, cast
 
@@ -22,12 +22,14 @@ from src.app.schemas.service_types import (
     PipelineFlowListData,
 )
 from src.app.services.runtime import ServiceError
+from src.app.services.bootstrap_diagnostics import BootstrapDiagnostics, load_bootstrap_json_object
 
 _IDENTIFIER_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 JsonObject: TypeAlias = dict[str, Any]
 FLOW_UPDATED_AT_COLUMN: Any = cast(Any, PipelineFlowRecord).updated_at
 STEP_FLOW_ID_COLUMN: Any = cast(Any, PipelineFlowStepRecord).flow_id
 STEP_POSITION_COLUMN: Any = cast(Any, PipelineFlowStepRecord).position
+LOGGER = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -39,6 +41,7 @@ class PipelineFlowManager:
         settings = get_settings()
         self._bundled_flows_dir = Path(settings.service_dir) / "pipeline_flows"
         self._legacy_flows_dir = settings.pipeline_flows_dir
+        self._bootstrap_diagnostics = BootstrapDiagnostics(logger=LOGGER, entity_name="pipeline flow")
 
     @staticmethod
     def _collect_bootstrap_dirs(*directories: Path) -> list[Path]:
@@ -55,29 +58,28 @@ class PipelineFlowManager:
     async def ensure_ready(self) -> None:
         with Session(database_module.engine) as session:
             existing = session.exec(select(PipelineFlowRecord).limit(1)).first()
-            
+
             if existing is not None:
                 return
             self._bootstrap_from_legacy_files(session)
             session.commit()
 
     def _bootstrap_from_legacy_files(self, session: Session) -> None:
+        self._bootstrap_diagnostics.reset()
         for legacy_dir in self._collect_bootstrap_dirs(self._bundled_flows_dir, self._legacy_flows_dir):
             if not legacy_dir.exists():
                 continue
 
             for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
-                try:
-                    raw_data: object = json.loads(file_path.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError):
+                raw_data = load_bootstrap_json_object(file_path, self._bootstrap_diagnostics)
+                if raw_data is None:
                     continue
-                if not isinstance(raw_data, dict):
-                    continue
-                raw_flow = cast(dict[str, Any], raw_data)
+                raw_flow = raw_data
 
                 try:
                     parsed = self._validate_flow(raw_flow, file_path.stem)
-                except ServiceError:
+                except ServiceError as error:
+                    self._bootstrap_diagnostics.record(file_path, error.detail)
                     continue
 
                 flow = session.get(PipelineFlowRecord, parsed.flow_id)
@@ -189,7 +191,7 @@ class PipelineFlowManager:
 
     def list_flows(self) -> PipelineFlowListData:
         flows: list[PipelineFlowData] = []
-        errors: list[str] = []
+        errors = self._bootstrap_diagnostics.snapshot()
 
         with Session(database_module.engine) as session:
             flow_rows = session.exec(
@@ -318,7 +320,6 @@ class PipelineFlowManager:
 
         with Session(database_module.engine) as session:
             flow = session.get(PipelineFlowRecord, normalized_flow_id)
-            
             if flow is None:
                 raise ServiceError(status_code=404, detail=f"Pipeline flow '{flow_id}' not found.")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,12 +27,14 @@ from src.app.schemas.service_types import (
     CommandTemplateMutationData,
 )
 from src.app.services.runtime import ServiceError
+from src.app.services.bootstrap_diagnostics import BootstrapDiagnostics, load_bootstrap_json_object
 
 _IDENTIFIER_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 _SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 JsonObject: TypeAlias = dict[str, Any]
 CommandItem: TypeAlias = dict[str, str]
 TEMPLATE_POSITION_COLUMN: Any = cast(Any, CommandTemplateRecord).position
+LOGGER = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -43,6 +46,7 @@ class CommandPackManager:
         settings = get_settings()
         self._bundled_packs_dir = Path(settings.service_dir) / "command_packs"
         self._legacy_packs_dir = settings.command_packs_dir
+        self._bootstrap_diagnostics = BootstrapDiagnostics(logger=LOGGER, entity_name="command pack")
 
     @staticmethod
     def _collect_bootstrap_dirs(*directories: Path) -> list[Path]:
@@ -95,21 +99,20 @@ class CommandPackManager:
 
     def _bootstrap_from_legacy_files(self, session: Session) -> None:
         imported = False
+        self._bootstrap_diagnostics.reset()
         for legacy_dir in self._collect_bootstrap_dirs(self._bundled_packs_dir, self._legacy_packs_dir):
             if not legacy_dir.exists():
                 continue
 
             for file_path in sorted(legacy_dir.glob("*.json"), key=lambda path: path.name):
-                try:
-                    raw_pack = json.loads(file_path.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError):
-                    continue
-                if not isinstance(raw_pack, dict):
+                raw_pack = load_bootstrap_json_object(file_path, self._bootstrap_diagnostics)
+                if raw_pack is None:
                     continue
 
                 try:
-                    parsed = self._validate_pack(cast(JsonObject, raw_pack), file_path.name)
-                except ServiceError:
+                    parsed = self._validate_pack(raw_pack, file_path.name)
+                except ServiceError as error:
+                    self._bootstrap_diagnostics.record(file_path, error.detail)
                     continue
 
                 imported = True
@@ -253,7 +256,7 @@ class CommandPackManager:
     def list_command_packs(self) -> CommandPackListData:
         packs: list[CommandPackData] = []
         templates: list[CommandTemplateData] = []
-        errors: list[str] = []
+        errors = self._bootstrap_diagnostics.snapshot()
 
         with session_scope() as session:
             pack_rows = session.exec(

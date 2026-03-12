@@ -10,6 +10,8 @@ export type SessionStatus =
   | 'failed'
   | 'stopped'
 
+export type SequenceStatus = 'pending' | 'running' | 'success' | 'failed' | 'stopped'
+
 export interface TerminalLine {
   id: string
   stream: StreamType
@@ -55,6 +57,25 @@ export interface ManualTerminal {
   currentCommandLabel?: string | null
   queue?: TerminalQueueCommand[]
   stdinEnabled?: boolean
+}
+
+export interface SequenceTerminalJob {
+  terminalNodeId: string
+  terminalSessionId: string | null
+  title: string
+  terminalType: TerminalType
+  status: SequenceStatus | SessionStatus | 'skipped'
+}
+
+export interface SequenceExecutionViewModel {
+  id: string
+  sequenceNodeId: string
+  status: SequenceStatus
+  currentTerminalIndex: number | null
+  createdAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  terminalJobs: SequenceTerminalJob[]
 }
 
 export interface SshConnectionVariable {

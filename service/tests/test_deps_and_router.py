@@ -1,21 +1,23 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from fastapi import FastAPI
+from starlette.requests import HTTPConnection
+
 from src.app.api.router import api_router
-from src.app.deps import (
-    get_command_pack_manager,
-    get_history_database,
-    get_pipeline_flow_manager,
-    get_runtime,
-    get_terminal_runtime,
-)
+from src.app.deps import get_application_services, get_runtime
 
 
-def test_deps_return_singletons():
-    assert get_runtime() is get_runtime()
-    assert get_terminal_runtime() is get_terminal_runtime()
-    assert get_command_pack_manager() is get_command_pack_manager()
-    assert get_history_database() is get_history_database()
-    assert get_pipeline_flow_manager() is get_pipeline_flow_manager()
+def test_deps_read_services_from_app_state():
+    app = FastAPI()
+    services = SimpleNamespace(runtime_manager=object())
+    app.state.services = services
+    scope = {"type": "http", "app": app, "headers": [], "query_string": b""}
+    connection = HTTPConnection(scope)
+
+    assert get_application_services(connection) is services
+    assert get_runtime(connection) is services.runtime_manager
 
 
 def test_api_router_contains_expected_paths():

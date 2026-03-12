@@ -66,3 +66,20 @@ async def test_pipeline_flows_bootstrap_and_crud(tmp_path: Path, isolated_db: En
 
     deleted = manager.delete_flow(created["id"])
     assert deleted["deleted"] is True
+
+
+@pytest.mark.asyncio
+async def test_pipeline_flows_expose_bootstrap_errors(tmp_path: Path, isolated_db: Engine) -> None:
+    _ = isolated_db
+    _clear_pipeline_tables()
+
+    manager = PipelineFlowManager()
+    legacy_flows_dir = tmp_path / "pipeline_flows"
+    setattr(manager, "_legacy_flows_dir", legacy_flows_dir)
+    legacy_flows_dir.mkdir(parents=True, exist_ok=True)
+    (legacy_flows_dir / "broken.json").write_text("{", encoding="utf-8")
+
+    await manager.ensure_ready()
+
+    listed = manager.list_flows()
+    assert any("broken.json" in error for error in listed["errors"])

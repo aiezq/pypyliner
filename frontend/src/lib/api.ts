@@ -7,21 +7,35 @@ const fallbackApiBaseUrl = import.meta.env.DEV ? '' : 'http://127.0.0.1:8000'
 
 export const API_BASE_URL = configuredApiBaseUrl ?? fallbackApiBaseUrl
 
-export const getWebSocketUrl = (path: string): string => {
+const joinUrlPath = (basePathname: string, path: string): string => {
+  const normalizedBase = basePathname === '/' ? '' : basePathname.replace(/\/+$/, '')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${normalizedBase}${normalizedPath}` || '/'
+}
+
+export const buildWebSocketUrl = (
+  apiBaseUrl: string,
+  path: string,
+  windowOrigin = window.location.origin,
+  windowProtocol = window.location.protocol,
+  windowHost = window.location.host,
+): string => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
 
-  if (!API_BASE_URL) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${protocol}//${window.location.host}${normalizedPath}`
+  if (!apiBaseUrl) {
+    const protocol = windowProtocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${windowHost}${normalizedPath}`
   }
 
-  const baseUrl = new URL(API_BASE_URL, window.location.origin)
+  const baseUrl = new URL(apiBaseUrl, windowOrigin)
   baseUrl.protocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-  baseUrl.pathname = normalizedPath
+  baseUrl.pathname = joinUrlPath(baseUrl.pathname, normalizedPath)
   baseUrl.search = ''
   baseUrl.hash = ''
   return baseUrl.toString()
 }
+
+export const getWebSocketUrl = (path: string): string => buildWebSocketUrl(API_BASE_URL, path)
 
 interface ValidationErrorItem {
   loc?: Array<string | number>

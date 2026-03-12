@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Coroutine, Final, Literal, TypeVar
+from typing import Any, Awaitable, Callable, Final, Literal, TypeVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -170,7 +170,11 @@ class RuntimeManager:
         }
 
     def snapshot(self) -> StateSnapshotData:
-        return {"runs": self.list_runs()}
+        return {
+            "runs": self.list_runs(),
+            "terminals": [],
+            "sequences": [],
+        }
 
     def snapshot_event(self) -> SnapshotEventMessage:
         return {"type": "snapshot", "data": self.snapshot()}
@@ -295,7 +299,7 @@ class RuntimeManager:
             if error is None:
                 return
             LOGGER.exception("Background task failed: %s", label, exc_info=error)
-            if on_error is not None:
+            if on_error is not None and isinstance(error, Exception):
                 self._create_background_task(on_error(error), label=f"{label}:error_handler")
 
         task.add_done_callback(_handle_completion)
@@ -303,12 +307,15 @@ class RuntimeManager:
 
     def _create_background_task(
         self,
-        coroutine: Coroutine[Any, Any, Any],
+        coroutine: Awaitable[Any],
         *,
         label: str,
         on_error: Callable[[Exception], Awaitable[None]] | None = None,
     ) -> asyncio.Task[Any]:
-        task = asyncio.create_task(coroutine)
+        async def _runner() -> Any:
+            return await coroutine
+
+        task = asyncio.create_task(_runner())
         return self._track_background_task(task, label=label, on_error=on_error)
 
     async def _terminate_process(self, process: asyncio.subprocess.Process) -> None:
@@ -477,9 +484,10 @@ class RuntimeManager:
 
         run.stop_requested = True
         await self._append_log(run.log_file_path, f"[{now_iso()}] [run] stop requested")
-        if self._is_process_running(run.current_process):
+        process = run.current_process
+        if process is not None and self._is_process_running(process):
             self._create_background_task(
-                self._terminate_process(run.current_process),
+                self._terminate_process(process),
                 label=f"terminate_process:{run.id}",
             )
         return self._serialize_run(run)

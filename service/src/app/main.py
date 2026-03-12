@@ -9,12 +9,7 @@ from src.app.api.router import api_router
 from src.app.core.database import run_migrations
 from src.app.core.logging import configure_logging, log_http_request
 from src.app.deps import (
-    get_ai_model_manager,
-    get_command_pack_manager,
-    get_history_database,
-    get_pipeline_flow_manager,
-    get_runtime,
-    get_terminal_runtime,
+    build_application_services,
 )
 from src.app.services.runtime import ServiceError
 
@@ -22,17 +17,19 @@ LOGGER = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     configure_logging()
     LOGGER.info("Startup: running database migrations")
     run_migrations()
     LOGGER.info("Startup: database migrations complete")
-    runtime = get_runtime()
-    terminal_runtime = get_terminal_runtime()
-    command_packs = get_command_pack_manager()
-    pipeline_flows = get_pipeline_flow_manager()
-    history_db = get_history_database()
-    ai_models = get_ai_model_manager()
+    services = build_application_services()
+    app.state.services = services
+    runtime = services.runtime_manager
+    terminal_runtime = services.terminal_runtime_manager
+    command_packs = services.command_pack_manager
+    pipeline_flows = services.pipeline_flow_manager
+    history_db = services.history_database
+    ai_models = services.ai_model_manager
     LOGGER.info("Startup: initializing history database")
     history_db.ensure_ready()
     LOGGER.info("Startup: history database ready")

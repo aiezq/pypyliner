@@ -165,8 +165,10 @@ Frontend отвечает за:
 Для первой frontend-итерации допустимо переиспользовать существующий слой `manualTerminals`/floating windows как host UI для backend terminal sessions, если:
 
 - source of truth для runtime state остаётся backend snapshot/events;
+- frontend не создаёт ui-only runtime placeholders для manual terminal при ошибке backend session creation;
 - `terminalId` в graph node обновляется backend session id;
 - placeholder local windows не оркестрируют backend очередь и не подменяют live session state.
+- frontend хранит отдельный sequence view-model, который гидратируется только из backend `sequences` snapshot/events и отображает `id`, `status`, `current_terminal_index`, `finished_at`.
 
 ## Backend
 

@@ -30,6 +30,14 @@ from src.app.services.terminal_runtime import (
 )
 
 
+class RecordingEventHub:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, object]] = []
+
+    async def broadcast(self, event_type: str, data: object) -> None:
+        self.events.append((event_type, data))
+
+
 class FakeSshChannel:
     def __init__(self) -> None:
         self.closed = False
@@ -237,6 +245,41 @@ async def _wait_for_sequence(
             await asyncio.sleep(0.05)
 
     return await asyncio.wait_for(_poll(), timeout=timeout)
+
+
+@pytest.mark.asyncio
+async def test_create_terminal_cleans_up_shell_on_startup_failure(monkeypatch: pytest.MonkeyPatch):
+    runtime = TerminalRuntimeManager()
+    started_pids: list[int] = []
+    original_start_local_shell = runtime._start_local_shell
+
+    async def track_local_shell_start(*args, **kwargs):
+        shell = await original_start_local_shell(*args, **kwargs)
+        assert shell.process is not None
+        started_pids.append(shell.process.pid)
+        return shell
+
+    async def fail_bootstrap(*_args, **_kwargs):
+        raise ServiceError(status_code=500, detail="shell bootstrap failed")
+
+    monkeypatch.setattr(runtime, "_start_local_shell", track_local_shell_start)
+    monkeypatch.setattr(runtime, "_bootstrap_shell", fail_bootstrap)
+
+    with pytest.raises(ServiceError) as error_info:
+        await runtime.create_terminal(
+            TerminalCreatePayload(
+                title="Broken terminal",
+                terminal_type="local",
+            )
+        )
+
+    assert error_info.value.detail == "shell bootstrap failed"
+    assert runtime.terminals == {}
+    assert runtime._shells == {}
+    assert started_pids
+    for pid in started_pids:
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
 
 
 @pytest.mark.asyncio
@@ -806,3 +849,36 @@ async def test_graph_terminal_stream_unlocks_existing_client_after_queue_complet
 
     stopped = await runtime.stop_terminal(terminal["id"])
     assert stopped["status"] == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_execute_sequence_broadcasts_sequence_events():
+    events = RecordingEventHub()
+    runtime = TerminalRuntimeManager(events=events)  # type: ignore[arg-type]
+    response = await runtime.execute_sequence(
+        SequenceExecutionPayload(
+            sequence_node_id="node_sequence_1",
+            terminals=[
+                TerminalExecutionPayload(
+                    terminal_node_id="node_terminal_1",
+                    title="Sequence Terminal",
+                    terminal_type="local",
+                    commands=[
+                        TerminalCommandPayload(
+                            node_id="node_cmd_1",
+                            label="Echo",
+                            original_command="echo sequence",
+                            resolved_command="echo sequence",
+                        )
+                    ],
+                )
+            ],
+        )
+    )
+
+    sequence = await _wait_for_sequence(runtime, response["id"])
+
+    event_types = [event_type for event_type, _payload in events.events]
+    assert "sequence_created" in event_types
+    assert "sequence_status" in event_types
+    assert sequence["status"] == "success"

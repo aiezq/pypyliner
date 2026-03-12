@@ -12,6 +12,7 @@ export const SessionStatusSchema = z.enum([
   'failed',
   'stopped',
 ])
+export const SequenceStatusSchema = z.enum(['pending', 'running', 'success', 'failed', 'stopped'])
 
 export const BackendLineSchema = z.object({
   id: z.string(),
@@ -66,13 +67,23 @@ export const BackendSequenceJobSchema = z.object({
   terminal_session_id: z.string().nullable(),
   title: z.string(),
   terminal_type: TerminalTypeSchema,
-  status: z.string(),
+  status: z.enum([
+    'idle',
+    'starting',
+    'pending',
+    'running',
+    'draining',
+    'success',
+    'failed',
+    'stopped',
+    'skipped',
+  ]),
 })
 
 export const BackendSequenceSchema = z.object({
   id: z.string(),
   sequence_node_id: z.string(),
-  status: z.string(),
+  status: SequenceStatusSchema,
   current_terminal_index: z.number().int().nullable(),
   created_at: z.string(),
   started_at: z.string().nullable(),
@@ -283,7 +294,7 @@ export const SocketEventSchema = z.discriminatedUnion('type', [
     data: z.object({
       sequence_id: z.string(),
       sequence_node_id: z.string(),
-      status: z.string(),
+      status: SequenceStatusSchema,
       current_terminal_index: z.number().int().nullable(),
       finished_at: z.string().nullable(),
     }),

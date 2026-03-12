@@ -5,6 +5,7 @@ import contextlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any, cast
 
 from src.app.core.settings import get_settings
 from src.app.schemas.ai import (
@@ -97,8 +98,8 @@ class AIModelManager:
 
     async def list_models(self) -> AIModelsResponse:
         runtime_available = await self._runtime.is_runtime_available()
-        installed = await self._runtime.list_installed_models() if runtime_available else set()
-        loaded = await self._runtime.list_loaded_models() if runtime_available else set()
+        installed: set[str] = await self._runtime.list_installed_models() if runtime_available else set()
+        loaded: set[str] = await self._runtime.list_loaded_models() if runtime_available else set()
         state_map = self._read_state_map()
 
         models = [
@@ -119,8 +120,8 @@ class AIModelManager:
     async def get_model_status(self, model_id: str) -> AIModelStatusResponse:
         manifest = self._get_manifest_entry(model_id)
         runtime_available = await self._runtime.is_runtime_available()
-        installed = await self._runtime.list_installed_models() if runtime_available else set()
-        loaded = await self._runtime.list_loaded_models() if runtime_available else set()
+        installed: set[str] = await self._runtime.list_installed_models() if runtime_available else set()
+        loaded: set[str] = await self._runtime.list_loaded_models() if runtime_available else set()
         persisted = self._read_state_map().get(model_id, PersistedModelState())
 
         return AIModelStatusResponse(
@@ -427,7 +428,8 @@ class AIModelManager:
             raise ServiceError(status_code=500, detail="AI model manifest is invalid JSON.") from error
         if not isinstance(raw, list):
             raise ServiceError(status_code=500, detail="AI model manifest must be a list.")
-        return [AIModelManifestEntry.model_validate(item) for item in raw]
+        raw_items = cast(list[object], raw)
+        return [AIModelManifestEntry.model_validate(item) for item in raw_items]
 
     def _read_state_map(self) -> dict[str, PersistedModelState]:
         try:
@@ -438,10 +440,12 @@ class AIModelManager:
             return {}
         if not isinstance(raw, dict):
             return {}
+        raw_state = cast(dict[object, object], raw)
         result: dict[str, PersistedModelState] = {}
-        for model_id, payload in raw.items():
+        for model_id, payload in raw_state.items():
             if isinstance(model_id, str) and isinstance(payload, dict):
-                result[model_id] = PersistedModelState(**payload)
+                payload_dict = cast(dict[str, Any], payload)
+                result[model_id] = PersistedModelState(**payload_dict)
         return result
 
     def _write_model_state(

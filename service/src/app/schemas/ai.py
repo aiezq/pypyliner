@@ -10,6 +10,26 @@ AIRuntimeName = Literal["ollama"]
 TerminalKind = Literal["local", "ssh"]
 
 
+def _new_model_summaries() -> list["AIModelSummary"]:
+    return []
+
+
+def _new_draft_variables() -> list["PipelineDraftVariable"]:
+    return []
+
+
+def _new_draft_steps() -> list["PipelineDraftStep"]:
+    return []
+
+
+def _new_clarification_answers() -> list["DocumentationClarificationAnswer"]:
+    return []
+
+
+def _new_clarification_questions() -> list["DocumentationClarificationQuestion"]:
+    return []
+
+
 class AIModelManifestEntry(BaseModel):
     model_id: str
     display_name: str
@@ -37,7 +57,7 @@ class AIModelSummary(AIModelManifestEntry):
 class AIModelsResponse(BaseModel):
     runtime_name: AIRuntimeName
     runtime_available: bool
-    models: list[AIModelSummary] = Field(default_factory=list)
+    models: list[AIModelSummary] = Field(default_factory=_new_model_summaries)
 
 
 class AIModelStatusResponse(BaseModel):
@@ -84,8 +104,8 @@ class PipelineDraft(BaseModel):
     summary: str
     assumptions: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
-    variables: list[PipelineDraftVariable] = Field(default_factory=list)
-    steps: list[PipelineDraftStep] = Field(default_factory=list)
+    variables: list[PipelineDraftVariable] = Field(default_factory=_new_draft_variables)
+    steps: list[PipelineDraftStep] = Field(default_factory=_new_draft_steps)
     target_terminal: PipelineDraftTargetTerminal
     confidence: float = Field(ge=0.0, le=1.0)
 
@@ -132,11 +152,11 @@ class AnalyzeDocumentationRequest(BaseModel):
 
 class GeneratePipelineDraftRequest(AnalyzeDocumentationRequest):
     mode: Literal["graph"] = "graph"
-    clarification_answers: list[DocumentationClarificationAnswer] = Field(default_factory=list)
+    clarification_answers: list[DocumentationClarificationAnswer] = Field(default_factory=_new_clarification_answers)
 
 
 class AnalyzeDocumentationResponse(BaseModel):
-    questions: list[DocumentationClarificationQuestion] = Field(default_factory=list)
+    questions: list[DocumentationClarificationQuestion] = Field(default_factory=_new_clarification_questions)
     warnings: list[str] = Field(default_factory=list)
     install_state: AIInstallState
     model_state: AIModelState

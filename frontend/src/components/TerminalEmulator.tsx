@@ -11,48 +11,6 @@ interface TerminalEmulatorProps {
   fallbackLines: string[]
 }
 
-const mapKeyboardEventToInput = (event: KeyboardEvent): string | null => {
-  if (event.metaKey && event.key.toLowerCase() === 'v') {
-    return null
-  }
-  if (event.ctrlKey && !event.altKey && !event.metaKey && event.key.length === 1) {
-    const upper = event.key.toUpperCase()
-    if (upper >= 'A' && upper <= 'Z') {
-      return String.fromCharCode(upper.charCodeAt(0) - 64)
-    }
-  }
-  if (!event.ctrlKey && !event.altKey && !event.metaKey && event.key.length === 1) {
-    return event.key
-  }
-
-  switch (event.key) {
-    case 'Enter':
-      return '\r'
-    case 'Backspace':
-      return '\x7f'
-    case 'Tab':
-      return '\t'
-    case 'Escape':
-      return '\x1b'
-    case 'ArrowUp':
-      return '\x1b[A'
-    case 'ArrowDown':
-      return '\x1b[B'
-    case 'ArrowRight':
-      return '\x1b[C'
-    case 'ArrowLeft':
-      return '\x1b[D'
-    case 'Delete':
-      return '\x1b[3~'
-    case 'Home':
-      return '\x1b[H'
-    case 'End':
-      return '\x1b[F'
-    default:
-      return null
-  }
-}
-
 function TerminalEmulator({ terminalId, canWrite, fallbackLines }: TerminalEmulatorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalRef = useRef<XTerm | null>(null)
@@ -130,17 +88,8 @@ function TerminalEmulator({ terminalId, canWrite, fallbackLines }: TerminalEmula
     term.open(container)
     term.focus()
     fitAddon.fit()
-    term.attachCustomKeyEventHandler((event) => {
-      if (event.type !== 'keydown') {
-        return true
-      }
-      const payload = mapKeyboardEventToInput(event)
-      if (payload === null || !desiredCanWriteRef.current || readOnlyRef.current) {
-        return true
-      }
-      event.preventDefault()
-      sendInput(payload)
-      return false
+    const dataDisposable = term.onData((data) => {
+      sendInput(data)
     })
 
     terminalRef.current = term
@@ -166,21 +115,6 @@ function TerminalEmulator({ terminalId, canWrite, fallbackLines }: TerminalEmula
       sendResize()
     })
     resizeObserver.observe(container)
-
-    const handlePaste = (event: ClipboardEvent): void => {
-      if (!desiredCanWriteRef.current || readOnlyRef.current) {
-        return
-      }
-      const text = event.clipboardData?.getData('text') ?? ''
-      if (!text) {
-        return
-      }
-      event.preventDefault()
-      event.stopPropagation()
-      sendInput(text.replace(/\r\n/g, '\n'))
-    }
-
-    container.addEventListener('paste', handlePaste, true)
 
     socket.addEventListener('open', () => {
       fitAddon.fit()
@@ -241,7 +175,7 @@ function TerminalEmulator({ terminalId, canWrite, fallbackLines }: TerminalEmula
 
     return () => {
       resizeObserver.disconnect()
-      container.removeEventListener('paste', handlePaste, true)
+      dataDisposable.dispose()
       socketRef.current = null
       socket.close()
       terminalRef.current = null

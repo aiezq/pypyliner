@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 TerminalType = Literal["local", "ssh"]
 
 
+def _new_terminal_commands() -> list["TerminalCommandPayload"]:
+    return []
+
+
 class TerminalCommandPayload(BaseModel):
     node_id: str = Field(min_length=1, max_length=200)
     label: str = Field(min_length=1, max_length=160)
@@ -23,7 +27,7 @@ class TerminalExecutionPayload(BaseModel):
     ssh_username: str | None = Field(default=None, max_length=200)
     ssh_password: str | None = Field(default=None, max_length=500)
     ssh_command: str | None = Field(default=None, max_length=5000)
-    commands: list[TerminalCommandPayload] = Field(default_factory=list, max_length=200)
+    commands: list[TerminalCommandPayload] = Field(default_factory=_new_terminal_commands, max_length=200)
 
 
 class TerminalCreatePayload(BaseModel):
