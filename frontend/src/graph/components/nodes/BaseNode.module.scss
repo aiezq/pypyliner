@@ -285,6 +285,45 @@
   padding-left: 8px;
 }
 
+.sequenceRuntimeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.runtimeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  border: 1px solid rgba(188, 198, 204, 0.18);
+  background: rgba(18, 22, 26, 0.82);
+  color: rgba(221, 230, 235, 0.8);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.runtimeChip--running {
+  border-color: rgba(145, 180, 169, 0.32);
+  background: rgba(41, 63, 55, 0.82);
+  color: #dff0e8;
+}
+
+.runtimeChip--success {
+  border-color: rgba(145, 180, 169, 0.32);
+  background: rgba(36, 57, 50, 0.78);
+  color: #d4eadf;
+}
+
+.runtimeChip--failed {
+  border-color: rgba(196, 135, 135, 0.3);
+  background: rgba(71, 39, 43, 0.82);
+  color: #f0d6d6;
+}
+
 /* ── Status area ───────────────────────────────────────── */
 
 .nodeStatus {

@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import CommandNode from '../../../../src/graph/components/nodes/CommandNode'
 import { useGraphStore } from '../../../../src/graph/store/graphStore'
+import { renderWithProviders } from '../../../renderWithProviders'
 
 vi.mock('@xyflow/react', () => ({
   Handle: () => null,
@@ -17,6 +18,11 @@ const resetGraphStore = (): void => {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -71,7 +77,7 @@ describe('CommandNode inline command editing', () => {
       sshConnections: [],
     })
 
-    render(<CommandNodeHost />)
+    renderWithProviders(<CommandNodeHost />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit node title: Deploy app' }))
 
@@ -109,7 +115,7 @@ describe('CommandNode inline command editing', () => {
       sshConnections: [],
     })
 
-    render(<CommandNodeHost />)
+    renderWithProviders(<CommandNodeHost />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Click to enter command' }))
 
@@ -150,7 +156,7 @@ describe('CommandNode inline command editing', () => {
       sshConnections: [],
     })
 
-    render(<CommandNodeHost />)
+    renderWithProviders(<CommandNodeHost />)
 
     const variableTokens = screen.getAllByText(/\{(host|user)\}/)
       .filter((element) => element.className.includes('nodeCodeVariable'))

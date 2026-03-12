@@ -84,6 +84,11 @@ function TerminalPanel(props: TerminalPanelProps) {
     const prefix = currentCommandPosition ? `${currentCommandPosition}/${queue.length}` : `${queue.length}`
     return `${prefix} ${terminal.currentCommandLabel}`
   }, [currentCommandPosition, queue.length, terminal.currentCommandLabel])
+  const terminalTypeLabel = terminal.terminalType === 'ssh' ? 'SSH' : 'LOCAL'
+  const sshTargetLabel =
+    terminal.terminalType === 'ssh'
+      ? [terminal.sshUsername, terminal.sshHost].filter(Boolean).join('@') || terminal.sshHost
+      : null
 
   useEffect(() => {
     const node = bodyRef.current
@@ -202,6 +207,19 @@ function TerminalPanel(props: TerminalPanelProps) {
           <p className="terminalWindow__meta">
             {messages.terminal.exitCode}: {terminal.exitCode ?? '...'}
           </p>
+          <div className="terminalWindow__meta terminalWindow__metaGroup">
+            <span className="terminalWindow__badge">{terminalTypeLabel}</span>
+            {terminal.isSequence ? (
+              <span className="terminalWindow__badge terminalWindow__badge--sequence">
+                {messages.graph.sequence}
+              </span>
+            ) : null}
+            {sshTargetLabel ? (
+              <span className="terminalWindow__meta terminalWindow__meta--muted">
+                {sshTargetLabel}
+              </span>
+            ) : null}
+          </div>
           <p className="terminalWindow__meta terminalWindow__meta--muted">
             {queueSummary ? `${queueSummary} • ` : ''}
             {terminal.promptUser}:{terminal.promptCwd}

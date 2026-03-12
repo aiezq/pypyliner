@@ -1,9 +1,9 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import HeaderBar from './components/HeaderBar'
+import SequenceRuntimeStrip from './components/SequenceRuntimeStrip'
 import { GraphEditor, useGraphStore } from './graph'
 import { useHistoryFeature } from './features/history/useHistoryFeature'
 import { useWorkbenchFeature } from './features/workbench/useWorkbenchFeature'
-import type { SessionStatus } from './types'
 import { useI18n } from './i18n/I18nProvider'
 
 type AppView = 'graph' | 'history'
@@ -23,19 +23,16 @@ function App() {
     isActive: activeView === 'history',
   })
 
-  const setActiveTerminalIds = useGraphStore((s) => s.setActiveTerminalIds)
-  const setTerminalStatuses = useGraphStore((s) => s.setTerminalStatuses)
+  const syncTerminalRuntime = useGraphStore((s) => s.syncTerminalRuntime)
+  const syncSequenceRuntime = useGraphStore((s) => s.syncSequenceRuntime)
 
   useEffect(() => {
-    const terminals = workbench.terminalWindowsLayerProps.manualTerminals
-    setActiveTerminalIds(terminals.map(t => t.id))
+    syncTerminalRuntime(workbench.terminalWindowsLayerProps.manualTerminals)
+  }, [syncTerminalRuntime, workbench.terminalWindowsLayerProps.manualTerminals])
 
-    const statuses: Record<string, SessionStatus> = {}
-    terminals.forEach(t => {
-      statuses[t.id] = t.status
-    })
-    setTerminalStatuses(statuses)
-  }, [workbench.terminalWindowsLayerProps.manualTerminals, setActiveTerminalIds, setTerminalStatuses])
+  useEffect(() => {
+    syncSequenceRuntime(workbench.sequenceExecutions)
+  }, [syncSequenceRuntime, workbench.sequenceExecutions])
 
   useEffect(() => {
     if (!isLocalAiOpen) {
@@ -67,6 +64,8 @@ function App() {
       {workbench.errorBannerMessage ? (
         <p className="errorBanner">{workbench.errorBannerMessage}</p>
       ) : null}
+
+      <SequenceRuntimeStrip sequences={workbench.sequenceExecutions} />
 
       <div className="appTabsRow">
         <div className="appTabs" role="tablist" aria-label={messages.app.mainViews}>

@@ -29,6 +29,71 @@
     gap: 0.45rem;
   }
 
+  .sequenceRuntimeStrip {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0 1.5rem 0.2rem;
+  }
+
+  .sequenceRuntimeCard {
+    min-width: 220px;
+    border: 1px solid rgba(243, 179, 94, 0.28);
+    border-radius: 10px;
+    padding: 0.55rem 0.75rem;
+    background: rgba(243, 179, 94, 0.08);
+  }
+
+  .sequenceRuntimeCard__title {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: rgba(255, 237, 206, 0.94);
+  }
+
+  .sequenceRuntimeCard__id,
+  .sequenceRuntimeCard__status,
+  .sequenceRuntimeCard__finishedAt {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .sequenceRuntimeCard__id {
+    color: rgba(214, 222, 230, 0.92);
+  }
+
+  .sequenceRuntimeCard__status {
+    color: rgba(243, 179, 94, 0.92);
+  }
+
+  .sequenceRuntimeCard__finishedAt {
+    color: rgba(188, 198, 204, 0.82);
+  }
+
+  .sequenceRuntimeCard__jobs {
+    display: grid;
+    gap: 0.28rem;
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(243, 179, 94, 0.16);
+  }
+
+  .sequenceRuntimeJob {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    font-size: 0.76rem;
+  }
+
+  .sequenceRuntimeJob__title {
+    color: rgba(228, 235, 240, 0.9);
+  }
+
+  .sequenceRuntimeJob__meta {
+    color: rgba(243, 179, 94, 0.86);
+    white-space: nowrap;
+  }
+
   .appTabButton {
     border-color: rgba(188, 198, 204, 0.3);
     background: rgba(30, 36, 42, 0.92);
@@ -96,6 +161,11 @@
 
     .appQuickActions {
       width: 100%;
+    }
+
+    .sequenceRuntimeStrip {
+      padding-left: 0;
+      padding-right: 0;
     }
 
     .appOverlay {

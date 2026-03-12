@@ -12,6 +12,11 @@ const resetGraphStore = (): void => {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -84,7 +89,10 @@ describe('useGraphExecution', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(useGraphStore.getState().nodes.find((node) => node.id === 'terminal_1')?.data.terminalId).toBe('term_1')
+    expect(useGraphStore.getState().nodes.find((node) => node.id === 'terminal_1')?.data).toMatchObject({
+      terminalId: 'term_1',
+      terminalSessionId: 'term_1',
+    })
     expect(useGraphStore.getState().activeTerminalIds).toContain('term_1')
     expect(useGraphStore.getState().terminalStatuses.term_1).toBe('starting')
   })

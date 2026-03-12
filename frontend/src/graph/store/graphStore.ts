@@ -24,7 +24,12 @@ import {
   type SerializedGraph,
 } from '../types'
 import type { PipelineDraft } from '../../lib/schemas'
-import type { SessionStatus, SshConnectionVariable } from '../../types'
+import type {
+  ManualTerminal,
+  SequenceExecutionViewModel,
+  SessionStatus,
+  SshConnectionVariable,
+} from '../../types'
 import { parseVariables } from '../utils/variableParser'
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -45,6 +50,22 @@ interface GraphState {
   viewport: Viewport
   activeTerminalIds: string[]
   terminalStatuses: Record<string, SessionStatus>
+  terminalSessionsById: Record<
+    string,
+    {
+      terminalNodeId: string | null
+      terminalType: 'local' | 'ssh'
+      sequenceId: string | null
+      status: SessionStatus
+      currentCommandIndex: number | null
+      exitCode: number | null
+      stdinEnabled: boolean
+    }
+  >
+  terminalSessionIdByNodeId: Record<string, string | null>
+  terminalCurrentCommandIndexById: Record<string, number | null>
+  sequenceExecutionsById: Record<string, SequenceExecutionViewModel>
+  activeSequenceExecutionIdByNodeId: Record<string, string | null>
   globalVariables: Record<string, string>
   sshConnections: SshConnectionVariable[]
 
@@ -55,6 +76,8 @@ interface GraphState {
   setViewport: (viewport: Viewport) => void
   setActiveTerminalIds: (ids: string[]) => void
   setTerminalStatuses: (statuses: Record<string, SessionStatus>) => void
+  syncTerminalRuntime: (terminals: ManualTerminal[]) => void
+  syncSequenceRuntime: (sequences: SequenceExecutionViewModel[]) => void
   setGlobalVariable: (key: string, value: string) => void
   deleteGlobalVariable: (key: string) => void
   saveSshConnection: (connection: Omit<SshConnectionVariable, 'id'> & { id?: string }) => string
@@ -150,6 +173,10 @@ function parseSshConnectionHint(connectionHint: string | null): {
 function normalizeSshTerminalNodeData(data: SshTerminalNodeData): SshTerminalNodeData {
   return {
     ...data,
+    terminalSessionId:
+      typeof data.terminalSessionId === 'string' || data.terminalSessionId === null
+        ? data.terminalSessionId
+        : data.terminalId,
     sshPassword: typeof data.sshPassword === 'string' ? data.sshPassword : '',
     sshCommand:
       typeof data.sshCommand === 'string' && data.sshCommand.trim()
@@ -159,6 +186,19 @@ function normalizeSshTerminalNodeData(data: SshTerminalNodeData): SshTerminalNod
 }
 
 function normalizeGraphNode(node: GraphNode): GraphNode {
+  if (node.type === NODE_TYPES.TERMINAL) {
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        terminalSessionId:
+          typeof node.data.terminalSessionId === 'string' || node.data.terminalSessionId === null
+            ? node.data.terminalSessionId
+            : node.data.terminalId,
+      },
+    } satisfies GraphNode
+  }
+
   if (node.type !== NODE_TYPES.SSH_TERMINAL) {
     return node
   }
@@ -480,6 +520,11 @@ export const useGraphStore = create<GraphState>()(
       viewport: { x: 0, y: 0, zoom: 1 },
       activeTerminalIds: [],
       terminalStatuses: {},
+      terminalSessionsById: {},
+      terminalSessionIdByNodeId: {},
+      terminalCurrentCommandIndexById: {},
+      sequenceExecutionsById: {},
+      activeSequenceExecutionIdByNodeId: {},
       globalVariables: {},
       sshConnections: [],
 
@@ -535,6 +580,79 @@ export const useGraphStore = create<GraphState>()(
       
       setTerminalStatuses: (statuses) => set({ terminalStatuses: statuses }),
 
+      syncTerminalRuntime: (terminals) => {
+        const activeTerminalIds = terminals.map((terminal) => terminal.id)
+        const terminalStatuses = Object.fromEntries(
+          terminals.map((terminal) => [terminal.id, terminal.status]),
+        )
+        const terminalSessionsById = Object.fromEntries(
+          terminals.map((terminal) => [
+            terminal.id,
+            {
+              terminalNodeId: terminal.terminalNodeId ?? null,
+              terminalType: terminal.terminalType,
+              sequenceId: terminal.sequenceId ?? null,
+              status: terminal.status,
+              currentCommandIndex: terminal.currentCommandIndex ?? null,
+              exitCode: terminal.exitCode ?? null,
+              stdinEnabled: terminal.stdinEnabled === true,
+            },
+          ]),
+        )
+        const terminalSessionIdByNodeId = Object.fromEntries(
+          terminals
+            .filter((terminal) => Boolean(terminal.terminalNodeId))
+            .map((terminal) => [terminal.terminalNodeId as string, terminal.id]),
+        )
+        const terminalCurrentCommandIndexById = Object.fromEntries(
+          terminals.map((terminal) => [terminal.id, terminal.currentCommandIndex ?? null]),
+        )
+
+        set((state) => ({
+          activeTerminalIds,
+          terminalStatuses,
+          terminalSessionsById,
+          terminalSessionIdByNodeId,
+          terminalCurrentCommandIndexById,
+          nodes: state.nodes.map((node) => {
+            if (
+              node.type !== NODE_TYPES.TERMINAL &&
+              node.type !== NODE_TYPES.SSH_TERMINAL
+            ) {
+              return node
+            }
+
+            const terminalSessionId = terminalSessionIdByNodeId[node.id]
+            if (terminalSessionId === undefined || node.data.terminalId === terminalSessionId) {
+              return node
+            }
+
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                terminalId: terminalSessionId,
+                terminalSessionId,
+              },
+            } satisfies GraphNode
+          }) as GraphNode[],
+        }))
+      },
+
+      syncSequenceRuntime: (sequences) => {
+        const sequenceExecutionsById = Object.fromEntries(
+          sequences.map((sequence) => [sequence.id, sequence]),
+        )
+        const activeSequenceExecutionIdByNodeId = Object.fromEntries(
+          sequences.map((sequence) => [sequence.sequenceNodeId, sequence.id]),
+        )
+
+        set((state) => ({
+          sequenceExecutionsById,
+          activeSequenceExecutionIdByNodeId,
+        }))
+      },
+
       setGlobalVariable: (key, value) => {
         set((state) => ({
           globalVariables: { ...state.globalVariables, [key]: value },
@@ -585,6 +703,7 @@ export const useGraphStore = create<GraphState>()(
                   ...node.data,
                   connectionId: null,
                   terminalId: null,
+                  terminalSessionId: null,
                 },
               }
             }
@@ -642,6 +761,7 @@ export const useGraphStore = create<GraphState>()(
           data: {
             label: data?.label ?? 'Terminal',
             terminalId: data?.terminalId ?? null,
+            terminalSessionId: data?.terminalSessionId ?? data?.terminalId ?? null,
           },
         }
 
@@ -659,6 +779,7 @@ export const useGraphStore = create<GraphState>()(
           data: {
             label: data?.label ?? 'SSH Terminal',
             terminalId: data?.terminalId ?? null,
+            terminalSessionId: data?.terminalSessionId ?? data?.terminalId ?? null,
             connectionId: data?.connectionId ?? null,
             sshUsername: data?.sshUsername ?? '',
             sshHost: data?.sshHost ?? '',
@@ -680,6 +801,10 @@ export const useGraphStore = create<GraphState>()(
           position,
           data: {
             label: data?.label ?? 'Sequence',
+            sequenceId: data?.sequenceId ?? null,
+            status: data?.status ?? null,
+            currentTerminalIndex: data?.currentTerminalIndex ?? null,
+            finishedAt: data?.finishedAt ?? null,
           },
         }
 
@@ -702,6 +827,7 @@ export const useGraphStore = create<GraphState>()(
                 data: {
                   label: terminalData.label,
                   terminalId: null,
+                  terminalSessionId: null,
                   connectionId: null,
                   sshUsername: '',
                   sshHost: '',
@@ -719,6 +845,7 @@ export const useGraphStore = create<GraphState>()(
                 data: {
                   label: terminalData.label,
                   terminalId: null,
+                  terminalSessionId: null,
                 },
               } satisfies GraphNode
             }
@@ -742,6 +869,27 @@ export const useGraphStore = create<GraphState>()(
               typeof data.command === 'string'
             ) {
               ;(merged as CommandNodeData).variableNames = parseVariables(data.command)
+            }
+
+            if (
+              (node.type === NODE_TYPES.TERMINAL || node.type === NODE_TYPES.SSH_TERMINAL) &&
+              !('terminalSessionId' in merged)
+            ) {
+              ;(merged as TerminalNodeData | SshTerminalNodeData).terminalSessionId =
+                (merged as TerminalNodeData | SshTerminalNodeData).terminalId
+            }
+
+            if (
+              node.type === NODE_TYPES.TERMINAL ||
+              node.type === NODE_TYPES.SSH_TERMINAL
+            ) {
+              const terminalNodeData = merged as TerminalNodeData | SshTerminalNodeData
+              if (
+                terminalNodeData.terminalSessionId !== undefined &&
+                terminalNodeData.terminalId !== terminalNodeData.terminalSessionId
+              ) {
+                terminalNodeData.terminalId = terminalNodeData.terminalSessionId ?? null
+              }
             }
 
             return { ...node, data: merged }
@@ -941,6 +1089,7 @@ export const useGraphStore = create<GraphState>()(
               data: {
                 label: terminalLabel || connectionDetails.label,
                 terminalId: null,
+                terminalSessionId: null,
                 connectionId: null,
                 sshUsername: connectionDetails.sshUsername,
                 sshHost: connectionDetails.sshHost,
@@ -959,6 +1108,7 @@ export const useGraphStore = create<GraphState>()(
               data: {
                 label: terminalLabel,
                 terminalId: null,
+                terminalSessionId: null,
               },
             })
           }
@@ -987,6 +1137,10 @@ export const useGraphStore = create<GraphState>()(
                 },
                 data: {
                   label: draft.flow_name || 'Generated Sequence',
+                  sequenceId: null,
+                  status: null,
+                  currentTerminalIndex: null,
+                  finishedAt: null,
                 },
               })
             }
@@ -1046,6 +1200,13 @@ export const useGraphStore = create<GraphState>()(
           nodes: graph.nodes.map((node) => normalizeGraphNode(node as GraphNode)),
           edges: graph.edges,
           viewport: graph.viewport,
+          activeTerminalIds: [],
+          terminalStatuses: {},
+          terminalSessionsById: {},
+          terminalSessionIdByNodeId: {},
+          terminalCurrentCommandIndexById: {},
+          sequenceExecutionsById: {},
+          activeSequenceExecutionIdByNodeId: {},
           globalVariables: graph.globalVariables,
           sshConnections: graph.sshConnections ?? [],
         })
@@ -1057,6 +1218,13 @@ export const useGraphStore = create<GraphState>()(
           nodes: [],
           edges: [],
           viewport: { x: 0, y: 0, zoom: 1 },
+          activeTerminalIds: [],
+          terminalStatuses: {},
+          terminalSessionsById: {},
+          terminalSessionIdByNodeId: {},
+          terminalCurrentCommandIndexById: {},
+          sequenceExecutionsById: {},
+          activeSequenceExecutionIdByNodeId: {},
           globalVariables: {},
           sshConnections: [],
         })

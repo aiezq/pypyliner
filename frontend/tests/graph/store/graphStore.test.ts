@@ -9,6 +9,11 @@ const resetGraphStore = (): void => {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -159,6 +164,107 @@ describe('useGraphStore serialization', () => {
     expect(state.nodes.filter((node) => node.type === 'terminal')).toHaveLength(1)
     expect(state.edges.filter((edge) => edge.type === 'chain')).toHaveLength(2)
     expect(state.edges.filter((edge) => edge.type === 'variable')).toHaveLength(2)
+  })
+
+  it('syncs terminal and sequence runtime maps from backend state', () => {
+    resetGraphStore()
+
+    useGraphStore.setState({
+      nodes: [
+        {
+          id: 'terminal_1',
+          type: 'terminal',
+          position: { x: 100, y: 0 },
+          data: {
+            label: 'Terminal',
+            terminalId: null,
+          },
+        },
+        {
+          id: 'sequence_1',
+          type: 'sequence',
+          position: { x: 260, y: 0 },
+          data: {
+            label: 'Sequence',
+            sequenceId: null,
+            status: null,
+            currentTerminalIndex: null,
+            finishedAt: null,
+          },
+        },
+      ],
+    })
+
+    useGraphStore.getState().syncTerminalRuntime([
+      {
+        id: 'term_1',
+        title: 'Terminal',
+        titleDraft: 'Terminal',
+        terminalType: 'local',
+        promptUser: 'local',
+        promptCwd: '~',
+        isSequence: true,
+        status: 'running',
+        exitCode: null,
+        draftCommand: '',
+        sshConnectionName: null,
+        sshHost: null,
+        sshUsername: null,
+        lines: [],
+        isBackendSession: true,
+        terminalNodeId: 'terminal_1',
+        sequenceId: 'sequence_runtime_1',
+        createdAt: '2026-03-11T09:00:00Z',
+        startedAt: '2026-03-11T09:00:01Z',
+        finishedAt: null,
+        currentCommandIndex: 0,
+        currentCommandId: 'cmd_1',
+        currentCommandLabel: 'Step 1',
+        queue: [],
+        stdinEnabled: false,
+      },
+    ])
+
+    useGraphStore.getState().syncSequenceRuntime([
+      {
+        id: 'sequence_runtime_1',
+        sequenceNodeId: 'sequence_1',
+        status: 'running',
+        currentTerminalIndex: 0,
+        createdAt: '2026-03-11T09:00:00Z',
+        startedAt: '2026-03-11T09:00:01Z',
+        finishedAt: null,
+        terminalJobs: [
+          {
+            terminalNodeId: 'terminal_1',
+            terminalSessionId: 'term_1',
+            title: 'Terminal',
+            terminalType: 'local',
+            status: 'running',
+          },
+        ],
+      },
+    ])
+
+    const state = useGraphStore.getState()
+
+    expect(state.activeTerminalIds).toEqual(['term_1'])
+    expect(state.terminalStatuses).toEqual({ term_1: 'running' })
+    expect(state.terminalSessionsById.term_1).toMatchObject({
+      terminalNodeId: 'terminal_1',
+      sequenceId: 'sequence_runtime_1',
+      currentCommandIndex: 0,
+    })
+    expect(state.terminalSessionIdByNodeId).toEqual({ terminal_1: 'term_1' })
+    expect(state.terminalCurrentCommandIndexById).toEqual({ term_1: 0 })
+    expect(state.sequenceExecutionsById.sequence_runtime_1?.sequenceNodeId).toBe('sequence_1')
+    expect(state.activeSequenceExecutionIdByNodeId).toEqual({ sequence_1: 'sequence_runtime_1' })
+    expect(
+      useGraphStore.getState().nodes.find((node) => node.id === 'terminal_1')?.data,
+    ).toMatchObject({
+      terminalId: 'term_1',
+      terminalSessionId: 'term_1',
+    })
   })
 
   it('auto-inserts a new command node into an intersected chain edge', () => {

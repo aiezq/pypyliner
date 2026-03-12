@@ -1,8 +1,8 @@
-import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import GraphEditor from '../../../src/graph/components/GraphEditor'
 import { useGraphStore } from '../../../src/graph/store/graphStore'
+import { renderWithProviders } from '../../renderWithProviders'
 
 let reactFlowProps: ComponentProps<typeof import('@xyflow/react').ReactFlow> | null = null
 
@@ -27,6 +27,11 @@ const resetGraphStore = (): void => {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -102,7 +107,7 @@ describe('GraphEditor deletion hooks', () => {
       sshConnections: [],
     })
 
-    render(<GraphEditor />)
+    renderWithProviders(<GraphEditor />)
 
     expect(reactFlowProps?.onBeforeDelete).toBeTypeOf('function')
 

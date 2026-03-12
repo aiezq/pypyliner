@@ -12,7 +12,7 @@ type Props = NodeProps & { data: SshTerminalNodeData }
 export default function SshTerminalNode({ id, data, selected }: Props) {
   const { messages } = useI18n()
   const updateNodeData = useGraphStore((s) => s.updateNodeData)
-  const activeTerminalIds = useGraphStore((s) => s.activeTerminalIds)
+  const terminalSessionsById = useGraphStore((s) => s.terminalSessionsById)
   const sshConnections = useGraphStore((s) => s.sshConnections)
   const { executeTerminalNode } = useGraphExecution()
   const [isRunning, setIsRunning] = useState(false)
@@ -24,9 +24,12 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
     [data.connectionId, sshConnections],
   )
 
-  const hasTerminalId = !!data.terminalId
-  const isConnected = hasTerminalId && activeTerminalIds.includes(data.terminalId!)
-  const isClosed = hasTerminalId && !activeTerminalIds.includes(data.terminalId!)
+  const terminalSessionId = data.terminalSessionId ?? data.terminalId
+  const runtimeTerminal = terminalSessionId ? terminalSessionsById[terminalSessionId] : undefined
+  const runtimeCommandNumber =
+    typeof runtimeTerminal?.currentCommandIndex === 'number'
+      ? runtimeTerminal.currentCommandIndex + 1
+      : null
 
   const connectionSummary = selectedConnection
     ? `${selectedConnection.username}@${selectedConnection.host}`
@@ -34,20 +37,45 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
       ? `${data.sshUsername}@${data.sshHost}`
       : messages.nodes.sshTargetNotConfigured
 
-  const statusVariant = error ? 'error' : isConnected ? 'connected' : isClosed ? 'closed' : 'idle'
+  const statusVariant = error
+    ? 'error'
+    : runtimeTerminal
+      ? runtimeTerminal.status === 'failed'
+        ? 'error'
+        : runtimeTerminal.status === 'running' ||
+            runtimeTerminal.status === 'starting' ||
+            runtimeTerminal.status === 'draining'
+          ? 'connected'
+          : 'closed'
+      : terminalSessionId
+        ? 'closed'
+        : 'idle'
   const statusLabel = error
     ? error
-    : isConnected
-      ? messages.nodes.sshConnected(connectionSummary)
-      : isClosed
+    : runtimeTerminal
+      ? runtimeTerminal.status === 'failed'
+        ? messages.terminal.statusFailed
+        : runtimeTerminal.status === 'running' ||
+            runtimeTerminal.status === 'starting' ||
+            runtimeTerminal.status === 'draining'
+          ? runtimeCommandNumber !== null
+            ? `${messages.terminal.statusRunning} • ${runtimeCommandNumber}`
+            : messages.terminal.statusRunning
+          : runtimeTerminal.status === 'success'
+            ? messages.terminal.statusSuccess
+            : runtimeTerminal.status === 'stopped'
+              ? messages.terminal.statusStopped
+              : messages.terminal.statusIdle
+      : terminalSessionId
         ? messages.nodes.sshClosed
         : connectionSummary
 
   const updateSshNodeData = (nextData: Partial<SshTerminalNodeData>): void => {
-    updateNodeData<SshTerminalNodeData>(id, {
-      ...nextData,
-      terminalId: null,
-    })
+      updateNodeData<SshTerminalNodeData>(id, {
+        ...nextData,
+        terminalId: null,
+        terminalSessionId: null,
+      })
   }
 
   const handleRun = async () => {
@@ -87,7 +115,11 @@ export default function SshTerminalNode({ id, data, selected }: Props) {
         footer={
           <div className={styles.nodeStatus}>
             <div className={`${styles.statusDot} ${styles[`statusDot--${statusVariant}`]}`} />
-            <span className={styles.statusText}>{statusLabel}</span>
+            <span className={styles.statusText}>
+              {terminalSessionId
+                ? `${messages.nodes.terminalId(terminalSessionId)} • ${statusLabel}`
+                : statusLabel}
+            </span>
           </div>
         }
       >

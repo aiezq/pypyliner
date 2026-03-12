@@ -1,15 +1,9 @@
 import { useCallback } from 'react'
 import { apiRequest } from '../../lib/api'
+import type { BackendSequence } from '../../lib/schemas'
 import { useGraphStore } from '../store/graphStore'
 import { EDGE_TYPES, NODE_TYPES } from '../types'
 import { resolveChain } from '../utils/graphResolver'
-
-interface SequenceExecutionResponse {
-  terminal_jobs: Array<{
-    terminal_node_id: string
-    terminal_session_id: string | null
-  }>
-}
 
 export function useSequenceExecution() {
   const updateNodeData = useGraphStore((state) => state.updateNodeData)
@@ -46,7 +40,7 @@ export function useSequenceExecution() {
       return []
     })
 
-    const response = await apiRequest<SequenceExecutionResponse>('/api/sequences/execute', {
+    const response = await apiRequest<BackendSequence>('/api/sequences/execute', {
       method: 'POST',
       body: JSON.stringify({
         sequence_node_id: sequenceNodeId,
@@ -69,12 +63,20 @@ export function useSequenceExecution() {
       }),
     })
 
+    updateNodeData(sequenceNodeId, {
+      sequenceId: response.id,
+      status: response.status,
+      currentTerminalIndex: response.current_terminal_index,
+      finishedAt: response.finished_at,
+    })
+
     response.terminal_jobs.forEach((job) => {
       if (!job.terminal_session_id) {
         return
       }
-      updateNodeData<{ terminalId: string | null }>(job.terminal_node_id, {
+      updateNodeData(job.terminal_node_id, {
         terminalId: job.terminal_session_id,
+        terminalSessionId: job.terminal_session_id,
       })
     })
   }, [updateNodeData])

@@ -1,5 +1,5 @@
 import type { Node, Edge } from '@xyflow/react'
-import type { SshConnectionVariable } from '../types'
+import type { SequenceStatus, SshConnectionVariable } from '../types'
 
 // ── Node type identifiers ──────────────────────────────────────────
 
@@ -57,12 +57,14 @@ export interface VariableNodeData {
 export interface TerminalNodeData {
   label: string
   terminalId: string | null
+  terminalSessionId?: string | null
   [key: string]: unknown
 }
 
 export interface SshTerminalNodeData {
   label: string
   terminalId: string | null
+  terminalSessionId?: string | null
   connectionId: string | null
   sshUsername: string
   sshHost: string
@@ -73,6 +75,10 @@ export interface SshTerminalNodeData {
 
 export interface SequenceNodeData {
   label: string
+  sequenceId?: string | null
+  status?: SequenceStatus | null
+  currentTerminalIndex?: number | null
+  finishedAt?: string | null
   [key: string]: unknown
 }
 

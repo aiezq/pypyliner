@@ -68,6 +68,13 @@ function FloatingTerminalWindow({
 
   const terminal = windowItem.terminal
   const isEditingTitle = editingManualTitleId === terminal.id
+  const titleHint = terminal.isSequence
+    ? messages.graph.sequence
+    : terminal.terminalType === 'ssh'
+      ? messages.terminal.sshTerminal
+      : terminal.terminalNodeId?.startsWith('manual_terminal_')
+        ? messages.terminal.manualTerminal
+        : messages.graph.terminal
   const canStopTerminal =
     terminal.status === 'running' ||
     terminal.status === 'starting' ||
@@ -95,7 +102,7 @@ function FloatingTerminalWindow({
         kind="manual"
         terminal={terminal}
         isEditingTitle={isEditingTitle}
-        titleHint={terminal.terminalType === 'ssh' ? messages.terminal.sshTerminal : messages.terminal.manualTerminal}
+        titleHint={titleHint}
         onHeaderMouseDown={onBeginDrag}
         onUpdateTitleDraft={(title) => onUpdateManualTitle(terminal.id, title)}
         onStartTitleEdit={() =>

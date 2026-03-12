@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { useManualTerminalController } from '../../hooks/useManualTerminalController'
 import { getWebSocketUrl } from '../../lib/api'
 import { RuntimeSocketEventSchema } from '../../lib/schemas'
+import { useSequenceRuntime } from './useSequenceRuntime'
 
 interface UseTerminalFeatureOptions {
   setBackendError: Dispatch<SetStateAction<string | null>>
@@ -11,6 +12,13 @@ export const useTerminalFeature = ({ setBackendError }: UseTerminalFeatureOption
   const manual = useManualTerminalController({
     setBackendError,
   })
+  const {
+    sequenceExecutions,
+    applySequenceSnapshot,
+    upsertSequenceExecution,
+    updateSequenceStatus,
+    bindSequenceTerminalSession,
+  } = useSequenceRuntime()
   const reconnectTimeoutIdRef = useRef<number | null>(null)
   const socketEventContextGetterRef = useRef(manual.getSocketEventContext)
   const [requestedMinimizedTerminalWindowIds, setRequestedMinimizedTerminalWindowIds] =
@@ -61,9 +69,20 @@ export const useTerminalFeature = ({ setBackendError }: UseTerminalFeatureOption
           switch (payload.type) {
             case 'snapshot':
               context?.applyTerminalSnapshot?.(payload.data.terminals)
+              applySequenceSnapshot(payload.data.sequences)
               break
             case 'terminal_created':
               context?.upsertTerminalSession?.(payload.data.terminal)
+              if (
+                payload.data.terminal.sequence_id &&
+                payload.data.terminal.terminal_node_id
+              ) {
+                bindSequenceTerminalSession(
+                  payload.data.terminal.terminal_node_id,
+                  payload.data.terminal.id,
+                  payload.data.terminal.sequence_id,
+                )
+              }
               break
             case 'terminal_status':
               context?.updateTerminalStatus?.(payload.data)
@@ -92,7 +111,10 @@ export const useTerminalFeature = ({ setBackendError }: UseTerminalFeatureOption
               )
               break
             case 'sequence_created':
+              upsertSequenceExecution(payload.data.sequence)
+              break
             case 'sequence_status':
+              updateSequenceStatus(payload.data)
               break
           }
         } catch (error) {
@@ -121,12 +143,19 @@ export const useTerminalFeature = ({ setBackendError }: UseTerminalFeatureOption
       reconnectTimeoutIdRef.current = null
       socket?.close()
     }
-  }, [setBackendError])
+  }, [
+    applySequenceSnapshot,
+    bindSequenceTerminalSession,
+    setBackendError,
+    updateSequenceStatus,
+    upsertSequenceExecution,
+  ])
 
   return {
     manual,
     isSocketConnected,
     requestedMinimizedTerminalWindowIds,
+    sequenceExecutions,
     setRequestedMinimizedTerminalWindowIds,
   }
 }

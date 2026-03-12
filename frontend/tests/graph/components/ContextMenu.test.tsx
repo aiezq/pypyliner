@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import ContextMenu from '../../../src/graph/components/ContextMenu'
 import { useGraphStore } from '../../../src/graph/store/graphStore'
 import { usePresetsStore } from '../../../src/graph/store/presetsStore'
 import type { ContextMenuState } from '../../../src/graph/hooks/useContextMenu'
+import { renderWithProviders } from '../../renderWithProviders'
 
 function resetStores(): void {
   window.localStorage.removeItem('graph-editor-state')
@@ -14,6 +15,11 @@ function resetStores(): void {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -66,7 +72,7 @@ describe('ContextMenu terminal switching', () => {
       sshConnections: [],
     })
 
-    render(<ContextMenu menu={baseMenu} onClose={() => undefined} />)
+    renderWithProviders(<ContextMenu menu={baseMenu} onClose={() => undefined} />)
 
     const switchButton = screen.getByRole('button', { name: /Switch to Default Terminal/i })
     expect(switchButton).toBeInTheDocument()

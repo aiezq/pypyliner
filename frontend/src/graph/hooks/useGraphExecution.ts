@@ -57,7 +57,10 @@ export function useGraphExecution(): UseGraphExecutionReturn {
         }),
       })
 
-      updateNodeData<{ terminalId: string | null }>(terminalNodeId, { terminalId: response.id })
+      updateNodeData<{ terminalId: string | null; terminalSessionId: string | null }>(terminalNodeId, {
+        terminalId: response.id,
+        terminalSessionId: response.id,
+      })
       setActiveTerminalIds(
         activeTerminalIds.includes(response.id) ? activeTerminalIds : [...activeTerminalIds, response.id],
       )

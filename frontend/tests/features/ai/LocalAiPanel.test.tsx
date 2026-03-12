@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LocalAiPanel from '../../../src/features/ai/LocalAiPanel'
 import { useGraphStore } from '../../../src/graph/store/graphStore'
+import { renderWithProviders } from '../../renderWithProviders'
 
 const apiMock = vi.hoisted(() => ({
   analyzeDocumentation: vi.fn(),
@@ -25,6 +26,11 @@ function resetGraphStore(): void {
     viewport: { x: 0, y: 0, zoom: 1 },
     activeTerminalIds: [],
     terminalStatuses: {},
+    terminalSessionsById: {},
+    terminalSessionIdByNodeId: {},
+    terminalCurrentCommandIndexById: {},
+    sequenceExecutionsById: {},
+    activeSequenceExecutionIdByNodeId: {},
     globalVariables: {},
     sshConnections: [],
   })
@@ -144,7 +150,7 @@ describe('LocalAiPanel', () => {
   })
 
   it('runs install action from the model card', async () => {
-    render(<LocalAiPanel onImportComplete={() => undefined} />)
+    renderWithProviders(<LocalAiPanel onImportComplete={() => undefined} />)
 
     await screen.findByText('Gemma 3')
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
@@ -156,7 +162,7 @@ describe('LocalAiPanel', () => {
 
   it('analyzes documentation, collects clarification answers, and imports draft into graph store', async () => {
     const onImportComplete = vi.fn()
-    render(<LocalAiPanel onImportComplete={onImportComplete} />)
+    renderWithProviders(<LocalAiPanel onImportComplete={onImportComplete} />)
 
     await screen.findByText('Gemma 3')
     fireEvent.click(screen.getByRole('button', { name: 'Generate from docs' }))
@@ -211,7 +217,7 @@ describe('LocalAiPanel', () => {
       ],
     })
 
-    render(<LocalAiPanel onImportComplete={() => undefined} />)
+    renderWithProviders(<LocalAiPanel onImportComplete={() => undefined} />)
 
     await screen.findByText('Downloading Gemma 3...')
     expect(screen.getByText('50.0%')).toBeInTheDocument()
@@ -237,7 +243,7 @@ describe('LocalAiPanel', () => {
       ],
     })
 
-    render(<LocalAiPanel onImportComplete={() => undefined} />)
+    renderWithProviders(<LocalAiPanel onImportComplete={() => undefined} />)
 
     await screen.findByRole('button', { name: 'Cancel' })
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))

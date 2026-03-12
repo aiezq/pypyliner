@@ -15,6 +15,7 @@ import { substituteVariables } from './variableParser'
 export interface ResolvedChain {
   terminalNodeId: string
   terminalId: string | null
+  terminalSessionId: string | null
   terminalLabel: string
   terminalType: 'local' | 'ssh'
   sshConnectionId: string | null
@@ -119,6 +120,7 @@ export function resolveChain(
   return {
     terminalNodeId,
     terminalId: termData.terminalId,
+    terminalSessionId: termData.terminalSessionId ?? termData.terminalId,
     terminalLabel: termData.label,
     terminalType: isSshTerminal ? 'ssh' : 'local',
     sshConnectionId: isSshTerminal ? (termData as SshTerminalNodeData).connectionId : null,
